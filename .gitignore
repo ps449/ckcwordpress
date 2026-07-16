@@ -1,0 +1,57 @@
+# Ignore OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore local agent configuration
+/.github/
+
+
+# Ignore archives/zips
+*.zip
+*.tar.gz
+*.rar
+
+# Ignore WordPress core folders and files
+/wp-admin/
+/wp-includes/
+/wp-config-sample.php
+/readme.html
+/license.txt
+/wp-activate.php
+/wp-blog-header.php
+/wp-comments-post.php
+/wp-cron.php
+/wp-links-opml.php
+/wp-load.php
+/wp-login.php
+/wp-mail.php
+/wp-settings.php
+/wp-signup.php
+/wp-trackback.php
+/xmlrpc.php
+
+# Ignore specific large plugins or standard plugins
+/wp-content/plugins/woocommerce/
+/wp-content/plugins/akismet/
+/wp-content/plugins/hello.php
+
+# Ignore standard default themes (keep our custom theme chao-gang-cheng)
+/wp-content/themes/twentytwentyfive/
+/wp-content/themes/twentytwentyfour/
+/wp-content/themes/twentytwentythree/
+/wp-content/themes/twentytwentytwo/
+
+# Ignore uploads, upgrades, and translation files
+/wp-content/uploads/
+/wp-content/upgrade/
+/wp-content/languages/
+/wp-content/cache/
+
+# Ignore SQLite database files
+/wp-content/database/.ht.sqlite
+/wp-content/database/._.ht.sqlite
