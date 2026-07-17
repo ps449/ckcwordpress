@@ -380,7 +380,7 @@ function chao_gang_cheng_render_products( $products ) {
                             }
                         }
                     }
-                    echo '<span class="chao-onsale" style="position: absolute; top: 10px; left: 10px; z-index: 5; background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; padding: 5px 10px; border-radius: 14px; box-shadow: 0 2px 6px rgba(220,38,38,0.35); line-height: 1;">' . esc_html( $badge_label ) . '</span>';
+                    echo '<span class="chao-onsale">' . esc_html( $badge_label ) . '</span>';
                 }
                 ?>
                 <img src="<?php echo esc_url( $image_url ); ?>" alt="<?php echo esc_attr( $product->get_name() ); ?>" width="300" height="300" loading="lazy" decoding="async">

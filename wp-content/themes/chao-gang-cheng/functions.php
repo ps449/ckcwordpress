@@ -5306,16 +5306,29 @@ function chao_gang_cheng_discount_badge_css() {
     .product-card {
         position: relative !important;
     }
+    /* 全站統一特價標籤 (包含首頁與分類/商店分頁)，美化視覺效果 */
+    .chao-onsale,
     .woocommerce span.onsale.chao-onsale,
     .woocommerce-page span.onsale.chao-onsale {
         display: block !important;
-        position: absolute; top: 10px; left: 10px; z-index: 9;
-        min-width: 0; min-height: 0; line-height: 1;
-        background: #dc2626; color: #fff;
-        font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
-        padding: 5px 10px; border-radius: 14px;
-        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
-        margin: 0;
+        position: absolute !important;
+        top: 10px !important;
+        left: 10px !important;
+        z-index: 9 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        line-height: 1 !important;
+        background: linear-gradient(135deg, #ef4444, #dc2626) !important; /* 精緻漸層紅 */
+        color: #fff !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
+        padding: 5px 9px !important;
+        border-radius: 12px !important; /* 藥丸流線型 */
+        box-shadow: 0 3px 8px rgba(220, 38, 38, 0.3) !important; /* 精緻紅影 */
+        margin: 0 !important;
+        text-align: center !important;
+        text-transform: uppercase !important;
     }
     </style>
     <?php
