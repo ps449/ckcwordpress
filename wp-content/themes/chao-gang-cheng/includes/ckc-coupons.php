@@ -2098,6 +2098,12 @@ function ckc_hide_cart_coupon_input_css() {
         .checkout_coupon.woocommerce-form-coupon {
             display: none !important;
         }
+        /* 隱藏結帳頁下方重複的原生紅利點數輸入區 */
+        .woocommerce-checkout-review-order .wps_wpr_checkout_points_class,
+        #order_review .wps_wpr_checkout_points_class,
+        #order_review .custom_point_checkout {
+            display: none !important;
+        }
     </style>
     <?php
 }
@@ -2135,6 +2141,42 @@ function ckc_checkout_coupon_panel() {
     // 傳入已過濾的券清單，套用後跳回結帳頁
     ckc_render_coupon_cards( 'checkout', $coupons );
     echo '</div>';
+}
+
+// ── 結帳頁加入「紅利點數」折抵面板
+add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_points_panel', 6 );
+function ckc_checkout_points_panel() {
+    if ( ! is_user_logged_in() ) return;
+
+    $user_id = get_current_user_id();
+    $points  = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
+    if ( $points <= 0 ) return; // 沒有點數就不顯示
+
+    // 取得點數兌換比例 (預設 1:1)
+    $wps_wpr_settings = get_option( 'wps_wpr_settings_gallery', array() );
+    $wps_wpr_cart_points_rate = isset( $wps_wpr_settings['wps_wpr_cart_points_rate'] ) ? (float) $wps_wpr_settings['wps_wpr_cart_points_rate'] : 1;
+    $wps_wpr_cart_price_rate  = isset( $wps_wpr_settings['wps_wpr_cart_price_rate'] ) ? (float) $wps_wpr_settings['wps_wpr_cart_price_rate'] : 1;
+    $wps_wpr_cart_points_rate = ( 0 == $wps_wpr_cart_points_rate ) ? 1 : $wps_wpr_cart_points_rate;
+    $wps_wpr_cart_price_rate  = ( 0 == $wps_wpr_cart_price_rate ) ? 1 : $wps_wpr_cart_price_rate;
+
+    $one_point_value = $wps_wpr_cart_price_rate / $wps_wpr_cart_points_rate;
+    $cart_subtotal   = WC()->cart ? WC()->cart->get_subtotal() : 0;
+
+    $points_needed   = $cart_subtotal / $one_point_value;
+    $points_to_apply = min( $points, $points_needed );
+
+    ?>
+    <div class="custom_point_checkout woocommerce-info wps_wpr_checkout_points_class" style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px; background: #fff; display: block !important;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" class="input-text" id="wps_cart_points" value="" placeholder="紅利點數" style="height: 42px; border-radius: 30px; padding: 0 20px; border: 1px solid #d1d5db; width: 220px;" />
+            <button type="button" class="button wps_cart_points_apply" name="wps_cart_points_apply" id="wps_cart_points_apply" data-id="<?php echo esc_attr( $user_id ); ?>" data-order-limit="0" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #7c6767; color: #fff; border: none; cursor: pointer;">折抵紅利</button>
+            <button type="button" class="button" id="wps_cart_points_apply_all" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #6b7280; color: #fff; border: none; cursor: pointer;">一鍵全部折抵</button>
+        </div>
+        <div class="wps_wpr_point_msg" style="margin-top: 8px; font-size: 13px; color: #4b5563;">
+            您的可用紅利點數： <strong style="color: #b91c1c; font-size: 15px;"><?php echo esc_html( $points ); ?></strong>
+        </div>
+    </div>
+    <?php
 }
 
 
