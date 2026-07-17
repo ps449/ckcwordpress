@@ -695,8 +695,8 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
     <?php
 }
 
-/* ---------------- 購物車頁：領券中心（只顯示已登入會員的券匣） ---------------- */
-add_action( 'woocommerce_before_cart', 'ckc_cart_coupon_center', 15 );
+/* ---------------- 購物車頁：領券中心（已由需求從購物車移除，僅保留於結帳頁面） ---------------- */
+// add_action( 'woocommerce_before_cart', 'ckc_cart_coupon_center', 15 );
 function ckc_cart_coupon_center() {
     // 未登入不顯示
     if ( ! is_user_logged_in() ) {
