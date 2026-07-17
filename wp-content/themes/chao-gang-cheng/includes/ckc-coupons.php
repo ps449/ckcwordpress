@@ -1757,15 +1757,240 @@ function ckc_coupon_claim_center_shortcode() {
     return ob_get_clean();
 }
 
-/* ---------------- 移除後台 WooCommerce / 行銷中的折價券選單 ---------------- */
+
+/* ================================================================================
+ * 後台：自訂「折價券管理」頂層選單
+ * 取代原本隱藏的 WooCommerce 折價券連結，提供友善的後台入口
+ * ================================================================================ */
+
+// 1. 移除原始 WooCommerce 折價券選單（避免重複）
 add_action( 'admin_menu', 'ckc_remove_woocommerce_coupons_menu', 999 );
 function ckc_remove_woocommerce_coupons_menu() {
-    // 移除 WooCommerce 選單下的折價券
     remove_submenu_page( 'woocommerce', 'edit.php?post_type=shop_coupon' );
-    // 移除行銷 (Marketing) 選單下的折價券
     remove_submenu_page( 'woocommerce-marketing', 'edit.php?post_type=shop_coupon' );
-    // 移除主選單獨立的折價券（若有）
     remove_menu_page( 'edit.php?post_type=shop_coupon' );
 }
 
+// 2. 新增自訂「折價券管理」頂層選單（放在 WooCommerce 之後）
+add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 25 );
+function ckc_register_coupon_admin_menu() {
+    // 頂層選單 → 直接導向「領券中心」折價券列表頁（加 meta_key 篩選）
+    add_menu_page(
+        '折價券管理',                              // 頁面標題
+        '🎟️ 折價券管理',                          // 選單標題
+        'manage_woocommerce',                    // 需要 WooCommerce 管理權限
+        'ckc-coupon-center',                     // 選單 slug
+        'ckc_coupon_center_admin_page',          // 渲染函數
+        '',                                      // 圖示（使用 emoji 在標題中）
+        56                                       // 位置：WooCommerce(55) 之後
+    );
 
+    // 子選單 1：領券中心設定（列表 + 快速管理）
+    add_submenu_page(
+        'ckc-coupon-center',
+        '領券中心折價券',
+        '領券中心折價券',
+        'manage_woocommerce',
+        'ckc-coupon-center',
+        'ckc_coupon_center_admin_page'
+    );
+
+    // 子選單 2：新增折價券（直接連到 WooCommerce 新增頁）
+    add_submenu_page(
+        'ckc-coupon-center',
+        '新增折價券',
+        '➕ 新增折價券',
+        'manage_woocommerce',
+        'post-new.php?post_type=shop_coupon'
+    );
+
+    // 子選單 3：前往領券中心頁面（外部連結）
+    add_submenu_page(
+        'ckc-coupon-center',
+        '查看前台領券中心',
+        '🔗 查看前台',
+        'manage_woocommerce',
+        'ckc-coupon-frontend',
+        'ckc_coupon_frontend_redirect'
+    );
+}
+
+// 3. 領券中心後台管理列表頁
+function ckc_coupon_center_admin_page() {
+    // 取得所有「啟用領取中心」的折價券
+    $all_posts = get_posts( array(
+        'post_type'      => 'shop_coupon',
+        'post_status'    => array( 'publish', 'draft' ),
+        'posts_per_page' => -1,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ) );
+
+    $claim_coupons  = array();
+    $other_coupons  = array();
+    foreach ( $all_posts as $post ) {
+        if ( 'yes' === get_post_meta( $post->ID, '_ckc_coupon_claim_public', true ) ) {
+            $claim_coupons[] = $post;
+        } else {
+            $other_coupons[] = $post;
+        }
+    }
+
+    $new_url  = admin_url( 'post-new.php?post_type=shop_coupon' );
+    $front_url = home_url( '/領券中心/' );
+    ?>
+    <div class="wrap">
+        <h1 class="wp-heading-inline">🎟️ 折價券管理 ─ 領券中心</h1>
+        <a href="<?php echo esc_url( $new_url ); ?>" class="page-title-action">新增折價券</a>
+        <a href="<?php echo esc_url( $front_url ); ?>" class="page-title-action" target="_blank" style="background:#ef0050;border-color:#ef0050;color:#fff;">查看前台</a>
+        <hr class="wp-header-end">
+
+        <style>
+        .ckc-admin-table { width:100%; border-collapse:collapse; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.07); border-radius:6px; overflow:hidden; margin-top:16px; }
+        .ckc-admin-table th { background:#f8f9fa; color:#1e293b; font-weight:600; padding:10px 14px; text-align:left; border-bottom:2px solid #e2e8f0; font-size:13px; }
+        .ckc-admin-table td { padding:10px 14px; border-bottom:1px solid #f1f5f9; font-size:13px; vertical-align:middle; }
+        .ckc-admin-table tr:last-child td { border-bottom:none; }
+        .ckc-admin-table tr:hover td { background:#fafbfc; }
+        .ckc-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+        .ckc-badge-on  { background:#dcfce7; color:#15803d; }
+        .ckc-badge-off { background:#f1f5f9; color:#94a3b8; }
+        .ckc-badge-pct { background:#fef9c3; color:#92400e; }
+        .ckc-section-title { font-size:15px; font-weight:700; color:#1e293b; margin:24px 0 8px; display:flex; align-items:center; gap:8px; }
+        .ckc-progress-bar { background:#e2e8f0; border-radius:4px; height:6px; width:80px; display:inline-block; vertical-align:middle; overflow:hidden; }
+        .ckc-progress-fill { background:#ef0050; height:100%; border-radius:4px; }
+        </style>
+
+        <!-- 領券中心折價券列表 -->
+        <div class="ckc-section-title">🎟️ 已上架至領券中心的折價券 <span style="color:#64748b;font-weight:400;font-size:13px;">(共 <?php echo count($claim_coupons); ?> 張)</span></div>
+
+        <?php if ( empty( $claim_coupons ) ) : ?>
+            <p style="color:#64748b;background:#f8fafc;padding:14px 18px;border-radius:8px;border:1px dashed #cbd5e1;">
+                尚無上架到領券中心的折價券。<a href="<?php echo esc_url($new_url); ?>">新增一張</a>，並在「領券中心設定」頁籤勾選「啟用領取中心上架」。
+            </p>
+        <?php else : ?>
+        <table class="ckc-admin-table">
+            <thead>
+                <tr>
+                    <th>折價券名稱 / 代碼</th>
+                    <th>優惠類型</th>
+                    <th>類別</th>
+                    <th>領取進度</th>
+                    <th>截止期限</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $claim_coupons as $post ) :
+                $coupon      = new WC_Coupon( $post->ID );
+                $label       = get_post_meta( $post->ID, '_ckc_coupon_label', true );
+                $category    = get_post_meta( $post->ID, '_ckc_coupon_claim_category', true );
+                $deadline    = get_post_meta( $post->ID, '_ckc_coupon_claim_deadline', true );
+                $inventory   = get_post_meta( $post->ID, '_ckc_coupon_claim_inventory', true );
+                $claim_count = intval( get_post_meta( $post->ID, '_ckc_coupon_claim_count', true ) );
+                $is_active   = ( 'publish' === $post->post_status );
+
+                // 計算進度
+                $pct = '';
+                $progress_html = '─';
+                if ( $inventory !== '' && $inventory !== false && intval($inventory) > 0 ) {
+                    $pct = min(100, round( ($claim_count / intval($inventory)) * 100 ));
+                    $progress_html = '<div class="ckc-progress-bar"><div class="ckc-progress-fill" style="width:' . $pct . '%"></div></div> ' . $claim_count . ' / ' . $inventory . '張';
+                } elseif ( $inventory === '' || $inventory === false ) {
+                    $progress_html = $claim_count . ' 張（無上限）';
+                }
+
+                // 優惠文字
+                $discount_type = $coupon->get_discount_type();
+                $amount = floatval( $coupon->get_amount() );
+                if ( 'percent' === $discount_type ) {
+                    $type_text = '<span class="ckc-badge ckc-badge-pct">' . (100 - $amount) . ' 折</span>';
+                } else {
+                    $type_text = '<span class="ckc-badge ckc-badge-on">折 NT$' . number_format($amount) . '</span>';
+                }
+
+                $edit_url = get_edit_post_link( $post->ID );
+                $deadline_text = $deadline ? str_replace('-', '/', $deadline) : '無限制';
+                ?>
+                <tr>
+                    <td>
+                        <strong><a href="<?php echo esc_url($edit_url); ?>"><?php echo esc_html( $label ?: $post->post_title ); ?></a></strong><br>
+                        <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;"><?php echo esc_html( strtoupper( $post->post_title ) ); ?></code>
+                    </td>
+                    <td><?php echo $type_text; ?></td>
+                    <td><?php echo $category ? esc_html($category) : '<span style="color:#94a3b8">─</span>'; ?></td>
+                    <td><?php echo $progress_html; ?></td>
+                    <td style="<?php echo ($deadline && strtotime($deadline) < time()) ? 'color:#ef4444;' : ''; ?>">
+                        <?php echo esc_html($deadline_text); ?>
+                    </td>
+                    <td>
+                        <span class="ckc-badge <?php echo $is_active ? 'ckc-badge-on' : 'ckc-badge-off'; ?>">
+                            <?php echo $is_active ? '上架中' : '草稿'; ?>
+                        </span>
+                    </td>
+                    <td>
+                        <a href="<?php echo esc_url($edit_url); ?>" class="button button-small">編輯</a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <!-- 其他折價券列表 -->
+        <?php if ( ! empty( $other_coupons ) ) : ?>
+        <div class="ckc-section-title" style="margin-top:30px;">📋 其他折價券（未上架至領券中心）<span style="color:#64748b;font-weight:400;font-size:13px;">(共 <?php echo count($other_coupons); ?> 張)</span></div>
+        <table class="ckc-admin-table">
+            <thead>
+                <tr>
+                    <th>折價券代碼</th>
+                    <th>優惠類型</th>
+                    <th>已使用 / 上限</th>
+                    <th>到期日</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $other_coupons as $post ) :
+                $coupon      = new WC_Coupon( $post->ID );
+                $usage       = $coupon->get_usage_count();
+                $limit       = $coupon->get_usage_limit();
+                $expires     = $coupon->get_date_expires();
+                $is_active   = ( 'publish' === $post->post_status );
+                $edit_url    = get_edit_post_link( $post->ID );
+                $label       = get_post_meta( $post->ID, '_ckc_coupon_label', true );
+                $amount      = floatval( $coupon->get_amount() );
+                $discount_type = $coupon->get_discount_type();
+                if ( 'percent' === $discount_type ) {
+                    $type_text = '<span class="ckc-badge ckc-badge-pct">' . (100 - $amount) . ' 折</span>';
+                } else {
+                    $type_text = '<span class="ckc-badge" style="background:#e0f2fe;color:#0369a1;">折 NT$' . number_format($amount) . '</span>';
+                }
+                ?>
+                <tr>
+                    <td>
+                        <a href="<?php echo esc_url($edit_url); ?>">
+                            <?php echo esc_html( $label ?: strtoupper($post->post_title) ); ?>
+                        </a><br>
+                        <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;"><?php echo esc_html(strtoupper($post->post_title)); ?></code>
+                    </td>
+                    <td><?php echo $type_text; ?></td>
+                    <td><?php echo $usage . ( $limit ? ' / ' . $limit : ' / ∞' ); ?></td>
+                    <td><?php echo $expires ? $expires->date_i18n('Y/m/d') : '─'; ?></td>
+                    <td><span class="ckc-badge <?php echo $is_active ? 'ckc-badge-on' : 'ckc-badge-off'; ?>"><?php echo $is_active ? '啟用' : '草稿'; ?></span></td>
+                    <td><a href="<?php echo esc_url($edit_url); ?>" class="button button-small">編輯</a></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+// 4. 前台重新導向頁（點「查看前台」跳轉）
+function ckc_coupon_frontend_redirect() {
+    wp_redirect( home_url( '/領券中心/' ) );
+    exit;
+}
