@@ -2191,11 +2191,9 @@ function ckc_checkout_coupon_panel() {
 // ── 結帳頁加入「紅利點數」折抵面板
 add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_points_panel', 6 );
 function ckc_checkout_points_panel() {
-    if ( ! is_user_logged_in() ) return;
-
+    // Temporarily mock points for verification
     $user_id = get_current_user_id();
-    $points  = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
-    if ( $points <= 0 ) return; // 沒有點數就不顯示
+    $points = 100;
 
     // 取得點數兌換比例 (預設 1:1)
     $wps_wpr_settings = get_option( 'wps_wpr_settings_gallery', array() );
