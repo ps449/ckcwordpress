@@ -5300,6 +5300,12 @@ add_action( 'wp_head', 'chao_gang_cheng_discount_badge_css' );
 function chao_gang_cheng_discount_badge_css() {
     ?>
     <style>
+    /* 確保商品卡片容器具備相對定位，使折扣標籤能精確對齊左上角 */
+    .woocommerce ul.products li.product,
+    .woocommerce-page ul.products li.product,
+    .product-card {
+        position: relative !important;
+    }
     .woocommerce span.onsale.chao-onsale,
     .woocommerce-page span.onsale.chao-onsale {
         display: block !important;
