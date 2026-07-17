@@ -211,7 +211,20 @@ function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
     update_post_meta( $coupon_id, '_ckc_coupon_claim_banner', $banner_url );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_description', $description );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_notes', $notes );
+
+    // ── 自動同步：若後台設定了「領取截止期限」且 WooCommerce 原生到期日為空，
+    //    則將 WC date_expires 也設成同一日期，確保折價券在截止後真正無法使用。
+    if ( ! empty( $deadline ) ) {
+        $wc_expiry = $coupon->get_date_expires();
+        if ( empty( $wc_expiry ) ) {
+            // 只在 WC 到期日未設定時才自動帶入，避免覆蓋管理員手動設定的值
+            $wc_coupon_obj = new WC_Coupon( $coupon_id );
+            $wc_coupon_obj->set_date_expires( strtotime( $deadline ) );
+            $wc_coupon_obj->save();
+        }
+    }
 }
+
 
 /* ---------------- 後台：領券中心專屬頁籤 ---------------- */
 add_filter( 'woocommerce_coupon_data_tabs', 'ckc_add_coupon_claim_center_tab', 25 );
@@ -276,12 +289,29 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
 
             // 5. 領取截止期限
             $deadline = get_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', true );
+            // 取得 WooCommerce 原生到期日（用於提示同步狀態）
+            $wc_expires = $coupon->get_date_expires();
+            $wc_expires_str = $wc_expires ? $wc_expires->date('Y-m-d') : '';
+            ?>
+            <p style="margin:0 0 4px 162px;padding:4px 8px;background:#fff8e1;border-left:3px solid #ffc107;font-size:12px;color:#6d5b00;border-radius:0 4px 4px 0;">
+                💡 <strong>領取截止期限</strong>（前台顯示）與上方「一般 &gt; 折價券到期日」（WooCommerce 使用期限）是兩個不同欄位。<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;若兩者均填寫，前台會分別顯示「領取期限」與「使用期限」。<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;建議兩欄填入相同日期，以避免會員困惑。
+                <?php if ( ! empty( $deadline ) && empty( $wc_expires_str ) ) : ?>
+                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#c00;">⚠️ 您設定了領取截止期限但未設定折價券到期日 — 儲存後系統將自動同步。</span>
+                <?php elseif ( ! empty( $deadline ) && $deadline !== $wc_expires_str ) : ?>
+                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#c55a00;">⚠️ 兩個日期不同：領取截止 <?php echo esc_html($deadline); ?> / WC到期日 <?php echo esc_html($wc_expires_str); ?></span>
+                <?php elseif ( ! empty( $deadline ) ) : ?>
+                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#2e7d32;">✅ 兩個日期一致（<?php echo esc_html($deadline); ?>）</span>
+                <?php endif; ?>
+            </p>
+            <?php
             woocommerce_wp_text_input( array(
                 'id'                => '_ckc_coupon_claim_deadline',
                 'value'             => esc_attr( $deadline ),
                 'label'             => '領取截止期限',
                 'placeholder'       => 'YYYY-MM-DD',
-                'description'       => '前台顯示的領取期限，過期後會自動下架。格式：YYYY-MM-DD',
+                'description'       => '前台顯示的「領取期限」，過期後自動從領券中心下架。格式：YYYY-MM-DD',
                 'desc_tip'          => true,
                 'class'             => 'date-picker',
                 'custom_attributes' => array(
