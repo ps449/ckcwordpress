@@ -371,9 +371,13 @@ function chao_gang_cheng_render_products( $products ) {
                     $regular     = floatval( $product->get_regular_price() );
                     $sale        = floatval( $product->get_sale_price() );
                     if ( $regular > 0 && $sale > 0 && $sale < $regular ) {
-                        $percent = round( ( 1 - $sale / $regular ) * 100 );
-                        if ( $percent >= 1 ) {
-                            $badge_label = '-' . $percent . '%';
+                        $percent = round( ( $sale / $regular ) * 100 );
+                        if ( $percent >= 1 && $percent < 100 ) {
+                            if ( $percent % 10 === 0 ) {
+                                $badge_label = ( $percent / 10 ) . '折';
+                            } else {
+                                $badge_label = $percent . '折';
+                            }
                         }
                     }
                     echo '<span class="chao-onsale" style="position: absolute; top: 10px; left: 10px; z-index: 5; background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; padding: 5px 10px; border-radius: 14px; box-shadow: 0 2px 6px rgba(220,38,38,0.35); line-height: 1;">' . esc_html( $badge_label ) . '</span>';
