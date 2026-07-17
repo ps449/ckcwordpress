@@ -40,6 +40,8 @@ function ckc_seed_demo_coupons() {
         return;
     }
 
+    $base_img = get_template_directory_uri() . '/assets/images/';
+
     $demo = array(
         array(
             'code'     => 'NEWMEMBER100',
@@ -52,6 +54,7 @@ function ckc_seed_demo_coupons() {
             'cat'      => '新會員專區',
             'deadline' => '2026-12-31',
             'stock'    => '200',
+            'image'    => $base_img . 'coupon-newmember.jpg',
             'desc'     => "歡迎加入潮港城！首次消費享 NT\$100 折扣，適用於全館所有商品。",
             'notes'    => "1. 本券每人限領一次\n2. 最低消費 NT\$500 以上方可使用\n3. 不得與其他折扣同時使用\n4. 效期至 2026/12/31",
         ),
@@ -66,6 +69,7 @@ function ckc_seed_demo_coupons() {
             'cat'      => '限時特惠',
             'deadline' => '2026-09-30',
             'stock'    => '100',
+            'image'    => $base_img . 'coupon-summer.jpg',
             'desc'     => "夏日限定！消費滿 NT\$1,000 即享 NT\$200 折扣，限量 100 張，先搶先贏！",
             'notes'    => "1. 限量 100 張，先搶先贏\n2. 每人限領一次\n3. 消費滿 NT\$1,000 以上方可使用\n4. 活動至 2026/09/30 止",
         ),
@@ -80,6 +84,7 @@ function ckc_seed_demo_coupons() {
             'cat'      => '運費優惠',
             'deadline' => '',
             'stock'    => '',
+            'image'    => $base_img . 'coupon-freeship.jpg',
             'desc'     => "每筆訂單消費滿 NT\$500 即可領取運費折抵 60 元，每人最多領取 2 張！",
             'notes'    => "1. 每人最多領取 2 張\n2. 消費滿 NT\$500 以上方可使用\n3. 無使用期限",
         ),
@@ -118,7 +123,7 @@ function ckc_seed_demo_coupons() {
         update_post_meta( $coupon_id, '_ckc_coupon_claim_deadline',    $c['deadline'] );
         update_post_meta( $coupon_id, '_ckc_coupon_claim_description', $c['desc'] );
         update_post_meta( $coupon_id, '_ckc_coupon_claim_notes',       $c['notes'] );
-        update_post_meta( $coupon_id, '_ckc_coupon_claim_image',       '' );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_image',       $c['image'] );
         update_post_meta( $coupon_id, '_ckc_coupon_claim_banner',      '' );
     }
 
@@ -128,6 +133,38 @@ function ckc_seed_demo_coupons() {
     // 標記已執行，不再重複
     update_option( 'ckc_demo_coupons_seeded', '1' );
 }
+
+/* ---------------- 已種子折價券圖片補丁（若已 seeded 但圖片為空時補齊）---------------- */
+add_action( 'wp_loaded', 'ckc_patch_demo_coupon_images', 21 );
+function ckc_patch_demo_coupon_images() {
+    // 只在 seeded 旗標存在但圖片尚未設定時執行
+    if ( ! get_option( 'ckc_demo_coupons_seeded' ) ) {
+        return;
+    }
+    if ( get_option( 'ckc_demo_coupon_images_patched' ) ) {
+        return;
+    }
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        return;
+    }
+    $base_img = get_template_directory_uri() . '/assets/images/';
+    $patch = array(
+        'NEWMEMBER100' => $base_img . 'coupon-newmember.jpg',
+        'SUMMER200'    => $base_img . 'coupon-summer.jpg',
+        'FREESHIP'     => $base_img . 'coupon-freeship.jpg',
+    );
+    foreach ( $patch as $code => $img_url ) {
+        $coupon_id = wc_get_coupon_id_by_code( $code );
+        if ( $coupon_id ) {
+            $current = get_post_meta( $coupon_id, '_ckc_coupon_claim_image', true );
+            if ( empty( $current ) ) {
+                update_post_meta( $coupon_id, '_ckc_coupon_claim_image', $img_url );
+            }
+        }
+    }
+    update_option( 'ckc_demo_coupon_images_patched', '1' );
+}
+
 
 /* ---------------- 後台：券編輯頁欄位 ---------------- */
 add_action( 'woocommerce_coupon_options', 'ckc_coupon_admin_fields', 20, 2 );
@@ -820,7 +857,7 @@ function ckc_coupon_claim_center_shortcode() {
                             $claim_count = intval( $coupon->get_meta( '_ckc_coupon_claim_count' ) );
 
                             if ( empty( $thumbnail ) ) {
-                                $thumbnail = get_template_directory_uri() . '/assets/images/default-coupon.png';
+                                $thumbnail = get_template_directory_uri() . '/assets/images/coupon-newmember.jpg';
                             }
 
                             // 判斷狀態
@@ -908,7 +945,7 @@ function ckc_coupon_claim_center_shortcode() {
                             $notes       = $coupon->get_meta( '_ckc_coupon_claim_notes' );
 
                             if ( empty( $thumbnail ) ) {
-                                $thumbnail = get_template_directory_uri() . '/assets/images/default-coupon.png';
+                                $thumbnail = get_template_directory_uri() . '/assets/images/coupon-newmember.jpg';
                             }
                             $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), wc_get_cart_url() );
                             ?>
