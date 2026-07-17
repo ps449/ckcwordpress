@@ -22,6 +22,13 @@ function ckc_force_enable_coupons_option( $value ) {
     return 'yes';
 }
 
+add_action( 'admin_init', 'ckc_ensure_coupons_enabled_in_db' );
+function ckc_ensure_coupons_enabled_in_db() {
+    if ( get_option( 'woocommerce_enable_coupons' ) !== 'yes' ) {
+        update_option( 'woocommerce_enable_coupons', 'yes' );
+    }
+}
+
 /* ---------------- 後台：券編輯頁欄位 ---------------- */
 add_action( 'woocommerce_coupon_options', 'ckc_coupon_admin_fields', 20, 2 );
 function ckc_coupon_admin_fields( $coupon_id, $coupon ) {
@@ -40,10 +47,11 @@ function ckc_coupon_admin_fields( $coupon_id, $coupon ) {
 }
 add_action( 'woocommerce_coupon_options_save', 'ckc_coupon_admin_fields_save', 20, 2 );
 function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
-    $coupon->update_meta_data( '_ckc_coupon_public', isset( $_POST['_ckc_coupon_public'] ) ? 'yes' : 'no' );
-    $label = isset( $_POST['_ckc_coupon_label'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_label'] ) ) : '';
-    $coupon->update_meta_data( '_ckc_coupon_label', $label );
-    $coupon->save();
+    $public = isset( $_POST['_ckc_coupon_public'] ) ? 'yes' : 'no';
+    $label  = isset( $_POST['_ckc_coupon_label'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_label'] ) ) : '';
+    
+    update_post_meta( $coupon_id, '_ckc_coupon_public', $public );
+    update_post_meta( $coupon_id, '_ckc_coupon_label', $label );
 }
 
 /* ---------------- 公開券查詢 ---------------- */
