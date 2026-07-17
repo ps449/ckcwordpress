@@ -7773,6 +7773,34 @@ function chao_gang_cheng_points_apply_all_script() {
         transform: translateY(-1px) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     }
+
+    /* Style for "Click here to enter your code" (showcoupon link) to make it look like a button */
+    .woocommerce-info a.showcoupon {
+        display: inline-block !important;
+        background-color: #7c6767 !important; /* Matches var(--secondary-color) */
+        color: #fff !important;
+        padding: 6px 18px !important;
+        border-radius: 30px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        text-decoration: none !important;
+        margin-left: 8px !important;
+        transition: all 0.2s ease-in-out !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+        vertical-align: middle !important;
+        border: none !important;
+    }
+    
+    .woocommerce-info a.showcoupon:hover {
+        background-color: #f86f69 !important; /* Matches var(--accent-color) */
+        color: #fff !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+    }
+
+    .woocommerce-info {
+        line-height: 2 !important; /* Give more height to center the button vertically */
+    }
     
     /* Desktop layout */
     @media (min-width: 769px) {
@@ -7795,6 +7823,19 @@ function chao_gang_cheng_points_apply_all_script() {
     
     /* Mobile layout */
     @media (max-width: 768px) {
+        .woocommerce-info {
+            text-align: center !important;
+            line-height: 1.8 !important;
+        }
+        .woocommerce-info a.showcoupon {
+            margin-left: 0 !important;
+            margin-top: 8px !important;
+            display: block !important;
+            width: fit-content !important;
+            margin-right: auto !important;
+            margin-left: auto !important;
+        }
+
         #coupon_code,
         #wps_cart_points {
             width: 100% !important;
