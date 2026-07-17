@@ -194,7 +194,6 @@ function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
     $inventory    = isset( $_POST['_ckc_coupon_claim_inventory'] ) && $_POST['_ckc_coupon_claim_inventory'] !== '' ? intval( $_POST['_ckc_coupon_claim_inventory'] ) : '';
     $claim_count  = isset( $_POST['_ckc_coupon_claim_count'] ) ? intval( $_POST['_ckc_coupon_claim_count'] ) : 0;
     $category     = isset( $_POST['_ckc_coupon_claim_category'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_claim_category'] ) ) : '';
-    $deadline     = isset( $_POST['_ckc_coupon_claim_deadline'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_claim_deadline'] ) ) : '';
     $image_url    = isset( $_POST['_ckc_coupon_claim_image'] ) ? esc_url_raw( wp_unslash( $_POST['_ckc_coupon_claim_image'] ) ) : '';
     $banner_url   = isset( $_POST['_ckc_coupon_claim_banner'] ) ? esc_url_raw( wp_unslash( $_POST['_ckc_coupon_claim_banner'] ) ) : '';
     $description  = isset( $_POST['_ckc_coupon_claim_description'] ) ? wp_kses_post( wp_unslash( $_POST['_ckc_coupon_claim_description'] ) ) : '';
@@ -204,23 +203,10 @@ function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
     update_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', $inventory );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_count', $claim_count );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_category', $category );
-    update_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', $deadline );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_image', $image_url );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_banner', $banner_url );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_description', $description );
     update_post_meta( $coupon_id, '_ckc_coupon_claim_notes', $notes );
-
-    // ── 自動同步：若後台設定了「領取截止期限」且 WooCommerce 原生到期日為空，
-    //    則將 WC date_expires 也設成同一日期，確保折價券在截止後真正無法使用。
-    if ( ! empty( $deadline ) ) {
-        $wc_expiry = $coupon->get_date_expires();
-        if ( empty( $wc_expiry ) ) {
-            // 只在 WC 到期日未設定時才自動帶入，避免覆蓋管理員手動設定的值
-            $wc_coupon_obj = new WC_Coupon( $coupon_id );
-            $wc_coupon_obj->set_date_expires( strtotime( $deadline ) );
-            $wc_coupon_obj->save();
-        }
-    }
 }
 
 
@@ -276,7 +262,6 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">啟用領取中心上架</td><td>→ 是否在前台「領券中心」頁顯示此折價券</td></tr>
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">券面標題</td><td>→ 前台卡片 <strong>大標題</strong>（如「新會員見面禮 NT$100」）</td></tr>
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">活動分類</td><td>→ 前台頁面頂端 <strong>篩選 Tab 標籤</strong>（如「新會員專區」）</td></tr>
-                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">領取期限</td><td>→ 卡片上顯示「<strong>領取期限：YYYY/MM/DD</strong>」</td></tr>
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">列表小縮圖</td><td>→ 卡片左側 <strong>方形 ICON 圖</strong></td></tr>
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">活動說明</td><td>→ 彈窗「使用規則」中的 <strong>活動說明</strong> 文字區塊</td></tr>
                 <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">使用限制與注意事項</td><td>→ 彈窗中的 <strong>注意事項</strong> 條列清單（每行一條）</td></tr>
@@ -339,38 +324,11 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
             </p>
         </div>
 
-        <?php /* ══ 群組 B：時間與庫存 ══ */ ?>
+        <?php /* ══ 群組 B：庫存設定 ══ */ ?>
         <div class="options_group">
-            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 時間與庫存</p>
+            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 庫存設定</p>
             <?php
-            // 3. 領取截止期限
-            ?>
-            <p style="margin:0 0 6px 162px;padding:4px 10px;background:#fff8e1;border-left:3px solid #ffc107;font-size:12px;color:#6d5b00;border-radius:0 4px 4px 0;line-height:1.6;">
-                💡 <strong>領取截止期限</strong>（前台顯示）與「一般 &gt; 折價券到期日」（WooCommerce 使用期限）是獨立欄位。<br>
-                建議兩欄填入相同日期，確保期限過後折價券也真正失效。
-                <?php if ( ! empty( $deadline ) && empty( $wc_expires_str ) ) : ?>
-                    <br><span style="color:#c00;">⚠️ 已設領取截止期限但 WC 到期日為空 — 儲存後將自動同步。</span>
-                <?php elseif ( ! empty( $deadline ) && $deadline !== $wc_expires_str ) : ?>
-                    <br><span style="color:#c55a00;">⚠️ 日期不一致：領取截止 <?php echo esc_html( $deadline ); ?> / WC到期日 <?php echo esc_html( $wc_expires_str ); ?></span>
-                <?php elseif ( ! empty( $deadline ) ) : ?>
-                    <br><span style="color:#2e7d32;">✅ 兩個日期一致（<?php echo esc_html( $deadline ); ?>）</span>
-                <?php endif; ?>
-            </p>
-            <?php
-            woocommerce_wp_text_input( array(
-                'id'                => '_ckc_coupon_claim_deadline',
-                'value'             => esc_attr( $deadline ),
-                'label'             => '領取截止期限',
-                'placeholder'       => 'YYYY-MM-DD（如 2026-12-31）',
-                'description'       => '前台顯示的「領取期限」，過期後自動從領券中心下架。格式：YYYY-MM-DD',
-                'desc_tip'          => true,
-                'class'             => 'date-picker',
-                'custom_attributes' => array(
-                    'pattern' => '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])',
-                ),
-            ) );
-
-            // 4. 領取限額/總庫存
+            // 3. 領取限額/總庫存
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_inventory',
                 'label'       => '領取限額 (總庫存)',
@@ -381,7 +339,7 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'desc_tip'    => true,
             ) );
 
-            // 5. 已領取次數（系統統計）
+            // 4. 已領取次數（系統統計）
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_count',
                 'label'       => '已領取次數',
