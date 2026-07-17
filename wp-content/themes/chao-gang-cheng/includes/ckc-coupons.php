@@ -2066,7 +2066,38 @@ function ckc_redirect_coupon_list_to_custom_page() {
 }
 
 
-// ── Step 4：新增唯一自訂「🎟️ 折價券管理」頂層選單（放在 WooCommerce 之後）
+/* ════════════════════════════════════════════
+   前台：隱藏購物車/結帳原生折價券輸入欄
+   （優惠券改由「我的優惠券」自訂面板管理）
+   ════════════════════════════════════════════ */
+
+// ── CSS 隱藏購物車表格底部「折價券 + 使用優惠券」欄位
+add_action( 'wp_head', 'ckc_hide_cart_coupon_input_css' );
+function ckc_hide_cart_coupon_input_css() {
+    if ( ! ( function_exists('is_cart') && is_cart() ) && ! ( function_exists('is_checkout') && is_checkout() ) ) {
+        return;
+    }
+    ?>
+    <style id="ckc-hide-cart-coupon">
+        /* 隱藏購物車原生折價券輸入區 */
+        .woocommerce-cart-form .coupon,
+        .woocommerce-cart .coupon,
+        .cart_totals .woocommerce-form-coupon-toggle,
+        .woocommerce-checkout .woocommerce-form-coupon-toggle,
+        .checkout_coupon.woocommerce-form-coupon {
+            display: none !important;
+        }
+    </style>
+    <?php
+}
+
+// ── 移除結帳頁上方「輸入優惠券代碼？」折疊欄
+add_action( 'wp', 'ckc_remove_checkout_coupon_form' );
+function ckc_remove_checkout_coupon_form() {
+    remove_action( 'woocommerce_before_checkout_form', 'woocommerce_checkout_coupon_form', 10 );
+}
+
+
 add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 25 );
 function ckc_register_coupon_admin_menu() {
     // ── 頂層選單（dashicons-tag 圖示，位置在 WooCommerce 之後）
