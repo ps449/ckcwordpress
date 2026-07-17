@@ -237,12 +237,58 @@ function ckc_add_coupon_claim_center_tab( $tabs ) {
 
 add_action( 'woocommerce_coupon_data_panels', 'ckc_add_coupon_claim_center_panel', 25, 2 );
 function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
+    // 讀取所有自訂 meta
+    $claim_public_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_public', true );
+    $label_val        = get_post_meta( $coupon_id, '_ckc_coupon_label', true );
+    $inventory_val    = get_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', true );
+    $claim_count      = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
+    $category_val     = get_post_meta( $coupon_id, '_ckc_coupon_claim_category', true );
+    $deadline         = get_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', true );
+    $image_url        = get_post_meta( $coupon_id, '_ckc_coupon_claim_image', true );
+    $banner_url       = get_post_meta( $coupon_id, '_ckc_coupon_claim_banner', true );
+    $description_val  = get_post_meta( $coupon_id, '_ckc_coupon_claim_description', true );
+    $notes_val        = get_post_meta( $coupon_id, '_ckc_coupon_claim_notes', true );
+    $wc_expires       = $coupon->get_date_expires();
+    $wc_expires_str   = $wc_expires ? $wc_expires->date( 'Y-m-d' ) : '';
+
+    // 取得所有現有的活動類別（供 datalist 建議）
+    $existing_categories = array();
+    $cat_posts = get_posts( array(
+        'post_type'      => 'shop_coupon',
+        'post_status'    => 'any',
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+    ) );
+    foreach ( $cat_posts as $pid ) {
+        $cat = get_post_meta( $pid, '_ckc_coupon_claim_category', true );
+        if ( ! empty( $cat ) ) {
+            $existing_categories[] = $cat;
+        }
+    }
+    $existing_categories = array_unique( $existing_categories );
     ?>
     <div id="ckc_claim_center_coupon_data" class="panel woocommerce_options_panel">
+
+        <?php /* ── 前台對照說明 ── */ ?>
+        <div class="options_group" style="background:#f0f7ff;border-left:4px solid #2196f3;margin:12px;padding:10px 14px;border-radius:0 6px 6px 0;">
+            <p style="margin:0 0 6px;font-weight:700;color:#1565c0;font-size:13px;">📋 前台欄位對照說明</p>
+            <table style="font-size:12px;color:#1e293b;border-collapse:collapse;width:100%;">
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">啟用領取中心上架</td><td>→ 是否在前台「領券中心」頁顯示此折價券</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">券面標題</td><td>→ 前台卡片 <strong>大標題</strong>（如「新會員見面禮 NT$100」）</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">活動分類</td><td>→ 前台頁面頂端 <strong>篩選 Tab 標籤</strong>（如「新會員專區」）</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">領取期限</td><td>→ 卡片上顯示「<strong>領取期限：YYYY/MM/DD</strong>」</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">列表小縮圖</td><td>→ 卡片左側 <strong>方形 ICON 圖</strong></td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">活動說明</td><td>→ 彈窗「使用規則」中的 <strong>活動說明</strong> 文字區塊</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">使用限制與注意事項</td><td>→ 彈窗中的 <strong>注意事項</strong> 條列清單（每行一條）</td></tr>
+                <tr><td style="padding:2px 8px;font-weight:600;white-space:nowrap;">領取限額</td><td>→ 卡片 <strong>領取進度條</strong>（已領 N / 限額 N 張）</td></tr>
+            </table>
+        </div>
+
+        <?php /* ══ 群組 A：上架設定 ══ */ ?>
         <div class="options_group">
+            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 上架設定</p>
             <?php
-            // 1. 是否啟用領券中心
-            $claim_public_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_public', true );
+            // 1. 啟用領券中心上架
             woocommerce_wp_checkbox( array(
                 'id'          => '_ckc_coupon_claim_public',
                 'label'       => '啟用領取中心上架',
@@ -251,68 +297,63 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'description' => '勾選後，此折價券將上架至「折價券領取中心」供會員公開領取',
             ) );
 
-            // 2. 券面標題（前台卡片 h3 標題，即「新會員見面禮 NT$100」這類文字）
-            $label_val = get_post_meta( $coupon_id, '_ckc_coupon_label', true );
+            // 2. 券面標題
             woocommerce_wp_text_field( array(
                 'id'          => '_ckc_coupon_label',
                 'label'       => '券面標題',
                 'value'       => $label_val,
                 'placeholder' => '例如：新會員見面禮 NT$100',
-                'description' => '前台領券中心卡片上顯示的大標題；留空則自動產生（如「折 NT$200」）',
+                'description' => '前台卡片大標題，留空則自動產生（如「折 NT$200」）',
                 'desc_tip'    => true,
             ) );
-
-            // 3. 領取限額/總庫存
-            $inventory_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', true );
-            woocommerce_wp_text_input( array(
-                'id'          => '_ckc_coupon_claim_inventory',
-                'label'       => '領取限額 (總庫存)',
-                'value'       => $inventory_val,
-                'placeholder' => '無限制請留空',
-                'type'        => 'number',
-                'description' => '當領取次數達到此上限時，前台會顯示「已搶光」且無法再領取',
-                'desc_tip'    => true,
-            ) );
-
-            // 4. 目前已領取次數
-            $claim_count = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
-            woocommerce_wp_text_input( array(
-                'id'          => '_ckc_coupon_claim_count',
-                'label'       => '已領取次數',
-                'value'       => $claim_count !== '' ? intval( $claim_count ) : 0,
-                'type'        => 'number',
-                'description' => '此為系統統計次數，可手動修正',
-                'desc_tip'    => true,
-            ) );
-
-
-            // 4. 活動類別
-            $category_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_category', true );
-            woocommerce_wp_text_field( array(
-                'id'          => '_ckc_coupon_claim_category',
-                'label'       => '活動類別',
-                'value'       => $category_val,
-                'placeholder' => '例如：全聯好康、保鮮收納',
-                'description' => '用於前台分頁標籤篩選，留空則不分類',
-                'desc_tip'    => true,
-            ) );
-
-            // 5. 領取截止期限
-            $deadline = get_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', true );
-            // 取得 WooCommerce 原生到期日（用於提示同步狀態）
-            $wc_expires = $coupon->get_date_expires();
-            $wc_expires_str = $wc_expires ? $wc_expires->date('Y-m-d') : '';
             ?>
-            <p style="margin:0 0 4px 162px;padding:4px 8px;background:#fff8e1;border-left:3px solid #ffc107;font-size:12px;color:#6d5b00;border-radius:0 4px 4px 0;">
-                💡 <strong>領取截止期限</strong>（前台顯示）與上方「一般 &gt; 折價券到期日」（WooCommerce 使用期限）是兩個不同欄位。<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;若兩者均填寫，前台會分別顯示「領取期限」與「使用期限」。<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;建議兩欄填入相同日期，以避免會員困惑。
+
+            <?php /* ── 活動分類（支援自訂 + datalist 建議）── */ ?>
+            <p class="form-field _ckc_coupon_claim_category_field">
+                <label for="_ckc_coupon_claim_category">
+                    活動分類
+                    <?php echo wc_help_tip( '前台頁面頂部的篩選 Tab 標籤。相同分類名稱的折價券會合併成一個 Tab。' ); ?>
+                </label>
+                <input
+                    type="text"
+                    name="_ckc_coupon_claim_category"
+                    id="_ckc_coupon_claim_category"
+                    value="<?php echo esc_attr( $category_val ); ?>"
+                    list="ckc_category_datalist"
+                    placeholder="例如：新會員專區、限時特惠、運費優惠"
+                    style="width:60%;"
+                />
+                <datalist id="ckc_category_datalist">
+                    <?php foreach ( $existing_categories as $cat ) : ?>
+                        <option value="<?php echo esc_attr( $cat ); ?>">
+                    <?php endforeach; ?>
+                    <option value="新會員專區">
+                    <option value="限時特惠">
+                    <option value="運費優惠">
+                    <option value="會員獨享">
+                    <option value="節慶優惠">
+                </datalist>
+                <span class="description" style="display:block;color:#64748b;font-size:11px;margin-top:2px;">
+                    與其他折價券填入<strong>相同分類名稱</strong>，前台即合併成同一個 Tab 篩選
+                </span>
+            </p>
+        </div>
+
+        <?php /* ══ 群組 B：時間與庫存 ══ */ ?>
+        <div class="options_group">
+            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 時間與庫存</p>
+            <?php
+            // 3. 領取截止期限
+            ?>
+            <p style="margin:0 0 6px 162px;padding:4px 10px;background:#fff8e1;border-left:3px solid #ffc107;font-size:12px;color:#6d5b00;border-radius:0 4px 4px 0;line-height:1.6;">
+                💡 <strong>領取截止期限</strong>（前台顯示）與「一般 &gt; 折價券到期日」（WooCommerce 使用期限）是獨立欄位。<br>
+                建議兩欄填入相同日期，確保期限過後折價券也真正失效。
                 <?php if ( ! empty( $deadline ) && empty( $wc_expires_str ) ) : ?>
-                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#c00;">⚠️ 您設定了領取截止期限但未設定折價券到期日 — 儲存後系統將自動同步。</span>
+                    <br><span style="color:#c00;">⚠️ 已設領取截止期限但 WC 到期日為空 — 儲存後將自動同步。</span>
                 <?php elseif ( ! empty( $deadline ) && $deadline !== $wc_expires_str ) : ?>
-                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#c55a00;">⚠️ 兩個日期不同：領取截止 <?php echo esc_html($deadline); ?> / WC到期日 <?php echo esc_html($wc_expires_str); ?></span>
+                    <br><span style="color:#c55a00;">⚠️ 日期不一致：領取截止 <?php echo esc_html( $deadline ); ?> / WC到期日 <?php echo esc_html( $wc_expires_str ); ?></span>
                 <?php elseif ( ! empty( $deadline ) ) : ?>
-                <br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#2e7d32;">✅ 兩個日期一致（<?php echo esc_html($deadline); ?>）</span>
+                    <br><span style="color:#2e7d32;">✅ 兩個日期一致（<?php echo esc_html( $deadline ); ?>）</span>
                 <?php endif; ?>
             </p>
             <?php
@@ -320,7 +361,7 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'id'                => '_ckc_coupon_claim_deadline',
                 'value'             => esc_attr( $deadline ),
                 'label'             => '領取截止期限',
-                'placeholder'       => 'YYYY-MM-DD',
+                'placeholder'       => 'YYYY-MM-DD（如 2026-12-31）',
                 'description'       => '前台顯示的「領取期限」，過期後自動從領券中心下架。格式：YYYY-MM-DD',
                 'desc_tip'          => true,
                 'class'             => 'date-picker',
@@ -328,53 +369,94 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                     'pattern' => '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])',
                 ),
             ) );
+
+            // 4. 領取限額/總庫存
+            woocommerce_wp_text_input( array(
+                'id'          => '_ckc_coupon_claim_inventory',
+                'label'       => '領取限額 (總庫存)',
+                'value'       => $inventory_val,
+                'placeholder' => '無限制請留空',
+                'type'        => 'number',
+                'description' => '達到上限後前台顯示「已搶光」，留空表示無限制',
+                'desc_tip'    => true,
+            ) );
+
+            // 5. 已領取次數（系統統計）
+            woocommerce_wp_text_input( array(
+                'id'          => '_ckc_coupon_claim_count',
+                'label'       => '已領取次數',
+                'value'       => $claim_count !== '' ? intval( $claim_count ) : 0,
+                'type'        => 'number',
+                'description' => '系統自動累計，可手動修正（歸零重置等）',
+                'desc_tip'    => true,
+            ) );
             ?>
         </div>
 
+        <?php /* ══ 群組 C：圖片設定 ══ */ ?>
         <div class="options_group">
-            <?php
-            // 6. 列表縮圖
-            $image_url = get_post_meta( $coupon_id, '_ckc_coupon_claim_image', true );
-            ?>
+            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 圖片設定</p>
+
+            <?php /* 列表小縮圖（帶即時預覽）*/ ?>
             <p class="form-field _ckc_coupon_claim_image_field">
-                <label for="_ckc_coupon_claim_image">列表小縮圖</label>
-                <input type="text" name="_ckc_coupon_claim_image" id="_ckc_coupon_claim_image" value="<?php echo esc_attr( $image_url ); ?>" style="width: 50%;" placeholder="請上傳或輸入圖片網址" />
+                <label for="_ckc_coupon_claim_image">
+                    列表小縮圖
+                    <?php echo wc_help_tip( '前台卡片左側的方形 ICON 圖（建議 400×400px）' ); ?>
+                </label>
+                <input type="text" name="_ckc_coupon_claim_image" id="_ckc_coupon_claim_image"
+                       value="<?php echo esc_attr( $image_url ); ?>"
+                       style="width:50%;" placeholder="請上傳或輸入圖片網址" />
                 <button type="button" class="button ckc_upload_image_btn" data-target="_ckc_coupon_claim_image">上傳/選擇圖片</button>
-                <?php echo wc_help_tip( '前台列表卡片上顯示的小方圖' ); ?>
+                <?php if ( ! empty( $image_url ) ) : ?>
+                    <br><img src="<?php echo esc_url( $image_url ); ?>" style="margin-top:4px;max-width:80px;max-height:80px;border-radius:8px;border:1px solid #e2e8f0;" alt="縮圖預覽">
+                <?php endif; ?>
             </p>
 
-            <?php
-            // 7. 詳情頁 Banner
-            $banner_url = get_post_meta( $coupon_id, '_ckc_coupon_claim_banner', true );
-            ?>
+            <?php /* 詳情頁 Banner（帶即時預覽）*/ ?>
             <p class="form-field _ckc_coupon_claim_banner_field">
-                <label for="_ckc_coupon_claim_banner">詳情頁大 Banner</label>
-                <input type="text" name="_ckc_coupon_claim_banner" id="_ckc_coupon_claim_banner" value="<?php echo esc_attr( $banner_url ); ?>" style="width: 50%;" placeholder="請上傳或輸入圖片網址" />
+                <label for="_ckc_coupon_claim_banner">
+                    詳情頁大 Banner
+                    <?php echo wc_help_tip( '點擊「使用規則」後彈出視窗上方的大橫幅圖（建議 800×300px）' ); ?>
+                </label>
+                <input type="text" name="_ckc_coupon_claim_banner" id="_ckc_coupon_claim_banner"
+                       value="<?php echo esc_attr( $banner_url ); ?>"
+                       style="width:50%;" placeholder="請上傳或輸入圖片網址" />
                 <button type="button" class="button ckc_upload_image_btn" data-target="_ckc_coupon_claim_banner">上傳/選擇圖片</button>
-                <?php echo wc_help_tip( '點擊使用規則後，彈出視窗上方顯示的大 Banner 圖' ); ?>
+                <?php if ( ! empty( $banner_url ) ) : ?>
+                    <br><img src="<?php echo esc_url( $banner_url ); ?>" style="margin-top:4px;max-width:200px;max-height:80px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover;" alt="Banner 預覽">
+                <?php endif; ?>
             </p>
         </div>
 
+        <?php /* ══ 群組 D：活動說明與注意事項 ══ */ ?>
         <div class="options_group">
+            <p class="form-field" style="margin:8px 0 4px 162px;font-weight:700;color:#374151;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">▌ 活動說明與注意事項（對應「使用規則」彈窗）</p>
             <?php
-            // 8. 活動說明 (Textarea)
-            $description_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_description', true );
+            // 6. 活動說明
             woocommerce_wp_textarea_input( array(
                 'id'          => '_ckc_coupon_claim_description',
                 'label'       => '活動說明',
                 'value'       => $description_val,
-                'placeholder' => '請輸入折價券的活動說明...',
-                'style'       => 'height: 100px;',
+                'placeholder' => "例如：\n歡迎加入潮港城！首次消費享 NT\$100 折扣，適用於全館所有商品。",
+                'description' => '前台「使用規則」彈窗中「活動說明」段落的內容',
+                'desc_tip'    => true,
+                'rows'        => 4,
+                'style'       => 'height:100px;resize:vertical;',
             ) );
 
-            // 9. 使用限制與注意事項 (Textarea)
+            // 7. 使用限制與注意事項（每行一條）
             woocommerce_wp_textarea_input( array(
                 'id'          => '_ckc_coupon_claim_notes',
                 'label'       => '使用限制與注意事項',
-                'placeholder' => "1. 本券限於實體門市結帳使用...\n2. 本券為不記名，任何人持本券皆可使用...",
-                'style'       => 'height: 120px;',
+                'value'       => $notes_val,          // ← 修復：加入 value 參數
+                'placeholder' => "每行輸入一條，例如：\n1. 本券每人限領一次\n2. 最低消費 NT\$500 以上方可使用\n3. 不得與其他折扣同時使用",
+                'description' => '前台「使用規則」彈窗中「注意事項」條列清單，每行自動成一條',
+                'desc_tip'    => true,
+                'rows'        => 6,
+                'style'       => 'height:140px;resize:vertical;',
             ) );
             ?>
+            <p style="margin:0 0 8px 162px;font-size:11px;color:#94a3b8;">💡 「使用限制與注意事項」每行自動轉換為一條條列，行首有無編號皆可。</p>
         </div>
     </div>
     <?php
