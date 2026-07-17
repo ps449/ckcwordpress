@@ -5302,6 +5302,7 @@ function chao_gang_cheng_discount_badge_css() {
     <style>
     .woocommerce span.onsale.chao-onsale,
     .woocommerce-page span.onsale.chao-onsale {
+        display: block !important;
         position: absolute; top: 10px; left: 10px; z-index: 9;
         min-width: 0; min-height: 0; line-height: 1;
         background: #dc2626; color: #fff;
