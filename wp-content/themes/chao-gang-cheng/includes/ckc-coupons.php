@@ -94,37 +94,44 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
         <div class="options_group">
             <?php
             // 1. 是否啟用領券中心
+            $claim_public_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_public', true );
             woocommerce_wp_checkbox( array(
                 'id'          => '_ckc_coupon_claim_public',
                 'label'       => '啟用領取中心上架',
+                'value'       => $claim_public_val,
+                'cbvalue'     => 'yes',
                 'description' => '勾選後，此折價券將上架至「折價券領取中心」供會員公開領取',
             ) );
 
             // 2. 領取限額/總庫存
+            $inventory_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', true );
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_inventory',
                 'label'       => '領取限額 (總庫存)',
+                'value'       => $inventory_val,
                 'placeholder' => '無限制請留空',
                 'type'        => 'number',
                 'description' => '當領取次數達到此上限時，前台會顯示「已搶光」且無法再領取',
                 'desc_tip'    => true,
             ) );
 
-            // 3. 目前已領取次數 (唯讀或可編輯)
+            // 3. 目前已領取次數
             $claim_count = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_count',
                 'label'       => '已領取次數',
-                'value'       => $claim_count ? intval( $claim_count ) : 0,
+                'value'       => $claim_count !== '' ? intval( $claim_count ) : 0,
                 'type'        => 'number',
                 'description' => '此為系統統計次數，可手動修正',
                 'desc_tip'    => true,
             ) );
 
             // 4. 活動類別
+            $category_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_category', true );
             woocommerce_wp_text_field( array(
                 'id'          => '_ckc_coupon_claim_category',
                 'label'       => '活動類別',
+                'value'       => $category_val,
                 'placeholder' => '例如：全聯好康、保鮮收納',
                 'description' => '用於前台分頁標籤篩選，留空則不分類',
                 'desc_tip'    => true,
@@ -174,9 +181,11 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
         <div class="options_group">
             <?php
             // 8. 活動說明 (Textarea)
+            $description_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_description', true );
             woocommerce_wp_textarea_input( array(
                 'id'          => '_ckc_coupon_claim_description',
                 'label'       => '活動說明',
+                'value'       => $description_val,
                 'placeholder' => '請輸入折價券的活動說明...',
                 'style'       => 'height: 100px;',
             ) );
@@ -293,11 +302,20 @@ function ckc_get_claimable_coupons() {
         'order'          => 'DESC',
     ) );
     $coupons = array();
+    $today   = current_time( 'Y-m-d' );
     foreach ( $posts as $post ) {
         $coupon = new WC_Coupon( $post->ID );
-        // 檢查前台設定截止時間
+        if ( ! $coupon->get_id() ) {
+            continue;
+        }
+        // 1. 過濾 WooCommerce 原生到期日
+        $wc_expires = $coupon->get_date_expires();
+        if ( $wc_expires && $wc_expires->getTimestamp() < time() ) {
+            continue;
+        }
+        // 2. 過濾自訂領取截止期限
         $deadline = get_post_meta( $post->ID, '_ckc_coupon_claim_deadline', true );
-        if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
+        if ( $deadline && strtotime( $deadline ) < strtotime( $today ) ) {
             continue; // 已過領取期限不顯示
         }
         $coupons[] = $coupon;
@@ -431,21 +449,26 @@ function ckc_coupons_register_endpoint() {
     }
 }
 
-add_action( 'init', 'ckc_ensure_coupon_center_page', 10 );
+add_action( 'wp_loaded', 'ckc_ensure_coupon_center_page', 10 );
 function ckc_ensure_coupon_center_page() {
     if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'get_page_by_path' ) ) {
         return;
     }
-    
+    // 使用 transient 快取，避免每次 request 都查資料庫（有效期 24 小時）
+    if ( get_transient( 'ckc_coupon_page_checked' ) ) {
+        return;
+    }
+    set_transient( 'ckc_coupon_page_checked', '1', DAY_IN_SECONDS );
+
     // 檢查「領券中心」頁面是否存在（支援中文 Slug、Urlencode、及英文 slug）
     $page = get_page_by_path( '領券中心' );
     if ( ! $page ) {
-        $page = get_page_by_path( urlencode( '領券中心' ) );
+        $page = get_page_by_path( rawurlencode( '領券中心' ) );
     }
     if ( ! $page ) {
         $page = get_page_by_path( 'coupon-center' );
     }
-    
+
     if ( $page ) {
         // 若頁面已存在，確認內容是否包含新版 shortcode
         if ( strpos( $page->post_content, '[ckc_coupon_claim_center]' ) === false ) {
@@ -505,6 +528,10 @@ function ckc_coupons_account_content() {
 add_action( 'wp_ajax_ckc_claim_coupon', 'ckc_claim_coupon_ajax_handler' );
 add_action( 'wp_ajax_nopriv_ckc_claim_coupon', 'ckc_claim_coupon_ajax_handler' );
 function ckc_claim_coupon_ajax_handler() {
+    // Nonce 安全驗證
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'ckc_claim_nonce' ) ) {
+        wp_send_json_error( array( 'message' => '安全驗證失敗，請重新整理頁面後再試！' ) );
+    }
     if ( ! is_user_logged_in() ) {
         wp_send_json_error( array( 'message' => '請先登入會員以領取折價券！' ) );
     }
@@ -556,6 +583,10 @@ function ckc_claim_coupon_ajax_handler() {
 add_action( 'wp_ajax_ckc_claim_by_code', 'ckc_claim_by_code_ajax_handler' );
 add_action( 'wp_ajax_nopriv_ckc_claim_by_code', 'ckc_claim_by_code_ajax_handler' );
 function ckc_claim_by_code_ajax_handler() {
+    // Nonce 安全驗證
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'ckc_claim_nonce' ) ) {
+        wp_send_json_error( array( 'message' => '安全驗證失敗，請重新整理頁面後再試！' ) );
+    }
     if ( ! is_user_logged_in() ) {
         wp_send_json_error( array( 'message' => '請先登入會員以領取折價券！' ) );
     }
@@ -1351,6 +1382,7 @@ function ckc_coupon_claim_center_shortcode() {
 
     <!-- 前端互動 AJAX/SPA 邏輯 JavaScript -->
     <script type="text/javascript">
+    var ckcClaimNonce = '<?php echo esc_js( wp_create_nonce( 'ckc_claim_nonce' ) ); ?>';
     jQuery(document).ready(function($) {
         // 切換頁籤 (SPA 分頁動作)
         $('.ckc-nav-btn').on('click', function() {
@@ -1462,7 +1494,8 @@ function ckc_coupon_claim_center_shortcode() {
                 type: 'POST',
                 data: {
                     action: 'ckc_claim_coupon',
-                    coupon_id: couponId
+                    coupon_id: couponId,
+                    nonce: ckcClaimNonce
                 },
                 success: function(response) {
                     if (response.success) {
@@ -1587,7 +1620,8 @@ function ckc_coupon_claim_center_shortcode() {
                 type: 'POST',
                 data: {
                     action: 'ckc_claim_by_code',
-                    coupon_code: code
+                    coupon_code: code,
+                    nonce: ckcClaimNonce
                 },
                 success: function(response) {
                     btn.text('領取').removeAttr('disabled');
