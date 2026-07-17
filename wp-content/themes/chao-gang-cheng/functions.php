@@ -7646,52 +7646,43 @@ function ckc_ajax_gemini_chat() {
 add_filter( 'gettext', 'ckc_translate_points_and_rewards_strings', 20, 3 );
 function ckc_translate_points_and_rewards_strings( $translated_text, $text, $domain ) {
     // 1. 翻譯 WooCommerce 優惠券折價券相關英文字串
-    if ( 'woocommerce' === $domain || empty( $domain ) ) {
-        if ( 'Have a coupon?' === $text ) {
-            return '有折價券嗎？';
-        }
-        if ( 'Click here to enter your code' === $text ) {
-            return '點此輸入折扣碼';
-        }
+    if ( 'Have a coupon?' === $text ) {
+        return '有折價券嗎？';
+    }
+    if ( 'Click here to enter your code' === $text ) {
+        return '點此輸入折扣碼';
+    }
+    if ( 'If you have a coupon code, please apply it below.' === $text ) {
+        return '如果您有折價券，請在下方輸入。';
+    }
+    if ( 'Apply coupon' === $text ) {
+        return '使用優惠券';
     }
 
-    // 2. 翻譯紅利點數外掛字串
-    if ( 'points-and-rewards-for-woocommerce' === $domain || empty( $domain ) || strpos( $domain, 'points-and-rewards' ) !== false ) {
-        switch ( $text ) {
-            case 'Apply Points':
-                $translated_text = '折抵紅利';
-                break;
-            case 'Your available points:':
-                $translated_text = '您的可用紅利點數：';
-                break;
-            case 'Your available points':
-                $translated_text = '您的可用紅利點數';
-                break;
-            case 'Points':
-                $translated_text = '紅利點數';
-                break;
-            case 'Points =':
-                $translated_text = '點數折抵：';
-                break;
-            case '%s Points':
-                $translated_text = '%s 點';
-                break;
-            case '%s Point':
-                $translated_text = '%s 點';
-                break;
-            case '%s Points = %s':
-                $translated_text = '%s 點 = %s';
-                break;
-            case '%s Point = %s':
-                $translated_text = '%s 點 = %s';
-                break;
-            case '%1$s Points = %2$s':
-                $translated_text = '%1$s 點 = %2$s';
-                break;
-            case '%1$s Point = %2$s':
-                $translated_text = '%1$s 點 = %2$s';
-                break;
-        }
+    // 2. 翻譯紅利點數外掛字串 (不檢查 text domain 以防第三方外掛名稱不一致)
+    switch ( $text ) {
+        case 'Apply Points':
+            return '折抵紅利';
+        case 'Your available points:':
+            return '您的可用紅利點數：';
+        case 'Your available points':
+            return '您的可用紅利點數';
+        case 'Points':
+            return '紅利點數';
+        case 'Points =':
+            return '點數折抵：';
+        case '%s Points':
+            return '%s 點';
+        case '%s Point':
+            return '%s 點';
+        case '%s Points = %s':
+            return '%s 點 = %s';
+        case '%s Point = %s':
+            return '%s 點 = %s';
+        case '%1$s Points = %2$s':
+            return '%1$s 點 = %2$s';
+        case '%1$s Point = %2$s':
+            return '%1$s 點 = %2$s';
     }
     return $translated_text;
 }
