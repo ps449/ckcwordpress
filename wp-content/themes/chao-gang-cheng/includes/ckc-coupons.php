@@ -2104,6 +2104,12 @@ function ckc_hide_cart_coupon_input_css() {
         #order_review .custom_point_checkout {
             display: none !important;
         }
+        /* 移除紅利點數輸入框可能帶有的日曆等圖示背景 */
+        #wps_cart_points {
+            background-image: none !important;
+            background-position: initial !important;
+            padding-left: 20px !important;
+        }
     </style>
     <?php
 }
