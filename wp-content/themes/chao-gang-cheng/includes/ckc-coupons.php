@@ -580,13 +580,43 @@ function ckc_coupon_apply_from_url() {
 
 /* ---------------- 券卡片渲染（購物車與帳號頁共用） ---------------- */
 function ckc_render_coupon_cards( $context = 'cart' ) {
-    $coupons = ckc_get_public_coupons();
-    if ( empty( $coupons ) ) {
-        if ( 'account' === $context ) {
-            echo '<p style="color:#64748b;font-size:14px;">目前沒有可領取的優惠券，新券上架會顯示在這裡，敬請期待！</p>';
+
+    if ( 'account' === $context ) {
+        // ── 專屬優惠券頁：只顯示「此會員已領取」的折價券 ──
+        if ( ! is_user_logged_in() ) {
+            echo '<p style="color:#64748b;font-size:14px;">請先登入以查看您的專屬優惠券。</p>';
+            return;
         }
-        return;
+        $user_id        = get_current_user_id();
+        $claimed_ids    = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+        $claimed_ids    = array_filter( array_map( 'intval', $claimed_ids ) );
+
+        if ( empty( $claimed_ids ) ) {
+            echo '<p style="color:#64748b;font-size:14px;">您目前尚未領取任何優惠券，前往<a href="' . esc_url( home_url( '/領券中心/' ) ) . '" style="color:#d97706;font-weight:700;">領券中心</a>領取吧！</p>';
+            return;
+        }
+
+        // 只取已領取的折價券（過期的也顯示，讓會員知道有過）
+        $coupons = array();
+        foreach ( $claimed_ids as $cid ) {
+            $coupon = new WC_Coupon( $cid );
+            if ( $coupon->get_id() ) {
+                $coupons[] = $coupon;
+            }
+        }
+
+        if ( empty( $coupons ) ) {
+            echo '<p style="color:#64748b;font-size:14px;">您的優惠券已全部失效或不存在。</p>';
+            return;
+        }
+    } else {
+        // ── 購物車頁：顯示全部公開折價券 ──
+        $coupons = ckc_get_public_coupons();
+        if ( empty( $coupons ) ) {
+            return;
+        }
     }
+
     $in_cart_page = function_exists( 'is_cart' ) && is_cart();
     ?>
     <div class="ckc-coupon-grid">
@@ -598,8 +628,10 @@ function ckc_render_coupon_cards( $context = 'cart' ) {
             $expires = $coupon->get_date_expires();
             $applied = WC()->cart ? WC()->cart->has_discount( $code ) : false;
             $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), wc_get_cart_url() );
+            // 判斷是否過期
+            $is_expired = $expires && $expires->getTimestamp() < time();
             ?>
-            <div class="ckc-coupon-card<?php echo $applied ? ' is-applied' : ''; ?>">
+            <div class="ckc-coupon-card<?php echo $applied ? ' is-applied' : ( $is_expired ? ' is-expired' : '' ); ?>">
                 <div class="ckc-coupon-left">
                     <div class="ckc-coupon-value"><?php echo esc_html( $value ); ?></div>
                     <?php if ( $min > 0 ) : ?>
@@ -613,11 +645,16 @@ function ckc_render_coupon_cards( $context = 'cart' ) {
                         <?php if ( $expires ) : ?>
                             ・<?php echo esc_html( $expires->date_i18n( 'Y/m/d' ) ); ?> 前有效
                         <?php endif; ?>
+                        <?php if ( $is_expired ) : ?>
+                            <span style="color:#ef4444;font-weight:700;"> ・已過期</span>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="ckc-coupon-action">
                     <?php if ( $applied ) : ?>
                         <span class="ckc-coupon-applied">✓ 已套用</span>
+                    <?php elseif ( $is_expired ) : ?>
+                        <span style="color:#94a3b8;font-size:12px;white-space:nowrap;">已過期</span>
                     <?php else : ?>
                         <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-coupon-apply"><?php echo $in_cart_page ? '立即套用' : '套用去結帳'; ?></a>
                     <?php endif; ?>
@@ -629,6 +666,7 @@ function ckc_render_coupon_cards( $context = 'cart' ) {
     .ckc-coupon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin: 14px 0; }
     .ckc-coupon-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px dashed #d6a878; border-radius: 10px; padding: 12px 14px; }
     .ckc-coupon-card.is-applied { border-style: solid; border-color: #16a34a; background: #f0fdf4; }
+    .ckc-coupon-card.is-expired { opacity: 0.55; border-color: #e2e8f0; }
     .ckc-coupon-left { text-align: center; min-width: 76px; border-right: 1px dashed #e2e8f0; padding-right: 12px; }
     .ckc-coupon-value { font-size: 17px; font-weight: 800; color: #b91c1c; line-height: 1.3; }
     .ckc-coupon-min { font-size: 11px; color: #94a3b8; margin-top: 2px; }
