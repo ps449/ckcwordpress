@@ -430,6 +430,42 @@ function ckc_coupons_register_endpoint() {
     }
 }
 
+add_action( 'init', 'ckc_ensure_coupon_center_page', 10 );
+function ckc_ensure_coupon_center_page() {
+    if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'get_page_by_path' ) ) {
+        return;
+    }
+    
+    // 檢查「領券中心」頁面是否存在（支援中文 Slug、Urlencode、及英文 slug）
+    $page = get_page_by_path( '領券中心' );
+    if ( ! $page ) {
+        $page = get_page_by_path( urlencode( '領券中心' ) );
+    }
+    if ( ! $page ) {
+        $page = get_page_by_path( 'coupon-center' );
+    }
+    
+    if ( $page ) {
+        // 若頁面已存在，確認內容是否包含新版 shortcode
+        if ( strpos( $page->post_content, '[ckc_coupon_claim_center]' ) === false ) {
+            wp_update_post( array(
+                'ID'           => $page->ID,
+                'post_content' => '[ckc_coupon_claim_center]',
+            ) );
+        }
+    } else {
+        // 若不存在則自動建立頁面
+        wp_insert_post( array(
+            'post_title'   => '領券中心',
+            'post_name'    => '領券中心',
+            'post_content' => '[ckc_coupon_claim_center]',
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+        ) );
+    }
+}
+
+
 add_filter( 'woocommerce_account_menu_items', 'ckc_coupons_account_menu_item', 25 );
 function ckc_coupons_account_menu_item( $items ) {
     $new = array();
