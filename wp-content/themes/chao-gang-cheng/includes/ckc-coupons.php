@@ -579,7 +579,7 @@ function ckc_coupon_apply_from_url() {
 }
 
 /* ---------------- 券卡片渲染（購物車與帳號頁共用） ---------------- */
-function ckc_render_coupon_cards( $context = 'cart' ) {
+function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) {
 
     if ( 'account' === $context ) {
         // ── 專屬優惠券頁：只顯示「此會員已領取」的折價券 ──
@@ -610,8 +610,12 @@ function ckc_render_coupon_cards( $context = 'cart' ) {
             return;
         }
     } else {
-        // ── 購物車頁：顯示全部公開折價券 ──
-        $coupons = ckc_get_public_coupons();
+        // ── 購物車頁：使用外部傳入的已過濾清單（由 ckc_cart_coupon_center 傳入）
+        if ( is_array( $coupons_override ) ) {
+            $coupons = $coupons_override;
+        } else {
+            $coupons = ckc_get_public_coupons();
+        }
         if ( empty( $coupons ) ) {
             return;
         }
@@ -680,17 +684,65 @@ function ckc_render_coupon_cards( $context = 'cart' ) {
     <?php
 }
 
-/* ---------------- 購物車頁：領券中心 ---------------- */
+/* ---------------- 購物車頁：領券中心（只顯示已登入會員的券匣） ---------------- */
 add_action( 'woocommerce_before_cart', 'ckc_cart_coupon_center', 15 );
 function ckc_cart_coupon_center() {
-    $coupons = ckc_get_public_coupons();
+    // 未登入不顯示
+    if ( ! is_user_logged_in() ) {
+        return;
+    }
+
+    $user_id     = get_current_user_id();
+    $claimed_ids = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+    $claimed_ids = array_filter( array_map( 'intval', $claimed_ids ) );
+
+    if ( empty( $claimed_ids ) ) {
+        return; // 未領取任何券，不顯示面板
+    }
+
+    // 建構已領取且有效（未過期）的折價券清單
+    $coupons = array();
+    foreach ( $claimed_ids as $cid ) {
+        $coupon = new WC_Coupon( $cid );
+        if ( ! $coupon->get_id() ) continue;
+        $wc_exp = $coupon->get_date_expires();
+        if ( $wc_exp && $wc_exp->getTimestamp() < time() ) continue; // 過期不顯示
+        $coupons[] = $coupon;
+    }
+
     if ( empty( $coupons ) ) {
         return;
     }
+
     echo '<div class="ckc-coupon-center" style="margin-bottom: 20px;">';
-    echo '<div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 4px;">🎟️ 領券中心</div>';
-    ckc_render_coupon_cards( 'cart' );
+    echo '<div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 4px;">🎟️ 我的優惠券</div>';
+    echo '<p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">每筆訂單限用一張優惠券</p>';
+    ckc_render_coupon_cards( 'cart', $coupons );
     echo '</div>';
+}
+
+/* ---------------- 限制対张：自動移除舊券再套用新券 ---------------- */
+add_action( 'woocommerce_applied_coupon', 'ckc_enforce_single_coupon', 10, 1 );
+function ckc_enforce_single_coupon( $new_code ) {
+    if ( ! WC()->cart ) return;
+    $applied = WC()->cart->get_applied_coupons();
+    // 移除除了剛続對之外的所有已套用券
+    foreach ( $applied as $code ) {
+        if ( wc_format_coupon_code( $code ) !== wc_format_coupon_code( $new_code ) ) {
+            WC()->cart->remove_coupon( $code );
+        }
+    }
+}
+
+/* ---------------- 禁止手動輸入第二張券碼（顧客提示） ---------------- */
+add_filter( 'woocommerce_coupon_error', 'ckc_single_coupon_error_msg', 10, 3 );
+function ckc_single_coupon_error_msg( $err, $err_code, $coupon ) {
+    // 107 = COUPON_ALREADY_APPLIED_INDIV_USE_ONLY
+    // 如果購物車已有券且在手動輸入新券碼
+    if ( WC()->cart && count( WC()->cart->get_applied_coupons() ) >= 1 ) {
+        return '每筆訂單限用一張優惠券，請先移除現有券再套用新券。';
+    }
+    return $err;
 }
 
 /* ---------------- 我的帳號「專屬優惠券」頁 ---------------- */
