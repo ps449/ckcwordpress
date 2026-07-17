@@ -2194,11 +2194,18 @@ function ckc_checkout_points_panel() {
     $user_id = get_current_user_id();
     $points  = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
     
-    error_log( sprintf( 'ckc_checkout_points_panel debug: user_id=%d, points=%d, is_logged_in=%d', 
+    $log_file = dirname( __FILE__ ) . '/../scratch/checkout_points_debug.txt';
+    $log_dir  = dirname( $log_file );
+    if ( ! is_dir( $log_dir ) ) {
+        @mkdir( $log_dir, 0755, true );
+    }
+    $log_msg = sprintf( "[%s] user_id=%d, points=%d, is_logged_in=%d\n", 
+        date( 'Y-m-d H:i:s' ),
         $user_id, 
         $points, 
         is_user_logged_in() ? 1 : 0
-    ) );
+    );
+    @file_put_contents( $log_file, $log_msg, FILE_APPEND );
 
     if ( ! is_user_logged_in() ) return;
     if ( $points <= 0 ) return; // 沒有點數就不顯示
