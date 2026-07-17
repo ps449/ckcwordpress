@@ -166,22 +166,20 @@ function ckc_patch_demo_coupon_images() {
 }
 
 
-/* ---------------- 後台：券編輯頁欄位 ---------------- */
+/* ---------------- 後台：一般 tab 追加欄位（僅限購物車領券面板相關）---------------- */
 add_action( 'woocommerce_coupon_options', 'ckc_coupon_admin_fields', 20, 2 );
 function ckc_coupon_admin_fields( $coupon_id, $coupon ) {
+    // 僅保留「購物車領券小面板 / 會員帳號頁」的顯示開關
+    // 說明：此欄位控制是否出現在購物車頁右側的「領券」小彈出面板，
+    //        與「領券中心設定」tab 的「啟用領取中心上架」是不同功能。
     woocommerce_wp_checkbox( array(
         'id'          => '_ckc_coupon_public',
-        'label'       => '顯示於領券中心',
-        'description' => '勾選後，此券會出現在購物車「領券中心」與會員「專屬優惠券」頁，消費者可一鍵套用',
+        'label'       => '顯示於購物車領券面板',
+        'description' => '勾選後，此券會出現在<strong>購物車頁面</strong>右側「領券」彈窗與會員帳號「專屬優惠券」頁，消費者可一鍵套用。（與下方「領券中心設定」為不同入口）',
     ) );
-    woocommerce_wp_text_field( array(
-        'id'          => '_ckc_coupon_label',
-        'label'       => '券面標題',
-        'placeholder' => '例如：新客見面禮',
-        'description' => '顯示在券卡片上的標題；留空則顯示折扣內容',
-        'desc_tip'    => true,
-    ) );
+    // 注意：「券面標題」已移至「領券中心設定」頁籤管理，在這裡不再重複顯示。
 }
+
 add_action( 'woocommerce_coupon_options_save', 'ckc_coupon_admin_fields_save', 20, 2 );
 function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
     // 儲存既有的前台領券與券面標題欄位
@@ -253,7 +251,18 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'description' => '勾選後，此折價券將上架至「折價券領取中心」供會員公開領取',
             ) );
 
-            // 2. 領取限額/總庫存
+            // 2. 券面標題（前台卡片 h3 標題，即「新會員見面禮 NT$100」這類文字）
+            $label_val = get_post_meta( $coupon_id, '_ckc_coupon_label', true );
+            woocommerce_wp_text_field( array(
+                'id'          => '_ckc_coupon_label',
+                'label'       => '券面標題',
+                'value'       => $label_val,
+                'placeholder' => '例如：新會員見面禮 NT$100',
+                'description' => '前台領券中心卡片上顯示的大標題；留空則自動產生（如「折 NT$200」）',
+                'desc_tip'    => true,
+            ) );
+
+            // 3. 領取限額/總庫存
             $inventory_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', true );
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_inventory',
@@ -265,7 +274,7 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'desc_tip'    => true,
             ) );
 
-            // 3. 目前已領取次數
+            // 4. 目前已領取次數
             $claim_count = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
             woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_claim_count',
@@ -275,6 +284,7 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
                 'description' => '此為系統統計次數，可手動修正',
                 'desc_tip'    => true,
             ) );
+
 
             // 4. 活動類別
             $category_val = get_post_meta( $coupon_id, '_ckc_coupon_claim_category', true );
