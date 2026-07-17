@@ -5226,9 +5226,13 @@ function chao_gang_cheng_discount_sale_flash( $html, $post, $product ) {
     $regular = floatval( $product->get_regular_price() );
     $sale    = floatval( $product->get_sale_price() );
     if ( $regular > 0 && $sale > 0 && $sale < $regular ) {
-        $percent = round( ( 1 - $sale / $regular ) * 100 );
-        if ( $percent >= 1 ) {
-            $label = '-' . $percent . '%';
+        $percent = round( ( $sale / $regular ) * 100 );
+        if ( $percent >= 1 && $percent < 100 ) {
+            if ( $percent % 10 === 0 ) {
+                $label = ( $percent / 10 ) . '折';
+            } else {
+                $label = $percent . '折';
+            }
         }
     }
     return '<span class="onsale chao-onsale">' . esc_html( $label ) . '</span>';
