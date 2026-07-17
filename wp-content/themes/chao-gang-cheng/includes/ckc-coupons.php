@@ -47,11 +47,185 @@ function ckc_coupon_admin_fields( $coupon_id, $coupon ) {
 }
 add_action( 'woocommerce_coupon_options_save', 'ckc_coupon_admin_fields_save', 20, 2 );
 function ckc_coupon_admin_fields_save( $coupon_id, $coupon ) {
+    // 儲存既有的前台領券與券面標題欄位
     $public = isset( $_POST['_ckc_coupon_public'] ) ? 'yes' : 'no';
     $label  = isset( $_POST['_ckc_coupon_label'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_label'] ) ) : '';
     
     update_post_meta( $coupon_id, '_ckc_coupon_public', $public );
     update_post_meta( $coupon_id, '_ckc_coupon_label', $label );
+
+    // 儲存新版領券中心自訂欄位
+    $claim_public = isset( $_POST['_ckc_coupon_claim_public'] ) ? 'yes' : 'no';
+    $inventory    = isset( $_POST['_ckc_coupon_claim_inventory'] ) && $_POST['_ckc_coupon_claim_inventory'] !== '' ? intval( $_POST['_ckc_coupon_claim_inventory'] ) : '';
+    $claim_count  = isset( $_POST['_ckc_coupon_claim_count'] ) ? intval( $_POST['_ckc_coupon_claim_count'] ) : 0;
+    $category     = isset( $_POST['_ckc_coupon_claim_category'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_claim_category'] ) ) : '';
+    $deadline     = isset( $_POST['_ckc_coupon_claim_deadline'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_coupon_claim_deadline'] ) ) : '';
+    $image_url    = isset( $_POST['_ckc_coupon_claim_image'] ) ? esc_url_raw( wp_unslash( $_POST['_ckc_coupon_claim_image'] ) ) : '';
+    $banner_url   = isset( $_POST['_ckc_coupon_claim_banner'] ) ? esc_url_raw( wp_unslash( $_POST['_ckc_coupon_claim_banner'] ) ) : '';
+    $description  = isset( $_POST['_ckc_coupon_claim_description'] ) ? wp_kses_post( wp_unslash( $_POST['_ckc_coupon_claim_description'] ) ) : '';
+    $notes        = isset( $_POST['_ckc_coupon_claim_notes'] ) ? wp_kses_post( wp_unslash( $_POST['_ckc_coupon_claim_notes'] ) ) : '';
+
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_public', $claim_public );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', $inventory );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_count', $claim_count );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_category', $category );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', $deadline );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_image', $image_url );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_banner', $banner_url );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_description', $description );
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_notes', $notes );
+}
+
+/* ---------------- 後台：領券中心專屬頁籤 ---------------- */
+add_filter( 'woocommerce_coupon_data_tabs', 'ckc_add_coupon_claim_center_tab', 25 );
+function ckc_add_coupon_claim_center_tab( $tabs ) {
+    $tabs['ckc_claim_center'] = array(
+        'label'  => '領券中心設定',
+        'target' => 'ckc_claim_center_coupon_data',
+        'class'  => 'ckc_claim_center_tab',
+    );
+    return $tabs;
+}
+
+add_action( 'woocommerce_coupon_data_panels', 'ckc_add_coupon_claim_center_panel', 25, 2 );
+function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
+    ?>
+    <div id="ckc_claim_center_coupon_data" class="panel woocommerce_options_panel hidden">
+        <div class="options_group">
+            <?php
+            // 1. 是否啟用領券中心
+            woocommerce_wp_checkbox( array(
+                'id'          => '_ckc_coupon_claim_public',
+                'label'       => '啟用領取中心上架',
+                'description' => '勾選後，此折價券將上架至「折價券領取中心」供會員公開領取',
+            ) );
+
+            // 2. 領取限額/總庫存
+            woocommerce_wp_text_input( array(
+                'id'          => '_ckc_coupon_claim_inventory',
+                'label'       => '領取限額 (總庫存)',
+                'placeholder' => '無限制請留空',
+                'type'        => 'number',
+                'description' => '當領取次數達到此上限時，前台會顯示「已搶光」且無法再領取',
+                'desc_tip'    => true,
+            ) );
+
+            // 3. 目前已領取次數 (唯讀或可編輯)
+            $claim_count = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
+            woocommerce_wp_text_input( array(
+                'id'          => '_ckc_coupon_claim_count',
+                'label'       => '已領取次數',
+                'value'       => $claim_count ? intval( $claim_count ) : 0,
+                'type'        => 'number',
+                'description' => '此為系統統計次數，可手動修正',
+                'desc_tip'    => true,
+            ) );
+
+            // 4. 活動類別
+            woocommerce_wp_text_field( array(
+                'id'          => '_ckc_coupon_claim_category',
+                'label'       => '活動類別',
+                'placeholder' => '例如：全聯好康、保鮮收納',
+                'description' => '用於前台分頁標籤篩選，留空則不分類',
+                'desc_tip'    => true,
+            ) );
+
+            // 5. 領取截止期限
+            $deadline = get_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', true );
+            woocommerce_wp_text_input( array(
+                'id'                => '_ckc_coupon_claim_deadline',
+                'value'             => esc_attr( $deadline ),
+                'label'             => '領取截止期限',
+                'placeholder'       => 'YYYY-MM-DD',
+                'description'       => '前台顯示的領取期限，過期後會自動下架。格式：YYYY-MM-DD',
+                'desc_tip'          => true,
+                'class'             => 'date-picker',
+                'custom_attributes' => array(
+                    'pattern' => '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])',
+                ),
+            ) );
+            ?>
+        </div>
+
+        <div class="options_group">
+            <?php
+            // 6. 列表縮圖
+            $image_url = get_post_meta( $coupon_id, '_ckc_coupon_claim_image', true );
+            ?>
+            <p class="form-field _ckc_coupon_claim_image_field">
+                <label for="_ckc_coupon_claim_image">列表小縮圖</label>
+                <input type="text" name="_ckc_coupon_claim_image" id="_ckc_coupon_claim_image" value="<?php echo esc_attr( $image_url ); ?>" style="width: 50%;" placeholder="請上傳或輸入圖片網址" />
+                <button type="button" class="button ckc_upload_image_btn" data-target="_ckc_coupon_claim_image">上傳/選擇圖片</button>
+                <?php echo wc_help_tip( '前台列表卡片上顯示的小方圖' ); ?>
+            </p>
+
+            <?php
+            // 7. 詳情頁 Banner
+            $banner_url = get_post_meta( $coupon_id, '_ckc_coupon_claim_banner', true );
+            ?>
+            <p class="form-field _ckc_coupon_claim_banner_field">
+                <label for="_ckc_coupon_claim_banner">詳情頁大 Banner</label>
+                <input type="text" name="_ckc_coupon_claim_banner" id="_ckc_coupon_claim_banner" value="<?php echo esc_attr( $banner_url ); ?>" style="width: 50%;" placeholder="請上傳或輸入圖片網址" />
+                <button type="button" class="button ckc_upload_image_btn" data-target="_ckc_coupon_claim_banner">上傳/選擇圖片</button>
+                <?php echo wc_help_tip( '點擊使用規則後，彈出視窗上方顯示的大 Banner 圖' ); ?>
+            </p>
+        </div>
+
+        <div class="options_group">
+            <?php
+            // 8. 活動說明 (Textarea)
+            woocommerce_wp_textarea_input( array(
+                'id'          => '_ckc_coupon_claim_description',
+                'label'       => '活動說明',
+                'placeholder' => '請輸入折價券的活動說明...',
+                'style'       => 'height: 100px;',
+            ) );
+
+            // 9. 使用限制與注意事項 (Textarea)
+            woocommerce_wp_textarea_input( array(
+                'id'          => '_ckc_coupon_claim_notes',
+                'label'       => '使用限制與注意事項',
+                'placeholder' => "1. 本券限於實體門市結帳使用...\n2. 本券為不記名，任何人持本券皆可使用...",
+                'style'       => 'height: 120px;',
+            ) );
+            ?>
+        </div>
+    </div>
+    <?php
+}
+
+/* ---------------- 後台：載入 WordPress 媒體庫上傳 JS ---------------- */
+add_action( 'admin_enqueue_scripts', 'ckc_coupon_admin_media_scripts' );
+function ckc_coupon_admin_media_scripts( $hook ) {
+    global $post_type;
+    if ( 'shop_coupon' === $post_type && ( 'post.php' === $hook || 'post-new.php' === $hook ) ) {
+        wp_enqueue_media();
+        wp_add_inline_script( 'jquery', "
+            jQuery(document).ready(function($) {
+                $('body').on('click', '.ckc_upload_image_btn', function(e) {
+                    e.preventDefault();
+                    var button = $(this);
+                    var targetId = button.data('target');
+                    var inputField = $('#' + targetId);
+                    
+                    var file_frame = wp.media.frames.file_frame = wp.media({
+                        title: '選擇折價券圖片',
+                        button: {
+                            text: '使用此圖片'
+                        },
+                        multiple: false
+                    });
+                    
+                    file_frame.on('select', function() {
+                        var attachment = file_frame.state().get('selection').first().toJSON();
+                        inputField.val(attachment.url);
+                    });
+                    
+                    file_frame.open();
+                });
+            });
+        " );
+    }
 }
 
 /* ---------------- 公開券查詢 ---------------- */
@@ -85,6 +259,34 @@ function ckc_get_public_coupons() {
     return $coupons;
 }
 
+/* ---------------- 領取中心公開券查詢 ---------------- */
+function ckc_get_claimable_coupons() {
+    $posts = get_posts( array(
+        'post_type'      => 'shop_coupon',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'meta_query'     => array(
+            array(
+                'key'   => '_ckc_coupon_claim_public',
+                'value' => 'yes',
+            ),
+        ),
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ) );
+    $coupons = array();
+    foreach ( $posts as $post ) {
+        $coupon = new WC_Coupon( $post->ID );
+        // 檢查前台設定截止時間
+        $deadline = get_post_meta( $post->ID, '_ckc_coupon_claim_deadline', true );
+        if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
+            continue; // 已過領取期限不顯示
+        }
+        $coupons[] = $coupon;
+    }
+    return $coupons;
+}
+
 // 券值文字（例：92 折／折 NT$100／免運費）
 function ckc_coupon_value_text( $coupon ) {
     $amount = floatval( $coupon->get_amount() );
@@ -110,8 +312,10 @@ function ckc_coupon_apply_from_url() {
     }
     $code   = wc_format_coupon_code( sanitize_text_field( wp_unslash( $_GET['ckc_apply_coupon'] ) ) );
     $coupon = new WC_Coupon( $code );
-    // 僅允許套用「領券中心」的公開券，避免暴力猜碼
-    if ( ! $coupon->get_id() || 'yes' !== $coupon->get_meta( '_ckc_coupon_public' ) ) {
+    
+    // 允許套用「購物車領券」或是「領券中心」的公開券，避免暴力猜碼
+    $is_public = 'yes' === $coupon->get_meta( '_ckc_coupon_public' ) || 'yes' === $coupon->get_meta( '_ckc_coupon_claim_public' );
+    if ( ! $coupon->get_id() || ! $is_public ) {
         wp_safe_redirect( wc_get_cart_url() );
         exit;
     }
@@ -239,3 +443,1129 @@ function ckc_coupons_account_content() {
     <?php
     ckc_render_coupon_cards( 'account' );
 }
+
+/* ----------------===================================================---------------- */
+/* ---------------- 新增功能：PX Pay 風格 [折價券領取中心] 短代碼與 AJAX 領取 ---------------- */
+/* ----------------===================================================---------------- */
+
+add_action( 'wp_ajax_ckc_claim_coupon', 'ckc_claim_coupon_ajax_handler' );
+add_action( 'wp_ajax_nopriv_ckc_claim_coupon', 'ckc_claim_coupon_ajax_handler' );
+function ckc_claim_coupon_ajax_handler() {
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => '請先登入會員以領取折價券！' ) );
+    }
+
+    $coupon_id = isset( $_POST['coupon_id'] ) ? intval( $_POST['coupon_id'] ) : 0;
+    if ( ! $coupon_id ) {
+        wp_send_json_error( array( 'message' => '無效的折價券識別碼！' ) );
+    }
+
+    $coupon = new WC_Coupon( $coupon_id );
+    if ( ! $coupon->get_id() || 'yes' !== $coupon->get_meta( '_ckc_coupon_claim_public' ) ) {
+        wp_send_json_error( array( 'message' => '此折價券未開放領取！' ) );
+    }
+
+    // 驗證領取期限
+    $deadline = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
+    if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
+        wp_send_json_error( array( 'message' => '此折價券領取期限已過！' ) );
+    }
+
+    // 驗證限量庫存
+    $inventory = $coupon->get_meta( '_ckc_coupon_claim_inventory' );
+    $claim_count = intval( $coupon->get_meta( '_ckc_coupon_claim_count' ) );
+    if ( $inventory !== '' && $inventory !== false && $claim_count >= intval( $inventory ) ) {
+        wp_send_json_error( array( 'message' => '此折價券已被搶光囉！' ) );
+    }
+
+    $user_id = get_current_user_id();
+    $claimed_coupons = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+
+    if ( in_array( $coupon_id, $claimed_coupons, true ) ) {
+        wp_send_json_error( array( 'message' => '您已經領取過此折價券囉！' ) );
+    }
+
+    // 儲存領取紀錄
+    $claimed_coupons[] = $coupon_id;
+    update_user_meta( $user_id, '_ckc_claimed_coupons', $claimed_coupons );
+
+    // 增加領取次數
+    $new_count = $claim_count + 1;
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_count', $new_count );
+
+    wp_send_json_success( array( 
+        'message'     => '領取成功！已存入您的券匣',
+        'is_sold_out' => ( $inventory !== '' && $new_count >= intval( $inventory ) )
+    ) );
+}
+
+add_action( 'wp_ajax_ckc_claim_by_code', 'ckc_claim_by_code_ajax_handler' );
+add_action( 'wp_ajax_nopriv_ckc_claim_by_code', 'ckc_claim_by_code_ajax_handler' );
+function ckc_claim_by_code_ajax_handler() {
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => '請先登入會員以領取折價券！' ) );
+    }
+
+    $code = isset( $_POST['coupon_code'] ) ? wc_format_coupon_code( sanitize_text_field( wp_unslash( $_POST['coupon_code'] ) ) ) : '';
+    if ( empty( $code ) ) {
+        wp_send_json_error( array( 'message' => '請輸入折價券代碼！' ) );
+    }
+
+    $coupon_id = wc_get_coupon_id_by_code( $code );
+    if ( ! $coupon_id ) {
+        wp_send_json_error( array( 'message' => '找不到此折價券代碼，請確認代碼是否輸入正確。' ) );
+    }
+
+    $coupon = new WC_Coupon( $coupon_id );
+    if ( ! $coupon->get_id() || 'yes' !== $coupon->get_meta( '_ckc_coupon_claim_public' ) ) {
+        wp_send_json_error( array( 'message' => '此折價券不支援公開領取！' ) );
+    }
+
+    // 驗證領取期限
+    $deadline = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
+    if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
+        wp_send_json_error( array( 'message' => '此折價券領取期限已過！' ) );
+    }
+
+    // 驗證限量庫存
+    $inventory = $coupon->get_meta( '_ckc_coupon_claim_inventory' );
+    $claim_count = intval( $coupon->get_meta( '_ckc_coupon_claim_count' ) );
+    if ( $inventory !== '' && $inventory !== false && $claim_count >= intval( $inventory ) ) {
+        wp_send_json_error( array( 'message' => '此折價券已被搶光囉！' ) );
+    }
+
+    $user_id = get_current_user_id();
+    $claimed_coupons = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+
+    if ( in_array( $coupon_id, $claimed_coupons, true ) ) {
+        wp_send_json_error( array( 'message' => '您已經領取過此折價券囉！' ) );
+    }
+
+    // 儲存領取紀錄
+    $claimed_coupons[] = $coupon_id;
+    update_user_meta( $user_id, '_ckc_claimed_coupons', $claimed_coupons );
+
+    // 增加領取次數
+    $new_count = $claim_count + 1;
+    update_post_meta( $coupon_id, '_ckc_coupon_claim_count', $new_count );
+
+    wp_send_json_success( array( 
+        'message'     => '領取成功！已存入您的券匣。',
+        'coupon_id'   => $coupon_id,
+        'is_sold_out' => ( $inventory !== '' && $new_count >= intval( $inventory ) )
+    ) );
+}
+
+add_shortcode( 'ckc_coupon_claim_center', 'ckc_coupon_claim_center_shortcode' );
+function ckc_coupon_claim_center_shortcode() {
+    if ( ! function_exists( 'WC' ) ) {
+        return '';
+    }
+
+    $user_id = get_current_user_id();
+    $claimed_ids = $user_id ? (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true ) : array();
+
+    // 獲取所有供領取的折價券
+    $coupons = ckc_get_claimable_coupons();
+    
+    // 收集所有活動分類以生成分頁標籤
+    $categories = array();
+    foreach ( $coupons as $coupon ) {
+        $cat = $coupon->get_meta( '_ckc_coupon_claim_category' );
+        if ( $cat && ! in_array( $cat, $categories, true ) ) {
+            $categories[] = $cat;
+        }
+    }
+
+    ob_start();
+    ?>
+    <div id="ckc-claim-center-container">
+        <!-- SPA 導覽列頭部 -->
+        <div class="ckc-claim-header">
+            <h2 class="ckc-claim-title">🎟️ 折價券領取中心</h2>
+            <div class="ckc-claim-nav-buttons">
+                <button type="button" class="ckc-nav-btn active" data-tab="claim-list">領券中心</button>
+                <button type="button" class="ckc-nav-btn" data-tab="my-box">
+                    我的券匣 <span class="ckc-box-count"><?php echo count( $claimed_ids ); ?></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 優惠代碼輸入搜尋區 -->
+        <div class="ckc-search-bar-wrap">
+            <div class="ckc-search-bar-inner">
+                <input type="text" id="ckc-coupon-code-input" placeholder="請輸入優惠代碼" />
+                <button type="button" id="ckc-submit-code-btn">領取</button>
+            </div>
+        </div>
+
+        <!-- SPA 區塊面板 -->
+        <div class="ckc-panel-wrap">
+            <!-- 1. 領券中心列表面板 -->
+            <div id="ckc-panel-claim-list" class="ckc-spa-panel active">
+                <!-- 分類篩選列 -->
+                <?php if ( ! empty( $categories ) ) : ?>
+                    <div class="ckc-categories-filter-bar">
+                        <button type="button" class="ckc-cat-tab active" data-category="all">全部</button>
+                        <?php foreach ( $categories as $cat ) : ?>
+                            <button type="button" class="ckc-cat-tab" data-category="<?php echo esc_attr( $cat ); ?>"><?php echo esc_html( $cat ); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <!-- 卡片列表 Grid -->
+                <div class="ckc-coupon-cards-grid">
+                    <?php if ( empty( $coupons ) ) : ?>
+                        <div class="ckc-no-coupons">目前沒有可領取的折價券，敬請期待！</div>
+                    <?php else : ?>
+                        <?php foreach ( $coupons as $coupon ) :
+                            $coupon_id   = $coupon->get_id();
+                            $code        = $coupon->get_code();
+                            $title       = $coupon->get_meta( '_ckc_coupon_label' );
+                            if ( empty( $title ) ) {
+                                $title = ckc_coupon_value_text( $coupon );
+                            }
+                            $deadline    = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
+                            $thumbnail   = $coupon->get_meta( '_ckc_coupon_claim_image' );
+                            $banner      = $coupon->get_meta( '_ckc_coupon_claim_banner' );
+                            $category    = $coupon->get_meta( '_ckc_coupon_claim_category' );
+                            $desc        = $coupon->get_meta( '_ckc_coupon_claim_description' );
+                            $notes       = $coupon->get_meta( '_ckc_coupon_claim_notes' );
+                            $inventory   = $coupon->get_meta( '_ckc_coupon_claim_inventory' );
+                            $claim_count = intval( $coupon->get_meta( '_ckc_coupon_claim_count' ) );
+
+                            if ( empty( $thumbnail ) ) {
+                                $thumbnail = get_template_directory_uri() . '/assets/images/default-coupon.png';
+                            }
+
+                            // 判斷狀態
+                            $is_claimed = in_array( $coupon_id, $claimed_ids, true );
+                            $is_sold_out = ( $inventory !== '' && $inventory !== false && $claim_count >= intval( $inventory ) );
+                            
+                            $status_class = '';
+                            $btn_text = '領取';
+                            $btn_disabled = '';
+                            if ( $is_claimed ) {
+                                $status_class = 'claimed';
+                                $btn_text = '已領取';
+                                $btn_disabled = 'disabled';
+                            } elseif ( $is_sold_out ) {
+                                $status_class = 'sold-out';
+                                $btn_text = '已搶光';
+                                $btn_disabled = 'disabled';
+                            }
+                            ?>
+                            <div class="ckc-coupon-item-card <?php echo $status_class; ?>" 
+                                 data-category="<?php echo esc_attr( $category ? $category : 'all' ); ?>"
+                                 data-coupon-id="<?php echo esc_attr( $coupon_id ); ?>"
+                                 data-title="<?php echo esc_attr( $title ); ?>"
+                                 data-code="<?php echo esc_attr( $code ); ?>"
+                                 data-deadline="<?php echo esc_attr( $deadline ); ?>"
+                                 data-banner="<?php echo esc_attr( $banner ); ?>"
+                                 data-desc="<?php echo esc_attr( $desc ); ?>"
+                                 data-notes="<?php echo esc_attr( $notes ); ?>"
+                                 data-claimed="<?php echo $is_claimed ? 'true' : 'false'; ?>"
+                                 data-soldout="<?php echo $is_sold_out ? 'true' : 'false'; ?>">
+                                
+                                <div class="ckc-card-left">
+                                    <div class="ckc-card-img-wrap">
+                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" />
+                                    </div>
+                                    <a href="#" class="ckc-rules-trigger">使用規則</a>
+                                </div>
+                                
+                                <div class="ckc-card-middle">
+                                    <h3 class="ckc-card-title"><?php echo esc_html( $title ); ?></h3>
+                                    <?php if ( $deadline ) : ?>
+                                        <div class="ckc-card-deadline">領取期限：<?php echo esc_html( str_replace('-', '/', $deadline) ); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <div class="ckc-card-right">
+                                    <button type="button" class="ckc-claim-action-btn <?php echo $status_class; ?>" <?php echo $btn_disabled; ?>>
+                                        <?php echo esc_html( $btn_text ); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- 2. 我的券匣面板 -->
+            <div id="ckc-panel-my-box" class="ckc-spa-panel">
+                <div class="ckc-coupon-cards-grid">
+                    <?php
+                    $my_claimed_coupons = array();
+                    if ( ! empty( $claimed_ids ) ) {
+                        foreach ( $claimed_ids as $cid ) {
+                            $c = new WC_Coupon( $cid );
+                            if ( $c->get_id() ) {
+                                $my_claimed_coupons[] = $c;
+                            }
+                        }
+                    }
+
+                    if ( empty( $my_claimed_coupons ) ) : ?>
+                        <div class="ckc-no-coupons">您的券匣空空如也，快去領券中心領取吧！</div>
+                    <?php else : ?>
+                        <?php foreach ( $my_claimed_coupons as $coupon ) :
+                            $coupon_id   = $coupon->get_id();
+                            $code        = $coupon->get_code();
+                            $title       = $coupon->get_meta( '_ckc_coupon_label' );
+                            if ( empty( $title ) ) {
+                                $title = ckc_coupon_value_text( $coupon );
+                            }
+                            $deadline    = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
+                            $thumbnail   = $coupon->get_meta( '_ckc_coupon_claim_image' );
+                            $banner      = $coupon->get_meta( '_ckc_coupon_claim_banner' );
+                            $desc        = $coupon->get_meta( '_ckc_coupon_claim_description' );
+                            $notes       = $coupon->get_meta( '_ckc_coupon_claim_notes' );
+
+                            if ( empty( $thumbnail ) ) {
+                                $thumbnail = get_template_directory_uri() . '/assets/images/default-coupon.png';
+                            }
+                            $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), wc_get_cart_url() );
+                            ?>
+                            <div class="ckc-coupon-item-card claimed-box" 
+                                 data-coupon-id="<?php echo esc_attr( $coupon_id ); ?>"
+                                 data-title="<?php echo esc_attr( $title ); ?>"
+                                 data-code="<?php echo esc_attr( $code ); ?>"
+                                 data-deadline="<?php echo esc_attr( $deadline ); ?>"
+                                 data-banner="<?php echo esc_attr( $banner ); ?>"
+                                 data-desc="<?php echo esc_attr( $desc ); ?>"
+                                 data-notes="<?php echo esc_attr( $notes ); ?>"
+                                 data-claimed="true"
+                                 data-soldout="false">
+                                
+                                <div class="ckc-card-left">
+                                    <div class="ckc-card-img-wrap">
+                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" />
+                                    </div>
+                                    <a href="#" class="ckc-rules-trigger">使用規則</a>
+                                </div>
+                                
+                                <div class="ckc-card-middle">
+                                    <h3 class="ckc-card-title"><?php echo esc_html( $title ); ?></h3>
+                                    <div class="ckc-card-code">代碼：<code><?php echo esc_html( strtoupper( $code ) ); ?></code></div>
+                                </div>
+                                
+                                <div class="ckc-card-right">
+                                    <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-apply-action-btn">立即使用</a>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- 詳情頁彈出視窗 Sheet Overlay -->
+        <div id="ckc-detail-modal" class="ckc-modal-overlay">
+            <div class="ckc-modal-sheet">
+                <!-- 彈窗頭部 -->
+                <div class="ckc-modal-header">
+                    <button type="button" class="ckc-modal-close-btn">
+                        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    </button>
+                    <span class="ckc-modal-header-title">福利券說明</span>
+                </div>
+                
+                <!-- 彈窗內容區 (滾動) -->
+                <div class="ckc-modal-body">
+                    <div class="ckc-modal-banner-wrap">
+                        <img id="ckc-modal-banner-img" src="" alt="Banner" />
+                    </div>
+                    
+                    <div class="ckc-modal-details-content">
+                        <h2 id="ckc-modal-title" class="ckc-modal-coupon-title"></h2>
+                        
+                        <div class="ckc-modal-date-info">
+                            <div class="ckc-date-row">
+                                <span class="ckc-date-label">領取期限：</span>
+                                <span id="ckc-modal-deadline-val"></span>
+                            </div>
+                        </div>
+
+                        <div class="ckc-modal-section-group">
+                            <h4 class="ckc-section-heading">活動說明</h4>
+                            <div id="ckc-modal-desc-content" class="ckc-section-text"></div>
+                        </div>
+
+                        <div class="ckc-modal-section-group">
+                            <h4 class="ckc-section-heading">注意事項</h4>
+                            <div id="ckc-modal-notes-content" class="ckc-section-text"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 彈窗底部固定領取鈕 -->
+                <div class="ckc-modal-footer">
+                    <button type="button" id="ckc-modal-submit-btn" class="ckc-modal-claim-btn">立即領取</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 吐司通知提示 Toast -->
+        <div id="ckc-toast" class="ckc-toast-box"></div>
+    </div>
+
+    <!-- 領券中心專屬樣式 CSS (Modular styling) -->
+    <style>
+    #ckc-claim-center-container {
+        max-width: 800px;
+        margin: 0 auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", Arial, sans-serif;
+        color: #334155;
+        background-color: #f8fafc;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+    
+    .ckc-claim-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .ckc-claim-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+    .ckc-claim-nav-buttons {
+        display: flex;
+        background: #e2e8f0;
+        padding: 4px;
+        border-radius: 30px;
+    }
+    .ckc-nav-btn {
+        background: none !important;
+        border: none !important;
+        padding: 8px 20px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+        border-radius: 20px !important;
+        transition: all 0.25s ease !important;
+        box-shadow: none !important;
+    }
+    .ckc-nav-btn.active {
+        background: #fff !important;
+        color: #1e293b !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    }
+    .ckc-box-count {
+        background: #ef4444;
+        color: #fff;
+        padding: 1px 6px;
+        font-size: 11px;
+        border-radius: 10px;
+        margin-left: 4px;
+    }
+    
+    .ckc-search-bar-wrap {
+        background: #fff;
+        padding: 12px 16px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        margin-bottom: 24px;
+    }
+    .ckc-search-bar-inner {
+        display: flex;
+        gap: 8px;
+    }
+    .ckc-search-bar-inner input {
+        flex: 1;
+        height: 42px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        padding: 0 16px !important;
+        font-size: 15px !important;
+        background: #f8fafc !important;
+        outline: none !important;
+        transition: border-color 0.2s !important;
+    }
+    .ckc-search-bar-inner input:focus {
+        border-color: #7c6767 !important;
+    }
+    .ckc-search-bar-inner button {
+        height: 42px !important;
+        line-height: 42px !important;
+        padding: 0 24px !important;
+        background: #7c6767 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: background 0.2s !important;
+    }
+    .ckc-search-bar-inner button:hover {
+        background: #655248 !important;
+    }
+    
+    .ckc-spa-panel {
+        display: none;
+    }
+    .ckc-spa-panel.active {
+        display: block;
+    }
+    
+    .ckc-categories-filter-bar {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 12px;
+        margin-bottom: 20px;
+        scrollbar-width: none;
+    }
+    .ckc-categories-filter-bar::-webkit-scrollbar {
+        display: none;
+    }
+    .ckc-cat-tab {
+        background: #fff !important;
+        border: 1px solid #e2e8f0 !important;
+        color: #475569 !important;
+        padding: 6px 16px !important;
+        border-radius: 20px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        white-space: nowrap;
+        transition: all 0.2s ease !important;
+        box-shadow: none !important;
+    }
+    .ckc-cat-tab.active {
+        background: #ef0050 !important; /* Matches PX Pay style */
+        border-color: #ef0050 !important;
+        color: #fff !important;
+    }
+    
+    .ckc-coupon-cards-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .ckc-no-coupons {
+        text-align: center;
+        padding: 40px 20px;
+        color: #64748b;
+        font-size: 15px;
+    }
+    
+    .ckc-coupon-item-card {
+        display: flex;
+        align-items: center;
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
+        transition: transform 0.2s, box-shadow 0.2s;
+        gap: 16px;
+    }
+    .ckc-coupon-item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+    }
+    
+    .ckc-card-left {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 90px;
+        gap: 8px;
+    }
+    .ckc-card-img-wrap {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #f1f5f9;
+    }
+    .ckc-card-img-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .ckc-rules-trigger {
+        font-size: 12px;
+        color: #64748b;
+        text-decoration: underline;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .ckc-rules-trigger:hover {
+        color: #ef0050;
+    }
+    
+    .ckc-card-middle {
+        flex: 1;
+        min-width: 0;
+    }
+    .ckc-card-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 6px 0;
+        line-height: 1.4;
+        cursor: pointer;
+    }
+    .ckc-card-title:hover {
+        color: #ef0050;
+    }
+    .ckc-card-deadline {
+        font-size: 13px;
+        color: #64748b;
+    }
+    .ckc-card-code {
+        font-size: 13px;
+        color: #64748b;
+    }
+    .ckc-card-code code {
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: monospace;
+    }
+    
+    .ckc-card-right {
+        display: flex;
+        justify-content: flex-end;
+        min-width: 94px;
+    }
+    .ckc-claim-action-btn,
+    .ckc-apply-action-btn {
+        display: inline-block !important;
+        text-align: center !important;
+        width: 94px !important;
+        height: 42px !important;
+        line-height: 42px !important;
+        padding: 0 !important;
+        background: #ef0050 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 20px !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        transition: background 0.2s, opacity 0.2s !important;
+        white-space: nowrap !important;
+        text-decoration: none !important;
+        box-shadow: 0 2px 4px rgba(239,0,80,0.15) !important;
+    }
+    .ckc-claim-action-btn.claimed {
+        background: #f1f5f9 !important;
+        color: #94a3b8 !important;
+        cursor: default !important;
+        box-shadow: none !important;
+    }
+    .ckc-claim-action-btn.sold-out {
+        background: #f1f5f9 !important;
+        color: #cbd5e1 !important;
+        cursor: default !important;
+        box-shadow: none !important;
+    }
+    .ckc-apply-action-btn {
+        background: #7c6767 !important;
+        box-shadow: 0 2px 4px rgba(124,103,103,0.15) !important;
+    }
+    .ckc-apply-action-btn:hover {
+        background: #655248 !important;
+    }
+    .ckc-claim-action-btn:not(.claimed):not(.sold-out):hover {
+        background: #d00045 !important;
+    }
+    
+    /* 滑動彈出說明視窗 (Bottom/Slide-up panel) */
+    .ckc-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 99999;
+    }
+    .ckc-modal-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .ckc-modal-sheet {
+        background: #fff;
+        width: 100%;
+        max-width: 500px;
+        border-radius: 20px 20px 0 0;
+        display: flex;
+        flex-direction: column;
+        max-height: 85vh;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
+    }
+    .ckc-modal-overlay.open .ckc-modal-sheet {
+        transform: translateY(0);
+    }
+    
+    .ckc-modal-header {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .ckc-modal-close-btn {
+        background: none !important;
+        border: none !important;
+        padding: 4px !important;
+        cursor: pointer !important;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: none !important;
+    }
+    .ckc-modal-close-btn svg {
+        width: 24px;
+        height: 24px;
+        fill: #475569;
+    }
+    .ckc-modal-header-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #1e293b;
+        flex: 1;
+        text-align: center;
+        margin-right: 32px;
+    }
+    
+    .ckc-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding-bottom: 80px;
+    }
+    .ckc-modal-banner-wrap {
+        width: 100%;
+        aspect-ratio: 16/10;
+        overflow: hidden;
+        background: #f1f5f9;
+    }
+    .ckc-modal-banner-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .ckc-modal-details-content {
+        padding: 20px;
+    }
+    .ckc-modal-coupon-title {
+        font-size: 19px;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0 0 12px 0;
+        line-height: 1.4;
+    }
+    .ckc-modal-date-info {
+        background: #f8fafc;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+    .ckc-date-row {
+        margin-bottom: 4px;
+    }
+    .ckc-date-row:last-child {
+        margin-bottom: 0;
+    }
+    .ckc-date-label {
+        font-weight: 600;
+        color: #64748b;
+    }
+    .ckc-modal-section-group {
+        margin-bottom: 20px;
+    }
+    .ckc-section-heading {
+        font-size: 15px;
+        font-weight: 700;
+        color: #334155;
+        border-left: 3px solid #ef0050;
+        padding-left: 8px;
+        margin: 0 0 10px 0;
+    }
+    .ckc-section-text {
+        font-size: 14px;
+        line-height: 1.7;
+        color: #475569;
+        white-space: pre-line;
+    }
+    
+    .ckc-modal-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px 20px;
+        background: rgba(255,255,255,0.9);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: center;
+        z-index: 10;
+    }
+    .ckc-modal-claim-btn {
+        width: 100% !important;
+        height: 46px !important;
+        background: #ef0050 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 25px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        transition: background 0.2s !important;
+        box-shadow: 0 4px 12px rgba(239,0,80,0.2) !important;
+    }
+    .ckc-modal-claim-btn.claimed {
+        background: #cbd5e1 !important;
+        color: #94a3b8 !important;
+        cursor: default !important;
+        box-shadow: none !important;
+    }
+    .ckc-modal-claim-btn.sold-out {
+        background: #e2e8f0 !important;
+        color: #cbd5e1 !important;
+        cursor: default !important;
+        box-shadow: none !important;
+    }
+    
+    /* 吐司小提示 Toast */
+    .ckc-toast-box {
+        position: fixed;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: rgba(30,30,30,0.95);
+        color: #fff;
+        padding: 12px 28px;
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 100000;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    }
+    .ckc-toast-box.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+    
+    /* 電腦桌機版彈出視窗微調 */
+    @media (min-width: 769px) {
+        .ckc-modal-overlay {
+            align-items: center;
+        }
+        .ckc-modal-sheet {
+            border-radius: 16px;
+            max-height: 80vh;
+            transform: scale(0.9);
+        }
+        .ckc-modal-overlay.open .ckc-modal-sheet {
+            transform: scale(1);
+        }
+        .ckc-modal-footer {
+            border-radius: 0 0 16px 16px;
+        }
+    }
+    </style>
+
+    <!-- 前端互動 AJAX/SPA 邏輯 JavaScript -->
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+        // 切換頁籤 (SPA 分頁動作)
+        $('.ckc-nav-btn').on('click', function() {
+            var tab = $(this).data('tab');
+            $('.ckc-nav-btn').removeClass('active');
+            $(this).addClass('active');
+            
+            $('.ckc-spa-panel').removeClass('active');
+            $('#ckc-panel-' + tab).addClass('active');
+            
+            // 如果切換到「我的券匣」，隱藏類別篩選列與搜尋欄
+            if (tab === 'my-box') {
+                $('.ckc-categories-filter-bar').hide();
+                $('.ckc-search-bar-wrap').hide();
+            } else {
+                $('.ckc-categories-filter-bar').show();
+                $('.ckc-search-bar-wrap').show();
+            }
+        });
+
+        // 點擊類別進行即時篩選
+        $('.ckc-cat-tab').on('click', function() {
+            var cat = $(this).data('category');
+            $('.ckc-cat-tab').removeClass('active');
+            $(this).addClass('active');
+
+            if (cat === 'all') {
+                $('.ckc-coupon-item-card:not(.claimed-box)').show();
+            } else {
+                $('.ckc-coupon-item-card:not(.claimed-box)').hide();
+                $('.ckc-coupon-item-card[data-category="' + cat + '"]:not(.claimed-box)').show();
+            }
+        });
+
+        // Toast 訊息提示
+        function showToast(message) {
+            var $toast = $('#ckc-toast');
+            $toast.text(message).addClass('show');
+            setTimeout(function() {
+                $toast.removeClass('show');
+            }, 3000);
+        }
+
+        // 福利券使用規則彈窗詳細資料載入
+        var currentModalCouponId = null;
+        
+        $('body').on('click', '.ckc-rules-trigger, .ckc-card-title', function(e) {
+            e.preventDefault();
+            var card = $(this).closest('.ckc-coupon-item-card');
+            var couponId = card.data('coupon-id');
+            var title = card.data('title');
+            var deadline = card.data('deadline');
+            var banner = card.data('banner');
+            var desc = card.data('desc');
+            var notes = card.data('notes');
+            var isClaimed = card.data('claimed');
+            var isSoldOut = card.data('soldout');
+
+            currentModalCouponId = couponId;
+
+            // 帶入彈出視窗資料
+            $('#ckc-modal-title').text(title);
+            
+            if (deadline) {
+                var formattedDate = deadline.replace(/-/g, '/');
+                $('#ckc-modal-deadline-val').text(formattedDate);
+            } else {
+                $('#ckc-modal-deadline-val').text('無限制');
+            }
+
+            if (banner) {
+                $('#ckc-modal-banner-img').attr('src', banner).show();
+                $('.ckc-modal-banner-wrap').show();
+            } else {
+                $('#ckc-modal-banner-img').attr('src', '').hide();
+                $('.ckc-modal-banner-wrap').hide();
+            }
+
+            $('#ckc-modal-desc-content').text(desc || '暫無活動說明');
+            $('#ckc-modal-notes-content').text(notes || '暫無注意事項');
+
+            // 彈出視窗底部的領取按鈕狀態
+            var $subBtn = $('#ckc-modal-submit-btn');
+            $subBtn.removeClass('claimed sold-out').removeAttr('disabled');
+            
+            var isMyBox = card.hasClass('claimed-box');
+            if (isMyBox || isClaimed === true || isClaimed === 'true') {
+                $subBtn.addClass('claimed').text('已領取').attr('disabled', 'disabled');
+            } else if (isSoldOut === true || isSoldOut === 'true') {
+                $subBtn.addClass('sold-out').text('已搶光').attr('disabled', 'disabled');
+            } else {
+                $subBtn.text('立即領取');
+            }
+
+            $('#ckc-detail-modal').addClass('open');
+        });
+
+        // 關閉彈出視窗
+        $('.ckc-modal-close-btn, .ckc-modal-overlay').on('click', function(e) {
+            if (e.target === this || $(this).hasClass('ckc-modal-close-btn')) {
+                $('#ckc-detail-modal').removeClass('open');
+            }
+        });
+
+        // AJAX 領取折價券底層方法
+        function claimCouponAjax(couponId, callback) {
+            $.ajax({
+                url: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',
+                type: 'POST',
+                data: {
+                    action: 'ckc_claim_coupon',
+                    coupon_id: couponId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showToast(response.data.message);
+                        
+                        // 同步更新列表中卡片的狀態
+                        var card = $('.ckc-coupon-item-card[data-coupon-id="' + couponId + '"]');
+                        card.data('claimed', 'true').addClass('claimed');
+                        card.find('.ckc-claim-action-btn').addClass('claimed').text('已領取').attr('disabled', 'disabled');
+                        
+                        // 更新券匣總計數
+                        var currentCount = parseInt($('.ckc-box-count').text()) || 0;
+                        $('.ckc-box-count').text(currentCount + 1);
+
+                        // 判斷庫存狀態
+                        if (response.data.is_sold_out) {
+                            card.data('soldout', 'true').addClass('sold-out');
+                        }
+
+                        // 動態插入一筆到「我的券匣」面板中，使用戶不需重新整理
+                        var code = card.data('code');
+                        var title = card.data('title');
+                        var deadline = card.data('deadline');
+                        var banner = card.data('banner');
+                        var desc = card.data('desc');
+                        var notes = card.data('notes');
+                        var img = card.find('.ckc-card-img-wrap img').attr('src');
+                        var applyUrl = '<?php echo esc_url( wc_get_cart_url() ); ?>?ckc_apply_coupon=' + encodeURIComponent(code);
+
+                        var claimedHtml = `
+                            <div class="ckc-coupon-item-card claimed-box" 
+                                 data-coupon-id="${couponId}"
+                                 data-title="${title}"
+                                 data-code="${code}"
+                                 data-deadline="${deadline}"
+                                 data-banner="${banner}"
+                                 data-desc="${desc}"
+                                 data-notes="${notes}"
+                                 data-claimed="true"
+                                 data-soldout="false">
+                                <div class="ckc-card-left">
+                                    <div class="ckc-card-img-wrap">
+                                        <img src="${img}" alt="${title}" />
+                                    </div>
+                                    <a href="#" class="ckc-rules-trigger">使用規則</a>
+                                </div>
+                                <div class="ckc-card-middle">
+                                    <h3 class="ckc-card-title">${title}</h3>
+                                    <div class="ckc-card-code">代碼：<code>${code.toUpperCase()}</code></div>
+                                </div>
+                                <div class="ckc-card-right">
+                                    <a href="${applyUrl}" class="ckc-apply-action-btn">立即使用</a>
+                                </div>
+                            </div>
+                        `;
+
+                        $('#ckc-panel-my-box .ckc-no-coupons').remove();
+                        $('#ckc-panel-my-box .ckc-coupon-cards-grid').append(claimedHtml);
+
+                        if (callback) callback(true);
+                    } else {
+                        showToast(response.data.message || '領取失敗，請重新重試！');
+                        if (callback) callback(false);
+                    }
+                },
+                error: function() {
+                    showToast('網路連線失敗，請稍後重試！');
+                    if (callback) callback(false);
+                }
+            });
+        }
+
+        // 列表中的卡片「領取」按鈕點擊事件
+        $('body').on('click', '.ckc-claim-action-btn:not(.claimed):not(.sold-out)', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            var card = btn.closest('.ckc-coupon-item-card');
+            var couponId = card.data('coupon-id');
+
+            btn.text('領取中...').attr('disabled', 'disabled');
+            claimCouponAjax(couponId, function(success) {
+                if (!success) {
+                    btn.text('領取').removeAttr('disabled');
+                }
+            });
+        });
+
+        // 彈出視窗內的「立即領取」按鈕點擊事件
+        $('#ckc-modal-submit-btn').on('click', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            if (btn.hasClass('claimed') || btn.hasClass('sold-out') || !currentModalCouponId) {
+                return;
+            }
+
+            btn.text('領取中...').attr('disabled', 'disabled');
+            claimCouponAjax(currentModalCouponId, function(success) {
+                if (success) {
+                    btn.addClass('claimed').text('已領取').attr('disabled', 'disabled');
+                    $('#ckc-detail-modal').removeClass('open');
+                } else {
+                    btn.removeClass('claimed').text('立即領取').removeAttr('disabled');
+                }
+            });
+        });
+
+        // 手動輸入折價券代碼點擊領取事件
+        $('#ckc-submit-code-btn').on('click', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            var codeInput = $('#ckc-coupon-code-input');
+            var code = codeInput.val().trim();
+
+            if (!code) {
+                showToast('請輸入折價券代碼！');
+                return;
+            }
+
+            btn.text('領取中...').attr('disabled', 'disabled');
+            $.ajax({
+                url: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',
+                type: 'POST',
+                data: {
+                    action: 'ckc_claim_by_code',
+                    coupon_code: code
+                },
+                success: function(response) {
+                    btn.text('領取').removeAttr('disabled');
+                    if (response.success) {
+                        showToast(response.data.message);
+                        codeInput.val('');
+                        
+                        // 若該券存在於目前畫面的列表中，進行同步狀態更新
+                        var couponId = response.data.coupon_id;
+                        var card = $('.ckc-coupon-item-card[data-coupon-id="' + couponId + '"]');
+                        if (card.length) {
+                            card.data('claimed', 'true').addClass('claimed');
+                            card.find('.ckc-claim-action-btn').addClass('claimed').text('已領取').attr('disabled', 'disabled');
+                        }
+
+                        // 稍微延遲後重新整理頁面，同步所有狀態與券匣
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1200);
+                    } else {
+                        showToast(response.data.message || '無法領取該折扣碼，請重試！');
+                    }
+                },
+                error: function() {
+                    btn.text('領取').removeAttr('disabled');
+                    showToast('網路連線失敗，請稍後重試！');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
