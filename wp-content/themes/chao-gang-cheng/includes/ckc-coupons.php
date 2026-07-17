@@ -1569,3 +1569,15 @@ function ckc_coupon_claim_center_shortcode() {
     return ob_get_clean();
 }
 
+/* ---------------- 移除後台 WooCommerce / 行銷中的折價券選單 ---------------- */
+add_action( 'admin_menu', 'ckc_remove_woocommerce_coupons_menu', 999 );
+function ckc_remove_woocommerce_coupons_menu() {
+    // 移除 WooCommerce 選單下的折價券
+    remove_submenu_page( 'woocommerce', 'edit.php?post_type=shop_coupon' );
+    // 移除行銷 (Marketing) 選單下的折價券
+    remove_submenu_page( 'woocommerce-marketing', 'edit.php?post_type=shop_coupon' );
+    // 移除主選單獨立的折價券（若有）
+    remove_menu_page( 'edit.php?post_type=shop_coupon' );
+}
+
+
