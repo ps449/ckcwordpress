@@ -2110,7 +2110,9 @@ function ckc_hide_cart_coupon_input_css() {
             background-position: initial !important;
             padding-left: 20px !important;
         }
-        /* 隱藏購物車頁面的紅利點數輸入區 */
+        /* 隱藏原生與購物車頁面的紅利點數輸入區（全球隱藏，僅保留結帳頁自訂區） */
+        .wps_wpr_points_class,
+        .custom_point,
         .woocommerce-cart .wps_wpr_points_class,
         .woocommerce-cart .custom_point {
             display: none !important;
