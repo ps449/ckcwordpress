@@ -5310,10 +5310,12 @@ function chao_gang_cheng_discount_badge_css() {
     .chao-onsale,
     .woocommerce span.onsale.chao-onsale,
     .woocommerce-page span.onsale.chao-onsale {
-        display: block !important;
+        display: inline-block !important; /* 縮小至符合文字寬度 */
         position: absolute !important;
         top: 10px !important;
         left: 10px !important;
+        right: auto !important; /* 覆蓋拉伸屬性 */
+        width: auto !important; /* 覆蓋拉伸屬性 */
         z-index: 9 !important;
         min-width: 0 !important;
         min-height: 0 !important;
