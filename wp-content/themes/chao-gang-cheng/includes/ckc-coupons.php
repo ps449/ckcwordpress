@@ -298,7 +298,7 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
             ) );
 
             // 2. 券面標題
-            woocommerce_wp_text_field( array(
+            woocommerce_wp_text_input( array(
                 'id'          => '_ckc_coupon_label',
                 'label'       => '券面標題',
                 'value'       => $label_val,
