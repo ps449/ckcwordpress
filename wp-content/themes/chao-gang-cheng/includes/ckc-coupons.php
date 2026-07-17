@@ -556,7 +556,7 @@ function ckc_coupon_value_text( $coupon ) {
     return $parts ? implode( '＋', $parts ) : '優惠券';
 }
 
-/* ---------------- 一鍵套用（?ckc_apply_coupon=CODE） ---------------- */
+/* ---------------- 一鍵套用（?ckc_apply_coupon=CODE&ckc_redirect=checkout） ---------------- */
 add_action( 'template_redirect', 'ckc_coupon_apply_from_url', 20 );
 function ckc_coupon_apply_from_url() {
     if ( empty( $_GET['ckc_apply_coupon'] ) || ! function_exists( 'WC' ) || ! WC()->cart ) {
@@ -564,17 +564,23 @@ function ckc_coupon_apply_from_url() {
     }
     $code   = wc_format_coupon_code( sanitize_text_field( wp_unslash( $_GET['ckc_apply_coupon'] ) ) );
     $coupon = new WC_Coupon( $code );
-    
+
+    // 套用後跳回來源頁（購物車 or 結帳頁），由 ckc_redirect 參數決定
+    $redirect = wc_get_cart_url();
+    if ( isset( $_GET['ckc_redirect'] ) && 'checkout' === sanitize_key( $_GET['ckc_redirect'] ) ) {
+        $redirect = wc_get_checkout_url();
+    }
+
     // 允許套用「購物車領券」或是「領券中心」的公開券，避免暴力猜碼
     $is_public = 'yes' === $coupon->get_meta( '_ckc_coupon_public' ) || 'yes' === $coupon->get_meta( '_ckc_coupon_claim_public' );
     if ( ! $coupon->get_id() || ! $is_public ) {
-        wp_safe_redirect( wc_get_cart_url() );
+        wp_safe_redirect( $redirect );
         exit;
     }
     if ( ! WC()->cart->has_discount( $code ) ) {
-        WC()->cart->apply_coupon( $code ); // 失敗時 WooCommerce 會自行顯示原因通知
+        WC()->cart->apply_coupon( $code );
     }
-    wp_safe_redirect( wc_get_cart_url() );
+    wp_safe_redirect( $redirect );
     exit;
 }
 
@@ -610,7 +616,7 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
             return;
         }
     } else {
-        // ── 購物車頁：使用外部傳入的已過濾清單（由 ckc_cart_coupon_center 傳入）
+        // ── 購物車頁 / 結帳頁：使用外部傳入的已過濾清單
         if ( is_array( $coupons_override ) ) {
             $coupons = $coupons_override;
         } else {
@@ -621,7 +627,12 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
         }
     }
 
-    $in_cart_page = function_exists( 'is_cart' ) && is_cart();
+    $in_cart_page    = function_exists( 'is_cart' ) && is_cart();
+    $in_checkout_page = function_exists( 'is_checkout' ) && is_checkout();
+    // 結帳頁套用後跳回結帳頁；購物車頁套用後跳回購物車
+    $base_apply_url = ( 'checkout' === $context )
+        ? add_query_arg( 'ckc_redirect', 'checkout', wc_get_cart_url() )
+        : wc_get_cart_url();
     ?>
     <div class="ckc-coupon-grid">
         <?php foreach ( $coupons as $coupon ) :
@@ -631,7 +642,7 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
             $min     = floatval( $coupon->get_minimum_amount() );
             $expires = $coupon->get_date_expires();
             $applied = WC()->cart ? WC()->cart->has_discount( $code ) : false;
-            $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), wc_get_cart_url() );
+            $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), $base_apply_url );
             // 判斷是否過期
             $is_expired = $expires && $expires->getTimestamp() < time();
             ?>
@@ -660,7 +671,7 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
                     <?php elseif ( $is_expired ) : ?>
                         <span style="color:#94a3b8;font-size:12px;white-space:nowrap;">已過期</span>
                     <?php else : ?>
-                        <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-coupon-apply"><?php echo $in_cart_page ? '立即套用' : '套用去結帳'; ?></a>
+                        <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-coupon-apply"><?php echo ( $in_cart_page ) ? '立即套用' : '套用去結帳'; ?></a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -2095,6 +2106,35 @@ function ckc_hide_cart_coupon_input_css() {
 add_action( 'wp', 'ckc_remove_checkout_coupon_form' );
 function ckc_remove_checkout_coupon_form() {
     remove_action( 'woocommerce_before_checkout_form', 'woocommerce_checkout_coupon_form', 10 );
+}
+
+// ── 結帳頁加入「我的優惠券」面板
+add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_coupon_panel', 5 );
+function ckc_checkout_coupon_panel() {
+    if ( ! is_user_logged_in() ) return;
+
+    $user_id     = get_current_user_id();
+    $claimed_ids = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+    $claimed_ids = array_filter( array_map( 'intval', $claimed_ids ) );
+    if ( empty( $claimed_ids ) ) return;
+
+    // 建構已領取且有效（未過期）的折價券清單
+    $coupons = array();
+    foreach ( $claimed_ids as $cid ) {
+        $coupon = new WC_Coupon( $cid );
+        if ( ! $coupon->get_id() ) continue;
+        $wc_exp = $coupon->get_date_expires();
+        if ( $wc_exp && $wc_exp->getTimestamp() < time() ) continue;
+        $coupons[] = $coupon;
+    }
+    if ( empty( $coupons ) ) return;
+
+    echo '<div class="ckc-coupon-center" style="margin-bottom: 24px;">';
+    echo '<div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 4px;">🎟️ 我的優惠券</div>';
+    echo '<p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">每筆訂單限用一張優惠券</p>';
+    // 傳入已過濾的券清單，套用後跳回結帳頁
+    ckc_render_coupon_cards( 'checkout', $coupons );
+    echo '</div>';
 }
 
 
