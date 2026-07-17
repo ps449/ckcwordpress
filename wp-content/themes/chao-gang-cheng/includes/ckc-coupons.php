@@ -2212,7 +2212,7 @@ function ckc_checkout_points_panel() {
     ?>
     <div class="custom_point_checkout woocommerce-info wps_wpr_checkout_points_class" style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px; background: #fff; display: block !important;">
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" class="input-text" id="wps_cart_points" value="" placeholder="紅利點數" style="height: 42px; border-radius: 30px; padding: 0 20px; border: 1px solid #d1d5db; width: 220px;" />
+            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" class="input-text" id="wps_cart_points" value="" placeholder="紅利點數" style="height: 42px; border-radius: 30px; padding: 0 20px; border: 1px solid #d1d5db; width: 220px; background-image: none !important;" />
             <button type="button" class="button wps_cart_points_apply" name="wps_cart_points_apply" id="wps_cart_points_apply" data-id="<?php echo esc_attr( $user_id ); ?>" data-order-limit="0" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #7c6767; color: #fff; border: none; cursor: pointer;">折抵紅利</button>
             <button type="button" class="button" id="wps_cart_points_apply_all" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #6b7280; color: #fff; border: none; cursor: pointer;">一鍵全部折抵</button>
         </div>
