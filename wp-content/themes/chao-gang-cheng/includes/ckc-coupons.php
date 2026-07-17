@@ -229,7 +229,6 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
     $inventory_val    = get_post_meta( $coupon_id, '_ckc_coupon_claim_inventory', true );
     $claim_count      = get_post_meta( $coupon_id, '_ckc_coupon_claim_count', true );
     $category_val     = get_post_meta( $coupon_id, '_ckc_coupon_claim_category', true );
-    $deadline         = get_post_meta( $coupon_id, '_ckc_coupon_claim_deadline', true );
     $image_url        = get_post_meta( $coupon_id, '_ckc_coupon_claim_image', true );
     $banner_url       = get_post_meta( $coupon_id, '_ckc_coupon_claim_banner', true );
     $description_val  = get_post_meta( $coupon_id, '_ckc_coupon_claim_description', true );
@@ -763,10 +762,10 @@ function ckc_claim_coupon_ajax_handler() {
         wp_send_json_error( array( 'message' => '此折價券未開放領取！' ) );
     }
 
-    // 驗證領取期限
-    $deadline = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
-    if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
-        wp_send_json_error( array( 'message' => '此折價券領取期限已過！' ) );
+    // 驗證領取期限（使用 WooCommerce 原生 date_expires）
+    $wc_expires = $coupon->get_date_expires();
+    if ( $wc_expires && $wc_expires->getTimestamp() < time() ) {
+        wp_send_json_error( array( 'message' => '此折價券已過期，無法領取！' ) );
     }
 
     // 驗證限量庫存
@@ -823,10 +822,10 @@ function ckc_claim_by_code_ajax_handler() {
         wp_send_json_error( array( 'message' => '此折價券不支援公開領取！' ) );
     }
 
-    // 驗證領取期限
-    $deadline = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
-    if ( $deadline && strtotime( $deadline ) < strtotime( date('Y-m-d') ) ) {
-        wp_send_json_error( array( 'message' => '此折價券領取期限已過！' ) );
+    // 驗證領取期限（使用 WooCommerce 原生 date_expires）
+    $wc_expires_check = $coupon->get_date_expires();
+    if ( $wc_expires_check && $wc_expires_check->getTimestamp() < time() ) {
+        wp_send_json_error( array( 'message' => '此折價券已過期，無法領取！' ) );
     }
 
     // 驗證限量庫存
@@ -927,7 +926,12 @@ function ckc_coupon_claim_center_shortcode() {
                             if ( empty( $title ) ) {
                                 $title = ckc_coupon_value_text( $coupon );
                             }
-                            $deadline    = $coupon->get_meta( '_ckc_coupon_claim_deadline' );
+                            $deadline    = '';
+                            $wc_exp      = $coupon->get_date_expires();
+                            if ( $wc_exp ) {
+                                // 前台顯示格式：YYYY/MM/DD，與後台「折價券到期日」同一資料來源
+                                $deadline = $wc_exp->date( 'Y/m/d' );
+                            }
                             $thumbnail   = $coupon->get_meta( '_ckc_coupon_claim_image' );
                             $banner      = $coupon->get_meta( '_ckc_coupon_claim_banner' );
                             $category    = $coupon->get_meta( '_ckc_coupon_claim_category' );
@@ -979,7 +983,7 @@ function ckc_coupon_claim_center_shortcode() {
                                 <div class="ckc-card-middle">
                                     <h3 class="ckc-card-title"><?php echo esc_html( $title ); ?></h3>
                                     <?php if ( $deadline ) : ?>
-                                        <div class="ckc-card-deadline">領取期限：<?php echo esc_html( str_replace('-', '/', $deadline) ); ?></div>
+                                        <div class="ckc-card-deadline">到期日：<?php echo esc_html( $deadline ); ?></div>
                                     <?php endif; ?>
                                 </div>
                                 
@@ -2076,7 +2080,7 @@ function ckc_coupon_center_admin_page() {
                     <th>優惠類型</th>
                     <th>類別</th>
                     <th>領取進度</th>
-                    <th>截止期限</th>
+                    <th>到期日</th>
                     <th>狀態</th>
                     <th>操作</th>
                 </tr>
@@ -2090,6 +2094,9 @@ function ckc_coupon_center_admin_page() {
                 $inventory   = get_post_meta( $post->ID, '_ckc_coupon_claim_inventory', true );
                 $claim_count = intval( get_post_meta( $post->ID, '_ckc_coupon_claim_count', true ) );
                 $is_active   = ( 'publish' === $post->post_status );
+                // 到期日使用 WooCommerce 原生 date_expires（與後台「折價券到期日」欄位同步）
+                $wc_exp      = $coupon->get_date_expires();
+                $deadline    = $wc_exp ? $wc_exp->date( 'Y/m/d' ) : '';
 
                 // 計算進度
                 $pct = '';
@@ -2111,7 +2118,7 @@ function ckc_coupon_center_admin_page() {
                 }
 
                 $edit_url = get_edit_post_link( $post->ID );
-                $deadline_text = $deadline ? str_replace('-', '/', $deadline) : '無限制';
+                $deadline_text = $deadline ?: '無限制';
                 ?>
                 <tr>
                     <td>
@@ -2121,7 +2128,7 @@ function ckc_coupon_center_admin_page() {
                     <td><?php echo $type_text; ?></td>
                     <td><?php echo $category ? esc_html($category) : '<span style="color:#94a3b8">─</span>'; ?></td>
                     <td><?php echo $progress_html; ?></td>
-                    <td style="<?php echo ($deadline && strtotime($deadline) < time()) ? 'color:#ef4444;' : ''; ?>">
+                    <td style="<?php echo ( $wc_exp && $wc_exp->getTimestamp() < time() ) ? 'color:#ef4444;' : ''; ?>">
                         <?php echo esc_html($deadline_text); ?>
                     </td>
                     <td>
