@@ -2110,11 +2110,14 @@ function ckc_hide_cart_coupon_input_css() {
             background-position: initial !important;
             padding-left: 20px !important;
         }
-        /* 隱藏原生與購物車頁面的紅利點數輸入區（全球隱藏，僅保留結帳頁自訂區） */
-        .wps_wpr_points_class,
-        .custom_point,
+        /* 隱藏原生與新版 Gutenberg Block 購物車頁面的紅利點數輸入區 */
+        .woocommerce-cart #wps_wpr_button_to_add_points_section,
+        .woocommerce-cart .wps_wpr_apply_custom_points,
+        .woocommerce-cart .wps_wpr_append_points_apply_html,
         .woocommerce-cart .wps_wpr_points_class,
-        .woocommerce-cart .custom_point {
+        .woocommerce-cart .custom_point,
+        .wps_wpr_points_class,
+        .custom_point {
             display: none !important;
         }
         /* 將「[ 移除 ]」文字連結樣式改為精美按鈕 */
