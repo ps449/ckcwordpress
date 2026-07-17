@@ -1975,6 +1975,7 @@ function ckc_purge_all_coupon_menu_entries() {
 // ── Step 2：admin_head CSS 強制隱藏兜底（瀏覽器端最終防線）
 add_action( 'admin_head', 'ckc_hide_coupon_menu_css' );
 function ckc_hide_coupon_menu_css() {
+    global $post_type;
     ?>
     <style id="ckc-hide-wc-coupon">
         /* 強制隱藏所有非自訂的 shop_coupon 連結 */
@@ -1988,6 +1989,13 @@ function ckc_hide_coupon_menu_css() {
             content: "\f524";
             font-family: dashicons;
         }
+        <?php if ( 'shop_coupon' === $post_type ) : ?>
+        /* 隱藏「一般」tab 的「折價券到期日」欄位
+           到期日改由「領券中心設定 > 領取截止期限」統一管理並自動同步 */
+        .coupon_options_panel p.form-field.expiry_date_field {
+            display: none !important;
+        }
+        <?php endif; ?>
     </style>
     <?php
 }
