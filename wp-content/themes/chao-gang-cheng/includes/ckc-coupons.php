@@ -2209,17 +2209,69 @@ function ckc_checkout_points_panel() {
     $points_needed   = $cart_subtotal / $one_point_value;
     $points_to_apply = min( $points, $points_needed );
 
+    // 檢查目前是否已套用紅利折抵點數
+    $applied_points = WC()->session ? (int) WC()->session->get( 'wps_cart_points', 0 ) : 0;
+    $is_applied = ($applied_points > 0);
+
     ?>
-    <div class="custom_point_checkout woocommerce-info wps_wpr_checkout_points_class" style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px; background: #fff; display: block !important;">
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" class="input-text" id="wps_cart_points" value="" placeholder="紅利點數" style="height: 42px; border-radius: 30px; padding: 0 20px; border: 1px solid #d1d5db; width: 220px; background-image: none !important;" />
-            <button type="button" class="button wps_cart_points_apply" name="wps_cart_points_apply" id="wps_cart_points_apply" data-id="<?php echo esc_attr( $user_id ); ?>" data-order-limit="0" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #7c6767; color: #fff; border: none; cursor: pointer;">折抵紅利</button>
-            <button type="button" class="button" id="wps_cart_points_apply_all" style="height: 42px; border-radius: 30px; padding: 0 24px; font-weight: 600; background-color: #6b7280; color: #fff; border: none; cursor: pointer;">一鍵全部折抵</button>
+    <div class="ckc-points-center" style="margin-bottom: 24px;">
+        <div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 8px;">🪙 紅利點數折抵</div>
+        
+        <div class="ckc-points-card<?php echo $is_applied ? ' is-applied' : ''; ?>" style="display: flex; align-items: center; gap: 12px; background: #fff; border: 1px dashed #d6a878; border-radius: 10px; padding: 12px 14px; max-width: 480px; position: relative; transition: all 0.25s ease;">
+            <div class="ckc-points-left" style="text-align: center; min-width: 80px; border-right: 1px dashed #e2e8f0; padding-right: 12px;">
+                <div class="ckc-points-value" style="font-size: 17px; font-weight: 800; color: #b91c1c; line-height: 1.3;">
+                    🪙 <?php echo $is_applied ? esc_html( $applied_points ) : esc_html( $points_to_apply ); ?> 點
+                </div>
+                <div class="ckc-points-worth" style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+                    折抵 NT$<?php echo esc_html( number_format( ($is_applied ? $applied_points : $points_to_apply) * $one_point_value ) ); ?>
+                </div>
+            </div>
+            
+            <div class="ckc-points-body" style="flex: 1; min-width: 0;">
+                <div class="ckc-points-title" style="font-size: 14px; font-weight: 700; color: #1e293b;">
+                    <?php echo $is_applied ? '已套用紅利折抵' : '紅利點數全額折抵'; ?>
+                </div>
+                <div class="ckc-points-meta" style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                    您的帳戶餘額： <code><?php echo esc_html( $points ); ?> 點</code>
+                </div>
+            </div>
+            
+            <div class="ckc-points-action" style="white-space: nowrap;">
+                <?php if ( $is_applied ) : ?>
+                    <button type="button" class="ckc-points-remove-btn" onclick="jQuery('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first().trigger('click');" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                        移除折抵
+                    </button>
+                <?php else : ?>
+                    <button type="button" class="ckc-points-apply-btn" onclick="jQuery('#wps_cart_points').val(<?php echo (int) $points_to_apply; ?>); jQuery('#wps_cart_points_apply').trigger('click');" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                        立即折抵
+                    </button>
+                <?php endif; ?>
+            </div>
         </div>
-        <div class="wps_wpr_point_msg" style="margin-top: 8px; font-size: 13px; color: #4b5563;">
-            您的可用紅利點數： <strong style="color: #b91c1c; font-size: 15px;"><?php echo esc_html( $points ); ?></strong>
+
+        <?php if ( ! $is_applied ) : ?>
+            <a href="javascript:void(0);" onclick="jQuery('#ckc-custom-points-wrap').toggle();" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #7f6c60; text-decoration: underline;">自訂折抵點數</a>
+            
+            <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
+                    <button type="button" onclick="jQuery('#wps_cart_points').val(jQuery('#ckc_custom_points_input').val()); jQuery('#wps_cart_points_apply').trigger('click');" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- 隱藏的實際輸入與提交表單（由 plugin JS 控制） -->
+        <div class="wps_wpr_checkout_points_class" style="display: none !important;">
+            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" id="wps_cart_points" value="<?php echo $is_applied ? esc_attr($applied_points) : ''; ?>" />
+            <button type="button" id="wps_cart_points_apply" data-id="<?php echo esc_attr( $user_id ); ?>" data-order-limit="0">Apply</button>
         </div>
     </div>
+
+    <style>
+    .ckc-points-card.is-applied { border-style: solid !important; border-color: #16a34a !important; background: #f0fdf4 !important; }
+    .ckc-points-remove-btn:hover { background-color: #ef4444 !important; color: #fff !important; border-color: #ef4444 !important; }
+    .ckc-points-apply-btn:hover { background-color: #f86f69 !important; }
+    </style>
     <?php
 }
 
