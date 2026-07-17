@@ -179,7 +179,8 @@
                         </div>
                     <?php endif; ?>
 
-                    <!-- Search Icon & Dropdown -->
+                    <!-- Search Icon & Dropdown（order-pay 金流跳轉頁不輸出：避免金流外掛的泛用表單 submit 誤送搜尋表單） -->
+                    <?php if ( ! ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-pay' ) ) ) : ?>
                     <div class="search-menu-wrapper" style="position: relative; display: inline-block;">
                         <a href="#" class="search-icon-toggle" title="搜尋商品" style="color: var(--secondary-color); display: flex; align-items: center; padding: 5px 0;" onclick="event.preventDefault();">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -197,6 +198,7 @@
                             </form>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                 </div>
             </div>
@@ -253,7 +255,8 @@
             </div>
         </div>
 
-        <!-- Mobile Search Dropdown Bar -->
+        <!-- Mobile Search Dropdown Bar（order-pay 金流跳轉頁不輸出） -->
+        <?php if ( ! ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-pay' ) ) ) : ?>
         <div class="mobile-search-bar" style="display: none;">
             <div class="container">
                 <form role="search" method="get" class="search-form" action="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 15px; background-color: var(--white); margin: 5px 0;">
@@ -268,6 +271,7 @@
                 </form>
             </div>
         </div>
+        <?php endif; ?>
     </header>
 
     <!-- Mobile Drawer Overlay & Content -->

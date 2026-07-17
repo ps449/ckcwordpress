@@ -23,6 +23,22 @@ files_to_upload = [
     {
         "local": "wp-content/themes/chao-gang-cheng/header.php",
         "remote": "wp-content/themes/chao-gang-cheng/header.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/ckc-referral.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/ckc-referral.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/ckc-referral-partner.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/ckc-referral-partner.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/ckc-referral-admin.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/ckc-referral-admin.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/ckc-coupons.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/ckc-coupons.php"
     }
 ]
 

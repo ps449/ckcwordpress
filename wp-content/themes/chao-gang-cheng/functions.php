@@ -6440,6 +6440,10 @@ function ckc_gemini_agent_page() {
                         <button class="quick-prompt-btn" data-prompt="請幫我將黑貓託運單號 【請貼上託運單號】 填入訂單 #【請輸入訂單號】，並通知客戶。">🐈‍⬛ 動作：填入黑貓託運單號（單筆）</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我批次匯入以下黑貓託運單號清單（每行一組：訂單號 託運單號）：&#10;【請在此貼上黑貓契客系統匯出的清單，例如：&#10;#265 9031234567890&#10;#271 9031234567891】">📦 動作：批次匯入黑貓託運單號</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我自動抓取所有已填託運單號訂單的黑貓貨運狀態，並回填至後台訂單紀錄。">📡 動作：自動抓取黑貓貨態回填後台</button>
+                        <button class="quick-prompt-btn" data-prompt="請給我推薦分潤報表：推薦訂單數、推薦營收、已發放點數與 Top 推薦人。">🤝 查詢推薦分潤報表</button>
+                        <button class="quick-prompt-btn" data-prompt="請產生夥伴分潤對帳單，包含每位夥伴的待確認、可出金、已出金金額與稅務試算。">💰 產生夥伴分潤對帳單</button>
+                        <button class="quick-prompt-btn" data-prompt="請標記會員 ID 【請輸入會員ID】 的可出金分潤為已出金。">✅ 動作：標記夥伴分潤已出金</button>
+                        <button class="quick-prompt-btn" data-prompt="請核准會員 ID 【請輸入會員ID】 成為推廣夥伴，費率 8%。">🌟 動作：核准推廣夥伴申請</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我執行自動化每日營運檢查：1. 確認是否有付款超過 24 小時卻未出貨的延遲訂單；2. 列出目前零庫存或負庫存的警告商品；3. 提供補貨建議。">⚠️ 執行每日庫存與出貨「自動化健康檢查」</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我查詢最新的一筆處理中訂單的詳細資訊，包含收件人、電話、地址與商品清單。">🔍 查詢特定訂單狀況</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我搜尋收件人是「王小明」的訂單記錄與目前的配送狀態。">👤 搜尋收件人訂單記錄</button>
@@ -7127,6 +7131,58 @@ function ckc_ajax_gemini_chat() {
         }
     }
 
+    // --- 1h. 夥伴分潤對帳單 (Agent Query: Partner Payout Statement) ---
+    if ( preg_match( '/(?:夥伴|出金).{0,10}(?:對帳|對帳單|結算)|對帳單/u', $message ) ) {
+        $has_action = true;
+        if ( ! empty( $api_key ) && function_exists( 'ckc_refp_statement_text' ) ) {
+            $action_result .= "\n[系統動作執行紀錄]：\n" . ckc_refp_statement_text();
+        } else {
+            $action_result .= "\n[系統動作執行紀錄]：【模擬沙盒數據】夥伴分潤對帳單：王小明（KOL，8%）可出金 NT$3,200（扣繳 NT$0、二代健保 NT$0、實付 NT$3,200）。(如配置真實 API Key 將讀取真實帳本)";
+        }
+    }
+
+    // --- 1i. 標記夥伴出金 (Agent Action: Mark Partner Payout as Paid) ---
+    if ( preg_match( '/(?:標記|完成).{0,15}會員\s*ID?\s*(\d+).{0,20}(?:已出金|出金|已付款|已匯款)/u', $message, $m ) ) {
+        $has_action = true;
+        if ( ! empty( $api_key ) && function_exists( 'ckc_refp_mark_paid' ) ) {
+            $action_result .= "\n[系統動作執行紀錄]：" . ckc_refp_mark_paid( intval( $m[1] ) );
+        } else {
+            $action_result .= "\n[系統動作執行紀錄]：【模擬沙盒動作成功】已將會員 ID {$m[1]} 的可出金分潤標記為已出金！(如配置真實 API Key 將實際更新帳本)";
+        }
+    }
+
+    // --- 1j. 核准推廣夥伴 (Agent Action: Approve Partner Application) ---
+    if ( preg_match( '/核准.{0,10}會員\s*ID?\s*(\d+).{0,15}(?:成為)?(?:推廣)?夥伴(?:.{0,15}?(\d+(?:\.\d+)?)\s*%)?/u', $message, $m ) ) {
+        $has_action = true;
+        $approve_id = intval( $m[1] );
+        $approve_rate = isset( $m[2] ) && '' !== $m[2] ? $m[2] : '';
+        if ( ! empty( $api_key ) && function_exists( 'ckc_refp_partner_type' ) ) {
+            if ( get_user_by( 'id', $approve_id ) ) {
+                $p_type = ( false !== mb_strpos( $message, '團購' ) ) ? 'groupbuyer' : 'kol';
+                update_user_meta( $approve_id, '_ckc_ref_partner', $p_type );
+                delete_user_meta( $approve_id, '_ckc_ref_partner_apply' );
+                if ( '' !== $approve_rate ) {
+                    update_user_meta( $approve_id, '_ckc_ref_partner_rate', $approve_rate );
+                }
+                $action_result .= "\n[系統動作執行紀錄]：已核准會員 ID {$approve_id} 成為推廣夥伴（" . ( 'kol' === $p_type ? 'KOL' : '團購主' ) . ( '' !== $approve_rate ? "，費率 {$approve_rate}%" : '，費率預設 8%' ) . "），其推薦訂單將改走現金分潤軌。";
+            } else {
+                $action_result .= "\n[系統動作執行紀錄]：執行失敗，找不到會員 ID {$approve_id}。";
+            }
+        } else {
+            $action_result .= "\n[系統動作執行紀錄]：【模擬沙盒動作成功】已核准會員 ID {$approve_id} 成為推廣夥伴！(如配置真實 API Key 將實際更新會員資料)";
+        }
+    }
+
+    // --- 1g. 推薦分潤報表 (Agent Query: Referral Commission Report) ---
+    if ( preg_match( '/(?:推薦|分潤).{0,10}(?:報表|統計|概況|成效)|(?:報表|統計).{0,10}(?:推薦|分潤)/u', $message ) ) {
+        $has_action = true;
+        if ( ! empty( $api_key ) && function_exists( 'ckc_ref_admin_report_text' ) ) {
+            $action_result .= "\n[系統動作執行紀錄]：推薦分潤報表查詢結果：\n" . ckc_ref_admin_report_text();
+        } else {
+            $action_result .= "\n[系統動作執行紀錄]：【模擬沙盒數據】推薦訂單共 12 筆，推薦營收 NT$18,600，已發放分潤 930 點。Top 推薦人：1. 王小明：5 筆訂單，累計 420 點。(如配置真實 API Key 將讀取真實資料庫)";
+        }
+    }
+
     // --- 2. 解析並讀取即時資料庫數據 (Agent Query) ---
     $db_context = '';
     
@@ -7585,11 +7641,22 @@ function ckc_ajax_gemini_chat() {
 }
 
 /**
- * 29. 翻譯紅利點數外掛字串 (Points and Rewards)
+ * 29. 翻譯結帳與紅利點數外掛字串 (Checkout & Points and Rewards)
  */
 add_filter( 'gettext', 'ckc_translate_points_and_rewards_strings', 20, 3 );
 function ckc_translate_points_and_rewards_strings( $translated_text, $text, $domain ) {
-    if ( 'points-and-rewards-for-woocommerce' === $domain ) {
+    // 1. 翻譯 WooCommerce 優惠券折價券相關英文字串
+    if ( 'woocommerce' === $domain || empty( $domain ) ) {
+        if ( 'Have a coupon?' === $text ) {
+            return '有折價券嗎？';
+        }
+        if ( 'Click here to enter your code' === $text ) {
+            return '點此輸入折扣碼';
+        }
+    }
+
+    // 2. 翻譯紅利點數外掛字串
+    if ( 'points-and-rewards-for-woocommerce' === $domain || empty( $domain ) || strpos( $domain, 'points-and-rewards' ) !== false ) {
         switch ( $text ) {
             case 'Apply Points':
                 $translated_text = '折抵紅利';
@@ -7599,6 +7666,30 @@ function ckc_translate_points_and_rewards_strings( $translated_text, $text, $dom
                 break;
             case 'Your available points':
                 $translated_text = '您的可用紅利點數';
+                break;
+            case 'Points':
+                $translated_text = '紅利點數';
+                break;
+            case 'Points =':
+                $translated_text = '點數折抵：';
+                break;
+            case '%s Points':
+                $translated_text = '%s 點';
+                break;
+            case '%s Point':
+                $translated_text = '%s 點';
+                break;
+            case '%s Points = %s':
+                $translated_text = '%s 點 = %s';
+                break;
+            case '%s Point = %s':
+                $translated_text = '%s 點 = %s';
+                break;
+            case '%1$s Points = %2$s':
+                $translated_text = '%1$s 點 = %2$s';
+                break;
+            case '%1$s Point = %2$s':
+                $translated_text = '%1$s 點 = %2$s';
                 break;
         }
     }
@@ -9803,6 +9894,10 @@ function chao_checkout_custom_js_css() {
 
 // Load custom LINE Login module
 require_once get_template_directory() . '/includes/line-login.php';
+require_once get_template_directory() . '/includes/ckc-referral.php'; // 分潤系統（推薦好友，第一階段點數軌）
+require_once get_template_directory() . '/includes/ckc-referral-partner.php'; // 分潤系統（第二階段夥伴現金軌）
+require_once get_template_directory() . '/includes/ckc-referral-admin.php'; // 分潤系統（後台夥伴管理頁）
+require_once get_template_directory() . '/includes/ckc-coupons.php'; // 折扣券（領券中心＋專屬優惠券頁）
 
 // Load custom ECPay ECPg 2.0 (站內付 2.0) Payment Gateway
 require_once get_template_directory() . '/includes/ecpay-ecpg-gateway.php';
@@ -10102,6 +10197,49 @@ function ckc_custom_loop_add_to_cart_link( $html, $product ) {
         );
     }
     return $html;
+}
+
+/**
+ * 31x. Order-pay（金流跳轉頁）防護：
+ * 綠界 AIO 外掛在此頁以泛用選擇器自動送出表單，曾誤送主題搜尋表單導致
+ * 跳轉到空白搜尋頁而非綠界付款頁。header.php 已在此頁停止輸出搜尋表單；
+ * 這裡再加後備防護：移除任何 GET 表單（含管理列搜尋），並確保綠界付款
+ * 表單被「定向」送出。
+ */
+add_action( 'wp_head', 'chao_orderpay_payment_redirect_guard', 5 );
+function chao_orderpay_payment_redirect_guard() {
+    if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( 'order-pay' ) ) {
+        return;
+    }
+    ?>
+    <script>
+    (function() {
+        // 移除頁面上所有 GET 表單（搜尋、管理列），讓 forms[0] 一定是付款表單
+        function purgeGetForms() {
+            var forms = document.querySelectorAll('form');
+            for (var i = 0; i < forms.length; i++) {
+                var f = forms[i];
+                if ((f.method || '').toLowerCase() === 'get' && f.parentNode) {
+                    f.parentNode.removeChild(f);
+                }
+            }
+        }
+        try {
+            new MutationObserver(purgeGetForms).observe(document.documentElement, { childList: true, subtree: true });
+        } catch (e) {}
+        document.addEventListener('DOMContentLoaded', function() {
+            purgeGetForms();
+            // 後備：一秒後若仍在本頁，定向送出綠界付款表單
+            setTimeout(function() {
+                var pay = document.querySelector('form[action*="ecpay.com.tw"]');
+                if (pay) {
+                    pay.submit();
+                }
+            }, 1000);
+        });
+    })();
+    </script>
+    <?php
 }
 
 /* ============================================================
