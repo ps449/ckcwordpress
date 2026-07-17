@@ -7706,19 +7706,76 @@ function chao_gang_cheng_points_apply_all_script() {
     }
     ?>
     <style>
+    /* Styling for Coupon and loyalty points inputs */
+    #coupon_code,
+    #wps_cart_points {
+        height: 42px !important;
+        line-height: 42px !important;
+        padding: 0 20px !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 30px !important;
+        background-color: #fff !important;
+        color: #333 !important;
+        box-sizing: border-box !important;
+        display: inline-block !important;
+        vertical-align: middle !important;
+        transition: all 0.2s ease-in-out !important;
+        text-align: left !important;
+    }
+
+    #coupon_code::placeholder,
+    #wps_cart_points::placeholder {
+        color: #9ca3af !important;
+        font-size: 15px !important;
+    }
+
+    /* Hide Spinners for Points Input to make it clean and look like a text input */
+    #wps_cart_points::-webkit-outer-spin-button,
+    #wps_cart_points::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+    #wps_cart_points {
+        -moz-appearance: textfield !important;
+    }
+
+    /* Hover and Focus states */
+    #coupon_code:hover,
+    #wps_cart_points:hover {
+        border-color: #9ca3af !important;
+    }
+
+    #coupon_code:focus,
+    #wps_cart_points:focus {
+        border-color: #7c6767 !important; /* Matches --secondary-color */
+        box-shadow: 0 0 0 3px rgba(124, 103, 103, 0.15) !important;
+        outline: none !important;
+    }
+
+    /* Keep all buttons aligned and sized correctly */
+    .coupon button[name="apply_coupon"],
+    #wps_cart_points_apply,
+    #wps_cart_points_apply_all {
+        height: 42px !important;
+        line-height: 42px !important; /* Ensure vertical alignment of text in buttons */
+        padding: 0 24px !important;
+        font-size: 15px !important;
+        vertical-align: middle !important;
+        display: inline-block !important;
+        box-sizing: border-box !important;
+    }
+
     #wps_cart_points_apply_all {
         background-color: #6b7280 !important;
         color: #fff !important;
         border: none !important;
-        border-radius: 20px !important;
-        padding: 10px 24px !important;
+        border-radius: 30px !important; /* Changed from 20px to 30px to match standard pill buttons */
         font-weight: 600 !important;
         cursor: pointer !important;
         transition: all 0.2s ease-in-out !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        display: inline-block !important;
-        vertical-align: middle !important;
-        font-size: 15px !important;
     }
     #wps_cart_points_apply_all:hover {
         background-color: #4b5563 !important;
@@ -7728,21 +7785,45 @@ function chao_gang_cheng_points_apply_all_script() {
     
     /* Desktop layout */
     @media (min-width: 769px) {
+        #coupon_code,
+        #wps_cart_points {
+            width: 220px !important; /* Make inputs wider on desktop */
+            margin-right: 12px !important;
+        }
+
+        .coupon button[name="apply_coupon"],
+        #wps_cart_points_apply {
+            margin-right: 12px !important;
+        }
+
         #wps_cart_points_apply_all {
-            margin-left: 10px !important;
+            margin-left: 0 !important; /* Removed default margin left since we space buttons explicitly */
             margin-top: 0 !important;
         }
     }
     
     /* Mobile layout */
     @media (max-width: 768px) {
+        #coupon_code,
+        #wps_cart_points {
+            width: 100% !important;
+            margin-bottom: 12px !important;
+            text-align: center !important;
+        }
+        
+        .coupon button[name="apply_coupon"],
+        #wps_cart_points_apply {
+            width: 100% !important;
+            margin-bottom: 12px !important;
+            display: block !important;
+        }
+
         #wps_cart_points_apply_all {
-            margin-top: 10px !important;
+            margin-top: 0 !important;
             margin-left: 0 !important;
             width: 100% !important;
             display: block !important;
-            box-sizing: border-box !important;
-            padding: 12px 24px !important;
+            padding: 0 24px !important;
         }
     }
     </style>
