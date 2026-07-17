@@ -194,37 +194,54 @@ function ckc_add_coupon_claim_center_panel( $coupon_id, $coupon ) {
     <?php
 }
 
-/* ---------------- 後台：載入 WordPress 媒體庫上傳 JS ---------------- */
+/* ---------------- 後台：載入 WordPress 媒體庫上傳與頁籤記憶 JS ---------------- */
 add_action( 'admin_enqueue_scripts', 'ckc_coupon_admin_media_scripts' );
 function ckc_coupon_admin_media_scripts( $hook ) {
     global $post_type;
     if ( 'shop_coupon' === $post_type && ( 'post.php' === $hook || 'post-new.php' === $hook ) ) {
         wp_enqueue_media();
-        wp_add_inline_script( 'jquery', "
+        wp_add_inline_script( 'jquery', '
             jQuery(document).ready(function($) {
-                $('body').on('click', '.ckc_upload_image_btn', function(e) {
+                // 1. 媒體庫上傳按鈕
+                $("body").on("click", ".ckc_upload_image_btn", function(e) {
                     e.preventDefault();
                     var button = $(this);
-                    var targetId = button.data('target');
-                    var inputField = $('#' + targetId);
+                    var targetId = button.data("target");
+                    var inputField = $("#" + targetId);
                     
                     var file_frame = wp.media.frames.file_frame = wp.media({
-                        title: '選擇折價券圖片',
+                        title: "選擇折價券圖片",
                         button: {
-                            text: '使用此圖片'
+                            text: "使用此圖片"
                         },
                         multiple: false
                     });
                     
-                    file_frame.on('select', function() {
-                        var attachment = file_frame.state().get('selection').first().toJSON();
+                    file_frame.on("select", function() {
+                        var attachment = file_frame.state().get("selection").first().toJSON();
                         inputField.val(attachment.url);
                     });
                     
                     file_frame.open();
                 });
+
+                // 2. 記憶點選的頁籤 (避免存檔後重設為第一頁籤)
+                $(".coupon_data_tabs").on("click", "a", function() {
+                    var activeTab = $(this).attr("href");
+                    if (activeTab) {
+                        localStorage.setItem("wc_coupon_active_tab", activeTab);
+                    }
+                });
+
+                // 載入時還原點選的頁籤
+                var savedTab = localStorage.getItem("wc_coupon_active_tab");
+                if (savedTab && $(".coupon_data_tabs a[href=\'" + savedTab + "\']").length) {
+                    setTimeout(function() {
+                        $(".coupon_data_tabs a[href=\'" + savedTab + "\']").click();
+                    }, 50);
+                }
             });
-        " );
+        ' );
     }
 }
 
