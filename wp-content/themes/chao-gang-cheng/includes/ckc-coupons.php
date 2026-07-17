@@ -966,6 +966,18 @@ function ckc_coupon_claim_center_shortcode() {
 
     $user_id = get_current_user_id();
     $claimed_ids = $user_id ? (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true ) : array();
+    $claimed_ids = array_filter( array_map( 'intval', $claimed_ids ) );
+
+    // 預先過濾出實際存在且已發佈的折價券，避免右上角計數與列表顯示不一致
+    $my_claimed_coupons = array();
+    if ( ! empty( $claimed_ids ) ) {
+        foreach ( $claimed_ids as $cid ) {
+            $c = new WC_Coupon( $cid );
+            if ( $c->get_id() && 'publish' === get_post_status( $c->get_id() ) ) {
+                $my_claimed_coupons[] = $c;
+            }
+        }
+    }
 
     // 獲取所有供領取的折價券
     $coupons = ckc_get_claimable_coupons();
@@ -988,7 +1000,7 @@ function ckc_coupon_claim_center_shortcode() {
             <div class="ckc-claim-nav-buttons">
                 <button type="button" class="ckc-nav-btn active" data-tab="claim-list">領券中心</button>
                 <button type="button" class="ckc-nav-btn" data-tab="my-box">
-                    我的券匣 <span class="ckc-box-count"><?php echo count( $claimed_ids ); ?></span>
+                    我的券匣 <span class="ckc-box-count"><?php echo count( $my_claimed_coupons ); ?></span>
                 </button>
             </div>
         </div>
@@ -1102,18 +1114,7 @@ function ckc_coupon_claim_center_shortcode() {
             <!-- 2. 我的券匣面板 -->
             <div id="ckc-panel-my-box" class="ckc-spa-panel">
                 <div class="ckc-coupon-cards-grid">
-                    <?php
-                    $my_claimed_coupons = array();
-                    if ( ! empty( $claimed_ids ) ) {
-                        foreach ( $claimed_ids as $cid ) {
-                            $c = new WC_Coupon( $cid );
-                            if ( $c->get_id() ) {
-                                $my_claimed_coupons[] = $c;
-                            }
-                        }
-                    }
-
-                    if ( empty( $my_claimed_coupons ) ) : ?>
+                    <?php if ( empty( $my_claimed_coupons ) ) : ?>
                         <div class="ckc-no-coupons">您的券匣空空如也，快去領券中心領取吧！</div>
                     <?php else : ?>
                         <?php foreach ( $my_claimed_coupons as $coupon ) :
