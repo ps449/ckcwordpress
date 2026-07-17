@@ -7686,7 +7686,7 @@ function ckc_translate_points_and_rewards_strings( $translated_text, $text, $dom
         case 'Cart Discount':
             return '紅利折抵';
         case '[Remove]':
-            return '[ 移除 ]';
+            return '移除';
         case 'Remove':
             return '移除';
     }

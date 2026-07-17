@@ -2117,6 +2117,34 @@ function ckc_hide_cart_coupon_input_css() {
         .woocommerce-cart .custom_point {
             display: none !important;
         }
+        /* 將「[ 移除 ]」文字連結樣式改為精美按鈕 */
+        .woocommerce-remove-coupon,
+        #wps_wpr_remove_cart_point,
+        .wps_remove_virtual_coupon {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #fee2e2 !important; /* 輕粉紅背景 */
+            color: #ef4444 !important; /* 紅色文字 */
+            border: 1px solid #fecaca !important;
+            border-radius: 12px !important; /* 藥丸形圓角 */
+            padding: 2px 10px !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+            font-weight: 600 !important;
+            text-decoration: none !important;
+            margin-left: 8px !important;
+            transition: all 0.2s ease-in-out !important;
+            cursor: pointer !important;
+            vertical-align: middle !important;
+        }
+        .woocommerce-remove-coupon:hover,
+        #wps_wpr_remove_cart_point:hover,
+        .wps_remove_virtual_coupon:hover {
+            background-color: #ef4444 !important; /* 懸停變深紅 */
+            color: #ffffff !important;
+            border-color: #ef4444 !important;
+        }
     </style>
     <?php
 }
