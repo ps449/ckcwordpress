@@ -29,6 +29,106 @@ function ckc_ensure_coupons_enabled_in_db() {
     }
 }
 
+/* ---------------- 一次性示範折價券種子（執行後自動停用） ---------------- */
+add_action( 'wp_loaded', 'ckc_seed_demo_coupons', 20 );
+function ckc_seed_demo_coupons() {
+    // 已執行過就跳過
+    if ( get_option( 'ckc_demo_coupons_seeded' ) ) {
+        return;
+    }
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        return;
+    }
+
+    $demo = array(
+        array(
+            'code'     => 'NEWMEMBER100',
+            'amount'   => '100',
+            'type'     => 'fixed_cart',
+            'min'      => '500',
+            'per_user' => '1',
+            'limit'    => '200',
+            'label'    => '新會員見面禮 NT$100',
+            'cat'      => '新會員專區',
+            'deadline' => '2026-12-31',
+            'stock'    => '200',
+            'desc'     => "歡迎加入潮港城！首次消費享 NT\$100 折扣，適用於全館所有商品。",
+            'notes'    => "1. 本券每人限領一次\n2. 最低消費 NT\$500 以上方可使用\n3. 不得與其他折扣同時使用\n4. 效期至 2026/12/31",
+        ),
+        array(
+            'code'     => 'SUMMER200',
+            'amount'   => '200',
+            'type'     => 'fixed_cart',
+            'min'      => '1000',
+            'per_user' => '1',
+            'limit'    => '100',
+            'label'    => '夏日限時 NT$200 折',
+            'cat'      => '限時特惠',
+            'deadline' => '2026-09-30',
+            'stock'    => '100',
+            'desc'     => "夏日限定！消費滿 NT\$1,000 即享 NT\$200 折扣，限量 100 張，先搶先贏！",
+            'notes'    => "1. 限量 100 張，先搶先贏\n2. 每人限領一次\n3. 消費滿 NT\$1,000 以上方可使用\n4. 活動至 2026/09/30 止",
+        ),
+        array(
+            'code'     => 'FREESHIP',
+            'amount'   => '60',
+            'type'     => 'fixed_cart',
+            'min'      => '500',
+            'per_user' => '2',
+            'limit'    => '',
+            'label'    => '運費折抵 NT$60',
+            'cat'      => '運費優惠',
+            'deadline' => '',
+            'stock'    => '',
+            'desc'     => "每筆訂單消費滿 NT\$500 即可領取運費折抵 60 元，每人最多領取 2 張！",
+            'notes'    => "1. 每人最多領取 2 張\n2. 消費滿 NT\$500 以上方可使用\n3. 無使用期限",
+        ),
+    );
+
+    foreach ( $demo as $c ) {
+        $existing_id = wc_get_coupon_id_by_code( $c['code'] );
+        if ( $existing_id ) {
+            $coupon_id = $existing_id;
+        } else {
+            $coupon_id = wp_insert_post( array(
+                'post_title'   => $c['code'],
+                'post_name'    => strtolower( $c['code'] ),
+                'post_content' => '',
+                'post_status'  => 'publish',
+                'post_type'    => 'shop_coupon',
+            ) );
+            if ( is_wp_error( $coupon_id ) ) {
+                continue;
+            }
+        }
+        // WooCommerce 原生欄位
+        update_post_meta( $coupon_id, 'discount_type',        $c['type'] );
+        update_post_meta( $coupon_id, 'coupon_amount',        $c['amount'] );
+        update_post_meta( $coupon_id, 'minimum_amount',       $c['min'] );
+        update_post_meta( $coupon_id, 'usage_limit',          $c['limit'] );
+        update_post_meta( $coupon_id, 'usage_limit_per_user', $c['per_user'] );
+        // CKC 購物車顯示
+        update_post_meta( $coupon_id, '_ckc_coupon_public',   'yes' );
+        update_post_meta( $coupon_id, '_ckc_coupon_label',    $c['label'] );
+        // CKC 領券中心欄位
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_public',      'yes' );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_inventory',   $c['stock'] );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_count',       '0' );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_category',    $c['cat'] );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_deadline',    $c['deadline'] );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_description', $c['desc'] );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_notes',       $c['notes'] );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_image',       '' );
+        update_post_meta( $coupon_id, '_ckc_coupon_claim_banner',      '' );
+    }
+
+    // 清除相關快取
+    delete_transient( 'ckc_coupon_page_checked' );
+
+    // 標記已執行，不再重複
+    update_option( 'ckc_demo_coupons_seeded', '1' );
+}
+
 /* ---------------- 後台：券編輯頁欄位 ---------------- */
 add_action( 'woocommerce_coupon_options', 'ckc_coupon_admin_fields', 20, 2 );
 function ckc_coupon_admin_fields( $coupon_id, $coupon ) {
