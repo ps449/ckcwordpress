@@ -1826,33 +1826,53 @@ function ckc_coupon_claim_center_shortcode() {
 
 
 /* ================================================================================
- * 後台：自訂「折價券管理」頂層選單
- * 取代原本隱藏的 WooCommerce 折價券連結，提供友善的後台入口
+ * 後台：統一折價券入口 — 只保留唯一路徑「🎟️ 折價券管理」
+ * 完整移除所有其他 WooCommerce / 行銷 / 插件新增的折價券連結
  * ================================================================================ */
 
-// 1. 移除原始 WooCommerce 折價券選單（多層兜底，確保完全移除）
-add_action( 'admin_menu', 'ckc_remove_woocommerce_coupons_menu', 9999 );
-function ckc_remove_woocommerce_coupons_menu() {
-    global $submenu;
+// ── Step 1：以最高優先順序（9999）徹底掃描所有選單，移除 shop_coupon 相關連結
+add_action( 'admin_menu', 'ckc_purge_all_coupon_menu_entries', 9999 );
+function ckc_purge_all_coupon_menu_entries() {
+    global $menu, $submenu;
 
-    // 方法 A：標準 WordPress API
-    remove_submenu_page( 'woocommerce', 'edit.php?post_type=shop_coupon' );
-    remove_submenu_page( 'woocommerce-marketing', 'edit.php?post_type=shop_coupon' );
+    // 1a. 移除所有頂層 shop_coupon 選單
     remove_menu_page( 'edit.php?post_type=shop_coupon' );
 
-    // 方法 B：直接操作全域 $submenu 陣列（最可靠，繞過 WC 版本差異）
-    $menus_to_clean = array( 'woocommerce', 'woocommerce-marketing' );
-    foreach ( $menus_to_clean as $parent_slug ) {
-        if ( ! isset( $submenu[ $parent_slug ] ) ) {
+    // 1b. 枚舉所有已知可能包含折價券的父選單（涵蓋 WooCommerce + 行銷 + 第三方插件）
+    $known_parents = array(
+        'woocommerce',
+        'woocommerce-marketing',
+        'wc-admin',
+        'wc-reports',
+    );
+
+    // 也從 $menu 動態蒐集所有頂層選單的 slug
+    if ( is_array( $menu ) ) {
+        foreach ( $menu as $item ) {
+            if ( isset( $item[2] ) && $item[2] !== 'ckc-coupon-center' ) {
+                $known_parents[] = $item[2];
+            }
+        }
+    }
+    $known_parents = array_unique( $known_parents );
+
+    // 1c. 對每個父選單掃描並移除 shop_coupon 子項
+    foreach ( $known_parents as $parent_slug ) {
+        // 方法 A：WordPress 標準 API
+        remove_submenu_page( $parent_slug, 'edit.php?post_type=shop_coupon' );
+
+        // 方法 B：直接操作 $submenu（最可靠）
+        if ( ! isset( $submenu[ $parent_slug ] ) || ! is_array( $submenu[ $parent_slug ] ) ) {
             continue;
         }
         foreach ( $submenu[ $parent_slug ] as $key => $item ) {
-            // $item[2] 是該子選單的 slug/URL
+            if ( ! isset( $item[2] ) ) {
+                continue;
+            }
+            $slug = (string) $item[2];
             if (
-                isset( $item[2] ) && (
-                    $item[2] === 'edit.php?post_type=shop_coupon' ||
-                    strpos( (string) $item[2], 'post_type=shop_coupon' ) !== false
-                )
+                $slug === 'edit.php?post_type=shop_coupon' ||
+                strpos( $slug, 'post_type=shop_coupon' ) !== false
             ) {
                 unset( $submenu[ $parent_slug ][ $key ] );
             }
@@ -1860,26 +1880,33 @@ function ckc_remove_woocommerce_coupons_menu() {
     }
 }
 
-// 1b. CSS 兜底：萬一 JS 渲染後還看得到，用 CSS 強制隱藏
+// ── Step 2：admin_head CSS 強制隱藏兜底（瀏覽器端最終防線）
 add_action( 'admin_head', 'ckc_hide_coupon_menu_css' );
 function ckc_hide_coupon_menu_css() {
     ?>
     <style id="ckc-hide-wc-coupon">
-        /* 隱藏 WooCommerce 子選單中的折價券連結 */
+        /* 強制隱藏所有非自訂的 shop_coupon 連結 */
         #adminmenu a[href="edit.php?post_type=shop_coupon"],
-        #adminmenu li:has(a[href="edit.php?post_type=shop_coupon"]) {
+        #adminmenu li:has(> a[href="edit.php?post_type=shop_coupon"]),
+        #adminmenu a[href*="post_type=shop_coupon"]:not([href*="post-new"]) {
             display: none !important;
+        }
+        /* 自訂折價券管理選單改用 Dashicons 票券圖示 */
+        #adminmenu #toplevel_page_ckc-coupon-center .wp-menu-image::before {
+            content: "\f524";
+            font-family: dashicons;
         }
     </style>
     <?php
 }
 
-// 1c. 若管理員直接進入 shop_coupon 列表，重新導向到自訂管理頁
+// ── Step 3：攔截直接 URL 存取（edit.php?post_type=shop_coupon）→ 導向自訂管理頁
 add_action( 'current_screen', 'ckc_redirect_coupon_list_to_custom_page' );
 function ckc_redirect_coupon_list_to_custom_page() {
     $screen = get_current_screen();
-    if ( ! $screen ) return;
-    // 攔截 WooCommerce 折價券列表頁（edit.php?post_type=shop_coupon）
+    if ( ! $screen ) {
+        return;
+    }
     if ( 'edit-shop_coupon' === $screen->id && ! isset( $_GET['ckc_bypass'] ) ) {
         wp_safe_redirect( admin_url( 'admin.php?page=ckc-coupon-center' ) );
         exit;
@@ -1887,31 +1914,31 @@ function ckc_redirect_coupon_list_to_custom_page() {
 }
 
 
-// 2. 新增自訂「折價券管理」頂層選單（放在 WooCommerce 之後）
+// ── Step 4：新增唯一自訂「🎟️ 折價券管理」頂層選單（放在 WooCommerce 之後）
 add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 25 );
 function ckc_register_coupon_admin_menu() {
-    // 頂層選單 → 直接導向「領券中心」折價券列表頁（加 meta_key 篩選）
+    // ── 頂層選單（dashicons-tag 圖示，位置在 WooCommerce 之後）
     add_menu_page(
-        '折價券管理',                              // 頁面標題
-        '🎟️ 折價券管理',                          // 選單標題
-        'manage_woocommerce',                    // 需要 WooCommerce 管理權限
-        'ckc-coupon-center',                     // 選單 slug
-        'ckc_coupon_center_admin_page',          // 渲染函數
-        '',                                      // 圖示（使用 emoji 在標題中）
-        56                                       // 位置：WooCommerce(55) 之後
+        '折價券管理',            // 頁面 <title>
+        '折價券管理',            // 選單標籤文字（Emoji 用 CSS 方式注入）
+        'manage_woocommerce',   // 需要 WooCommerce 管理權限
+        'ckc-coupon-center',    // 唯一 slug
+        'ckc_coupon_center_admin_page',
+        'dashicons-tag',        // WordPress 內建標籤圖示
+        56                      // 位置：WooCommerce(55) 之後
     );
 
-    // 子選單 1：領券中心設定（列表 + 快速管理）
+    // ── 子選單 A：折價券列表（與頂層相同，標題用「所有折價券」區分）
     add_submenu_page(
         'ckc-coupon-center',
-        '領券中心折價券',
-        '領券中心折價券',
+        '所有折價券',
+        '📋 所有折價券',
         'manage_woocommerce',
         'ckc-coupon-center',
         'ckc_coupon_center_admin_page'
     );
 
-    // 子選單 2：新增折價券（直接連到 WooCommerce 新增頁）
+    // ── 子選單 B：新增折價券（WooCommerce 新增頁）
     add_submenu_page(
         'ckc-coupon-center',
         '新增折價券',
@@ -1920,11 +1947,11 @@ function ckc_register_coupon_admin_menu() {
         'post-new.php?post_type=shop_coupon'
     );
 
-    // 子選單 3：前往領券中心頁面（外部連結）
+    // ── 子選單 C：前往前台領券中心（外部連結）
     add_submenu_page(
         'ckc-coupon-center',
         '查看前台領券中心',
-        '🔗 查看前台',
+        '🔗 前台領券中心',
         'manage_woocommerce',
         'ckc-coupon-frontend',
         'ckc_coupon_frontend_redirect'
