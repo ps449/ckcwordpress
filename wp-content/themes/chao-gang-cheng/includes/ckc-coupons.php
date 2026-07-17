@@ -16,6 +16,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /* ---------------- 啟用原生折扣碼 ---------------- */
 add_filter( 'woocommerce_coupons_enabled', '__return_true', 20 );
+add_filter( 'option_woocommerce_enable_coupons', 'ckc_force_enable_coupons_option', 20 );
+add_filter( 'pre_option_woocommerce_enable_coupons', 'ckc_force_enable_coupons_option', 20 );
+function ckc_force_enable_coupons_option( $value ) {
+    return 'yes';
+}
 
 /* ---------------- 後台：券編輯頁欄位 ---------------- */
 add_action( 'woocommerce_coupon_options', 'ckc_coupon_admin_fields', 20, 2 );
