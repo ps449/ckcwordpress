@@ -2500,6 +2500,12 @@ function ckc_checkout_points_panel() {
                 </div>
             </div>
         <?php endif; ?>
+
+        <!-- 隱藏的實際輸入與提交表單（配合官方 WooCommerce Points and Rewards 外掛規格） -->
+        <form class="wc_points_rewards_apply_discount" method="post" style="display: none !important;">
+            <input type="number" name="wc_points_rewards_apply_discount_amount" class="wc_points_rewards_apply_discount_amount" value="<?php echo $is_applied ? esc_attr($applied_points) : ''; ?>" />
+            <input type="submit" class="button wc_points_rewards_apply_discount" name="wc_points_rewards_apply_discount" value="Apply" />
+        </form>
     </div>
 
     <style>
@@ -2522,17 +2528,17 @@ function ckc_checkout_points_panel() {
                 return;
             }
             
-            // 尋找由外掛動態輸出且已被 CSS 隱藏的本物元素
-            var $realInput = $('.woocommerce-checkout-review-order #wps_cart_points, #order_review #wps_cart_points, #wps_cart_points').not('#ckc_custom_points_input').first();
-            var $realBtn = $('.woocommerce-checkout-review-order #wps_cart_points_apply, #order_review #wps_cart_points_apply, #wps_cart_points_apply').first();
+            // 定位官方外掛的隱藏輸入欄與表單
+            var $realInput = $('input.wc_points_rewards_apply_discount_amount').not('#ckc_custom_points_input').first();
+            var $realForm = $('form.wc_points_rewards_apply_discount').first();
             
-            if ($realInput.length && $realBtn.length) {
+            if ($realInput.length && $realForm.length) {
                 try {
                     sessionStorage.setItem('ckc_pts_act', 'applied');
                     sessionStorage.setItem('ckc_pts_scroll', window.scrollY);
                 } catch(err){}
                 $realInput.val(pts);
-                $realBtn.trigger('click');
+                $realForm.submit(); // 觸發官方外掛的 Ajax 套用事件
             } else {
                 alert('系統目前無法定位紅利套用元件，請重新整理頁面再試。');
             }
@@ -2541,7 +2547,7 @@ function ckc_checkout_points_panel() {
         // 點數移除邏輯
         $(document).on('click', '.ckc-points-remove-btn', function(e){
             e.preventDefault();
-            var $realRemoveBtn = $('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first();
+            var $realRemoveBtn = $('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon, .woocommerce-remove-coupon').first();
             if ($realRemoveBtn.length) {
                 try {
                     sessionStorage.setItem('ckc_pts_act', 'removed');
