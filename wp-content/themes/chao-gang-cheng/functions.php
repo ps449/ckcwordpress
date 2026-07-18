@@ -11521,3 +11521,10 @@ function ckc_ref_give_signup_bonus_proxy( $user_id, $new_customer_data ) {
     do_action( 'woocommerce_created_customer', $user_id, $new_customer_data, false );
 }
 
+/**
+ * ─────────────────────────────────────────────────────────────────
+ * 影片藝廊外掛 (YotuWP) 翻譯設定
+ * ─────────────────────────────────────────────────────────────────
+ */
+add_filter( 'yotuwp_next_text', function() { return '下一頁'; } );
+add_filter( 'yotuwp_prev_text', function() { return '上一頁'; } );
