@@ -2574,7 +2574,7 @@ function ckc_checkout_points_panel() {
             
             if (sc > 0) { window.scrollTo(0, sc); }
             
-            var msg = (act === 'applied') ? '✅ 已成功套用紅利折抵！' : '已移除點數折抵';
+            var msg = (act === 'applied') ? '已套用紅利折抵' : '已取消套用紅利折抵';
             var bg = (act === 'applied') ? '#16a34a' : '#64748b';
             
             var $t = $('#ckc-coupon-toast');
