@@ -2984,14 +2984,9 @@ function chao_gang_cheng_custom_my_account_menu_items( $items ) {
         unset( $items['backinstock'] );
     }
     // 隱藏禮物卡頁籤（功能保留但不顯示於導覽列）
-    if ( isset( $items['gift-card'] ) ) {
-        unset( $items['gift-card'] );
-    }
-    if ( isset( $items['gift_card'] ) ) {
-        unset( $items['gift_card'] );
-    }
-    if ( isset( $items['woo-gift-cards'] ) ) {
-        unset( $items['woo-gift-cards'] );
+    // 涵蓋各禮物卡外掛的不同 menu key
+    foreach ( array( 'gift-card', 'gift_card', 'giftcards', 'woo-gift-cards', 'yith-gift-cards' ) as $_gift_key ) {
+        unset( $items[ $_gift_key ] );
     }
     
     // Set Points menu item to "紅利點數" and position it before Logout
