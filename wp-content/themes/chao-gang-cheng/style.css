@@ -3798,9 +3798,10 @@ body.show-register-form .u-column1.col-1 {
 }
 
 .mobile-logo-section img {
-  height: 38px !important;
+  height: 76px !important;
   width: auto !important;
-  max-width: 38px !important;
+  max-width: 100% !important;
+  object-fit: contain !important;
 }
 
 .mobile-logo-text {
