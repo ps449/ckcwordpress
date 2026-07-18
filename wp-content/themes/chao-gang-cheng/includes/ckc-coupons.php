@@ -2518,6 +2518,28 @@ function ckc_checkout_points_panel() {
     </style>
     <script>
     jQuery(function($){
+        var _ckcScrollLock = false;
+        var _ckcScrollTarget = 0;
+
+        // 鎖定滾動位置：攔截 WooCommerce 原生向上捲動
+        function ckcLockScroll(y) {
+            _ckcScrollTarget = y;
+            _ckcScrollLock = true;
+            // 立刻把頁面固定在目前位置
+            $(window).on('scroll.ckcLock', function(){
+                if (_ckcScrollLock) {
+                    window.scrollTo(0, _ckcScrollTarget);
+                }
+            });
+        }
+
+        // 解鎖滾動，並確保落在正確位置
+        function ckcUnlockScroll() {
+            _ckcScrollLock = false;
+            $(window).off('scroll.ckcLock');
+            window.scrollTo(0, _ckcScrollTarget);
+        }
+
         // 點數套用邏輯（自訂點數與立即全額折抵共用）
         $(document).on('click', '.ckc-points-apply-btn, .ckc-points-custom-apply-btn', function(e){
             e.preventDefault();
@@ -2535,8 +2557,8 @@ function ckc_checkout_points_panel() {
             if ($realInput.length && $realForm.length) {
                 try {
                     sessionStorage.setItem('ckc_pts_act', 'applied');
-                    sessionStorage.setItem('ckc_pts_scroll', window.scrollY);
                 } catch(err){}
+                ckcLockScroll(window.scrollY); // 鎖定目前位置
                 $realInput.val(pts);
                 $realForm.submit(); // 觸發官方外掛的 Ajax 套用事件
             } else {
@@ -2551,8 +2573,8 @@ function ckc_checkout_points_panel() {
             if ($realRemoveBtn.length) {
                 try {
                     sessionStorage.setItem('ckc_pts_act', 'removed');
-                    sessionStorage.setItem('ckc_pts_scroll', window.scrollY);
                 } catch(err){}
+                ckcLockScroll(window.scrollY); // 鎖定目前位置
                 $realRemoveBtn.trigger('click');
             } else {
                 alert('無法定位移除紅利折抵的按鈕，請重新整理頁面。');
@@ -2561,23 +2583,17 @@ function ckc_checkout_points_panel() {
 
         // 監聽結帳頁面更新完成（AJAX 結束）
         $(document.body).on('updated_checkout updated_cart_totals', function(){
-            var act = null, sc = 0;
+            var act = null;
             try { 
-                act = sessionStorage.getItem('ckc_pts_act'); 
-                sc = parseInt(sessionStorage.getItem('ckc_pts_scroll') || '0', 10);
+                act = sessionStorage.getItem('ckc_pts_act');
             } catch(e){}
             if (!act) { return; }
             try { 
-                sessionStorage.removeItem('ckc_pts_act'); 
-                sessionStorage.removeItem('ckc_pts_scroll');
+                sessionStorage.removeItem('ckc_pts_act');
             } catch(e){}
-            
-            if (sc > 0) {
-                // 延遲 100ms 執行，以覆蓋 WooCommerce 原生在 updated_checkout 結束後的自動向上捲動行為
-                setTimeout(function(){
-                    window.scrollTo(0, sc);
-                }, 100);
-            }
+
+            // 解鎖並還原滾動位置
+            ckcUnlockScroll();
             
             var msg = (act === 'applied') ? '已套用紅利折抵' : '已取消套用紅利折抵';
             var bg = (act === 'applied') ? '#16a34a' : '#64748b';
