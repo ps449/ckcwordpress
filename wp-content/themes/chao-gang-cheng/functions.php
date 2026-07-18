@@ -5342,6 +5342,13 @@ function chao_gang_cheng_admin_menu_styling() {
             var $storeStart = $('#toplevel_page_ckc-gemini-agent');
             if (!$storeStart.length) $storeStart = $('#toplevel_page_woocommerce');
             if (!$storeStart.length) $storeStart = $('#menu-posts-product');
+            
+            // Move AutomateWoo to 網站內容 (right before 電商營運 starts)
+            var $aw = $('#toplevel_page_automatewoo');
+            if ($aw.length && $storeStart.length) {
+                $aw.insertBefore($storeStart);
+            }
+
             if ($storeStart.length) {
                 $storeStart.before('<li class="menu-section-header">電商營運</li>');
             }
