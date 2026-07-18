@@ -241,7 +241,7 @@
                 
                 <div class="mobile-logo-section">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: flex; align-items: center; text-decoration: none;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo-v1-05.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" style="height: 45px; width: auto; object-fit: contain;">
+                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo-v1-05.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" style="height: 35px; width: auto; object-fit: contain;">
                     </a>
                 </div>
                 
