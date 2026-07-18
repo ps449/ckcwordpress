@@ -16,6 +16,133 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /* ---------------- 啟用原生折扣碼 ---------------- */
 add_filter( 'woocommerce_coupons_enabled', '__return_true', 20 );
+
+/* ================================================================
+ * 每筆訂單限用一張優惠券（純 order hook，前後台一致）
+ *
+ * 統一在「訂單層級」保證單券，前台與後台共用同一核心函式 ckc_order_keep_single_coupon()：
+ *   - 前台結帳：woocommerce_checkout_create_order（cart 券轉入 order 後、金額最終確定前）
+ *   - 後台加券：woocommerce_order_applied_coupon（管理員手動建單／編輯訂單）
+ *
+ * 注意（此為刻意設計的取捨）：購物車頁在「送出結帳前」不再即時限制單券，
+ * 消費者可能暫時看到多張券同時套用；直到建立訂單時才統一清成一張。
+ * ================================================================ */
+
+/**
+ * 判斷一張券是否為「本站行銷優惠券」（領券中心／我的優惠券上架的券）。
+ * 只有這類券才納入「每筆訂單限用一張優惠券」的單券限制；點數折抵（紅利折抵）、
+ * 系統虛擬券等不算，可與優惠券並存、不會被單券邏輯移除。
+ */
+function ckc_is_marketing_coupon( $code ) {
+    $code = wc_format_coupon_code( is_scalar( $code ) ? (string) $code : '' );
+    if ( '' === $code ) {
+        return false;
+    }
+    $coupon = new WC_Coupon( $code );
+    if ( ! $coupon->get_id() ) {
+        return false; // 虛擬券（如點數折抵）或券不存在 → 不視為行銷優惠券
+    }
+    // 修正：只要折價券在資料庫中存在（有 ID），且折扣類型為一般折扣型（非 shipping 等系統特殊類型），
+    // 一律視為「行銷優惠券」納入單張限制，防止多張疊加導致折扣超額。
+    // _ckc_coupon_public / _ckc_coupon_claim_public 不再是唯一判斷依據。
+    $discount_types = array( 'fixed_cart', 'percent', 'fixed_product' );
+    if ( in_array( $coupon->get_discount_type(), $discount_types, true ) ) {
+        return true;
+    }
+    // 其餘特殊類型（如第三方插件自訂類型）維持以 meta 為判斷
+    return 'yes' === $coupon->get_meta( '_ckc_coupon_public' )
+        || 'yes' === $coupon->get_meta( '_ckc_coupon_claim_public' );
+}
+
+/**
+ * 核心：確保一張 WC_Order 只保留一張「行銷優惠券」。
+ * 點數折抵等系統券不受影響，可與優惠券並存。
+ *
+ * @param WC_Order|int   $order     訂單物件或 ID。
+ * @param string|WC_Coupon $keep    指定要保留的券碼（後台加券時為剛加的那張）；
+ *                                   留空則保留最後（最新）套用的一張行銷券。
+ */
+function ckc_order_keep_single_coupon( $order, $keep = '' ) {
+    if ( ! is_a( $order, 'WC_Order' ) ) {
+        $order = is_numeric( $order ) ? wc_get_order( $order ) : null;
+    }
+    if ( ! $order || ! method_exists( $order, 'get_coupon_codes' ) || ! method_exists( $order, 'remove_coupon' ) ) {
+        return;
+    }
+    // 只針對「行銷優惠券」計數與移除，保留點數折抵等系統券
+    $marketing = array_values( array_filter( $order->get_coupon_codes(), 'ckc_is_marketing_coupon' ) );
+    if ( count( $marketing ) <= 1 ) {
+        return;
+    }
+    if ( is_object( $keep ) && method_exists( $keep, 'get_code' ) ) {
+        $keep = $keep->get_code();
+    }
+    $keep_code = ( $keep && ckc_is_marketing_coupon( $keep ) ) ? wc_format_coupon_code( $keep ) : wc_format_coupon_code( end( $marketing ) );
+    foreach ( $marketing as $c ) {
+        if ( wc_format_coupon_code( $c ) !== $keep_code ) {
+            $order->remove_coupon( $c );
+        }
+    }
+    $order->calculate_totals();
+}
+
+// 前台結帳：cart 的多張券轉入 order 後，於金額最終確定前清成一張
+add_action( 'woocommerce_checkout_create_order', 'ckc_checkout_order_single_coupon', 20, 2 );
+function ckc_checkout_order_single_coupon( $order, $data ) {
+    ckc_order_keep_single_coupon( $order ); // 保留最後套用的一張
+}
+
+// 後台：管理員手動建單／編輯訂單加券時，保留剛加的那張
+add_action( 'woocommerce_order_applied_coupon', 'ckc_order_applied_single_coupon', 20, 2 );
+function ckc_order_applied_single_coupon( $order = null, $applied = '' ) {
+    ckc_order_keep_single_coupon( $order, $applied );
+}
+
+/* ---------------- 前台：購物車／結帳階段即時限用一張券 ----------------
+ * 讓消費者在「送出結帳前」購物車與結帳頁就只有一張券——套用任一張券時
+ * （來自領券中心、帳號頁或原生折扣碼輸入框）自動移除其他已套用的券，只留
+ * 最新這一張。remove_coupon 觸發的是 removed_coupon（非 applied），無遞迴。
+ */
+add_action( 'woocommerce_applied_coupon', 'ckc_cart_single_coupon', 20, 1 );
+function ckc_cart_single_coupon( $applied_code ) {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        return;
+    }
+    $applied_code = wc_format_coupon_code( $applied_code );
+    // 只在「新套用的是行銷優惠券」時才啟動單券限制；點數折抵等系統券套用時不動作
+    if ( ! ckc_is_marketing_coupon( $applied_code ) ) {
+        return;
+    }
+    $removed = false;
+    foreach ( WC()->cart->get_applied_coupons() as $code ) {
+        // 只移除「其他行銷優惠券」，保留點數折抵等系統券可並存
+        if ( wc_format_coupon_code( $code ) !== $applied_code && ckc_is_marketing_coupon( $code ) ) {
+            WC()->cart->remove_coupon( $code );
+            $removed = true;
+        }
+    }
+    if ( $removed && function_exists( 'wc_add_notice' ) ) {
+        wc_add_notice( '每筆訂單限用一張優惠券，已為您改套用最新選擇的優惠券。', 'notice' );
+    }
+}
+
+/* 清理購物車 session 中殘留的多張「行銷優惠券」（單券規則上線前套入的舊資料），只留最新一張；點數折抵券不動 */
+add_action( 'woocommerce_cart_loaded_from_session', 'ckc_cart_purge_extra_coupons', 20 );
+function ckc_cart_purge_extra_coupons( $cart ) {
+    if ( ! $cart || ! is_a( $cart, 'WC_Cart' ) ) {
+        return;
+    }
+    $marketing = array_values( array_filter( $cart->get_applied_coupons(), 'ckc_is_marketing_coupon' ) );
+    if ( count( $marketing ) <= 1 ) {
+        return;
+    }
+    $keep = end( $marketing );
+    foreach ( $marketing as $code ) {
+        if ( $code !== $keep ) {
+            $cart->remove_coupon( $code );
+        }
+    }
+}
 add_filter( 'option_woocommerce_enable_coupons', 'ckc_force_enable_coupons_option', 20 );
 add_filter( 'pre_option_woocommerce_enable_coupons', 'ckc_force_enable_coupons_option', 20 );
 function ckc_force_enable_coupons_option( $value ) {
@@ -584,35 +711,41 @@ function ckc_coupon_apply_from_url() {
     exit;
 }
 
+/**
+ * 統一取得「會員已領取且有效」的折價券。
+ * 供領券中心的「我的券匣」徽章數與會員「專屬優惠券」頁共用同一份清單，確保兩處數量一致。
+ * 有效 = 已領取 ID 中，券存在、已發佈（publish）、且有券碼（排除已刪除／草稿／空碼殭屍券）。
+ */
+function ckc_get_user_claimed_coupons( $user_id = 0 ) {
+    $user_id = $user_id ? intval( $user_id ) : get_current_user_id();
+    if ( ! $user_id ) {
+        return array();
+    }
+    $claimed_ids = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
+    $claimed_ids = array_values( array_unique( array_filter( array_map( 'intval', $claimed_ids ) ) ) );
+    $coupons = array();
+    foreach ( $claimed_ids as $cid ) {
+        $coupon = new WC_Coupon( $cid );
+        if ( $coupon->get_id() && 'publish' === get_post_status( $cid ) && '' !== $coupon->get_code() ) {
+            $coupons[] = $coupon;
+        }
+    }
+    return $coupons;
+}
+
 /* ---------------- 券卡片渲染（購物車與帳號頁共用） ---------------- */
 function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) {
 
     if ( 'account' === $context ) {
-        // ── 專屬優惠券頁：只顯示「此會員已領取」的折價券 ──
+        // ── 專屬優惠券頁：顯示「此會員已領取且有效」的券（與券匣徽章同一來源，數量一致）──
         if ( ! is_user_logged_in() ) {
             echo '<p style="color:#64748b;font-size:14px;">請先登入以查看您的專屬優惠券。</p>';
             return;
         }
-        $user_id        = get_current_user_id();
-        $claimed_ids    = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
-        $claimed_ids    = array_filter( array_map( 'intval', $claimed_ids ) );
-
-        if ( empty( $claimed_ids ) ) {
-            echo '<p style="color:#64748b;font-size:14px;">您目前尚未領取任何優惠券，前往<a href="' . esc_url( home_url( '/領券中心/' ) ) . '" style="color:#d97706;font-weight:700;">領券中心</a>領取吧！</p>';
-            return;
-        }
-
-        // 只取已領取的折價券（過期的也顯示，讓會員知道有過）
-        $coupons = array();
-        foreach ( $claimed_ids as $cid ) {
-            $coupon = new WC_Coupon( $cid );
-            if ( $coupon->get_id() ) {
-                $coupons[] = $coupon;
-            }
-        }
+        $coupons = ckc_get_user_claimed_coupons( get_current_user_id() );
 
         if ( empty( $coupons ) ) {
-            echo '<p style="color:#64748b;font-size:14px;">您的優惠券已全部失效或不存在。</p>';
+            echo '<p style="color:#64748b;font-size:14px;">目前沒有可用的優惠券，前往<a href="' . esc_url( home_url( '/領券中心/' ) ) . '" style="color:#d97706;font-weight:700;">領券中心</a>領取吧！</p>';
             return;
         }
     } else {
@@ -637,16 +770,21 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
     <div class="ckc-coupon-grid">
         <?php foreach ( $coupons as $coupon ) :
             $code    = $coupon->get_code();
+            // 跳過已刪除／無券碼的殭屍券（領取紀錄殘留，get_code() 為空），
+            // 否則 has_discount('') 會退化成「購物車是否有任何券」而誤判已套用。
+            if ( '' === $code ) {
+                continue;
+            }
             $label   = $coupon->get_meta( '_ckc_coupon_label' );
             $value   = ckc_coupon_value_text( $coupon );
             $min     = floatval( $coupon->get_minimum_amount() );
             $expires = $coupon->get_date_expires();
-            $applied = WC()->cart ? WC()->cart->has_discount( $code ) : false;
+            $applied = ( WC()->cart && '' !== $code ) ? WC()->cart->has_discount( $code ) : false;
             $apply_url = add_query_arg( 'ckc_apply_coupon', rawurlencode( $code ), $base_apply_url );
             // 判斷是否過期
             $is_expired = $expires && $expires->getTimestamp() < time();
             ?>
-            <div class="ckc-coupon-card<?php echo $applied ? ' is-applied' : ( $is_expired ? ' is-expired' : '' ); ?>">
+            <div class="ckc-coupon-card<?php echo $applied ? ' is-applied' : ( $is_expired ? ' is-expired' : '' ); ?>" data-code="<?php echo esc_attr( $code ); ?>" data-apply-url="<?php echo esc_url( $apply_url ); ?>">
                 <div class="ckc-coupon-left">
                     <div class="ckc-coupon-value"><?php echo esc_html( $value ); ?></div>
                     <?php if ( $min > 0 ) : ?>
@@ -671,7 +809,7 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
                     <?php elseif ( $is_expired ) : ?>
                         <span style="color:#94a3b8;font-size:12px;white-space:nowrap;">已過期</span>
                     <?php else : ?>
-                        <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-coupon-apply"><?php echo ( $in_cart_page ) ? '立即套用' : '套用去結帳'; ?></a>
+                        <a href="<?php echo esc_url( $apply_url ); ?>" class="ckc-coupon-apply" data-coupon-code="<?php echo esc_attr( $code ); ?>"><?php echo ( $in_cart_page ) ? '立即套用' : '套用去結帳'; ?></a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -732,29 +870,11 @@ function ckc_cart_coupon_center() {
     echo '</div>';
 }
 
-/* ---------------- 限制対张：自動移除舊券再套用新券 ---------------- */
-add_action( 'woocommerce_applied_coupon', 'ckc_enforce_single_coupon', 10, 1 );
-function ckc_enforce_single_coupon( $new_code ) {
-    if ( ! WC()->cart ) return;
-    $applied = WC()->cart->get_applied_coupons();
-    // 移除除了剛続對之外的所有已套用券
-    foreach ( $applied as $code ) {
-        if ( wc_format_coupon_code( $code ) !== wc_format_coupon_code( $new_code ) ) {
-            WC()->cart->remove_coupon( $code );
-        }
-    }
-}
-
-/* ---------------- 禁止手動輸入第二張券碼（顧客提示） ---------------- */
-add_filter( 'woocommerce_coupon_error', 'ckc_single_coupon_error_msg', 10, 3 );
-function ckc_single_coupon_error_msg( $err, $err_code, $coupon ) {
-    // 107 = COUPON_ALREADY_APPLIED_INDIV_USE_ONLY
-    // 如果購物車已有券且在手動輸入新券碼
-    if ( WC()->cart && count( WC()->cart->get_applied_coupons() ) >= 1 ) {
-        return '每筆訂單限用一張優惠券，請先移除現有券再套用新券。';
-    }
-    return $err;
-}
+/* ---------------- 單券限制已統一至檔案頂部的 order hook（ckc_order_keep_single_coupon）----------------
+ * 原本的 cart 層限制（woocommerce_applied_coupon）、手動輸入錯誤提示
+ * （woocommerce_coupon_error）與重複的 order hook 已依「純 order hook」方向移除，
+ * 前後台一致改在訂單層級保證單券。詳見本檔頂部。
+ */
 
 /* ---------------- 我的帳號「專屬優惠券」頁 ---------------- */
 add_action( 'init', 'ckc_coupons_register_endpoint', 6 );
@@ -968,16 +1088,9 @@ function ckc_coupon_claim_center_shortcode() {
     $claimed_ids = $user_id ? (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true ) : array();
     $claimed_ids = array_filter( array_map( 'intval', $claimed_ids ) );
 
-    // 預先過濾出實際存在且已發佈的折價券，避免右上角計數與列表顯示不一致
-    $my_claimed_coupons = array();
-    if ( ! empty( $claimed_ids ) ) {
-        foreach ( $claimed_ids as $cid ) {
-            $c = new WC_Coupon( $cid );
-            if ( $c->get_id() && 'publish' === get_post_status( $c->get_id() ) ) {
-                $my_claimed_coupons[] = $c;
-            }
-        }
-    }
+    // 與會員「專屬優惠券」頁共用同一份有效券清單（排除已刪除／草稿／空碼殭屍券），
+    // 確保「我的券匣」徽章數與專屬優惠券頁的張數一致。
+    $my_claimed_coupons = ckc_get_user_claimed_coupons( $user_id );
 
     // 獲取所有供領取的折價券
     $coupons = ckc_get_claimable_coupons();
@@ -999,9 +1112,9 @@ function ckc_coupon_claim_center_shortcode() {
             <h2 class="ckc-claim-title">🎟️ 折價券領取中心</h2>
             <div class="ckc-claim-nav-buttons">
                 <button type="button" class="ckc-nav-btn active" data-tab="claim-list">領券中心</button>
-                <button type="button" class="ckc-nav-btn" data-tab="my-box">
+                <a class="ckc-nav-btn ckc-nav-link" href="<?php echo esc_url( wc_get_account_endpoint_url( 'coupons' ) ); ?>">
                     我的券匣 <span class="ckc-box-count"><?php echo count( $my_claimed_coupons ); ?></span>
-                </button>
+                </a>
             </div>
         </div>
 
@@ -1707,8 +1820,9 @@ function ckc_coupon_claim_center_shortcode() {
     <script type="text/javascript">
     var ckcClaimNonce = '<?php echo esc_js( wp_create_nonce( 'ckc_claim_nonce' ) ); ?>';
     jQuery(document).ready(function($) {
-        // 切換頁籤 (SPA 分頁動作)
-        $('.ckc-nav-btn').on('click', function() {
+        // 切換頁籤 (SPA 分頁動作)。只作用於分頁「按鈕」；「我的券匣」已改為
+        // 連結（a.ckc-nav-link）直接前往會員專屬優惠券頁，不走 SPA 切換。
+        $('button.ckc-nav-btn').on('click', function() {
             var tab = $(this).data('tab');
             $('.ckc-nav-btn').removeClass('active');
             $(this).addClass('active');
@@ -2165,11 +2279,9 @@ function ckc_checkout_coupon_panel() {
     if ( ! is_user_logged_in() ) return;
 
     $user_id     = get_current_user_id();
-    $claimed_ids = (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true );
-    $claimed_ids = array_filter( array_map( 'intval', $claimed_ids ) );
-    if ( empty( $claimed_ids ) ) return;
+    $claimed_ids = array_filter( array_map( 'intval', (array) get_user_meta( $user_id, '_ckc_claimed_coupons', true ) ) );
 
-    // 建構已領取且有效（未過期）的折價券清單
+    // 已領取且未過期的券（供券卡片顯示；沒券時仍顯示折扣碼輸入框）
     $coupons = array();
     foreach ( $claimed_ids as $cid ) {
         $coupon = new WC_Coupon( $cid );
@@ -2178,21 +2290,129 @@ function ckc_checkout_coupon_panel() {
         if ( $wc_exp && $wc_exp->getTimestamp() < time() ) continue;
         $coupons[] = $coupon;
     }
-    if ( empty( $coupons ) ) return;
 
     echo '<div class="ckc-coupon-center" style="margin-bottom: 24px;">';
     echo '<div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 4px;">🎟️ 我的優惠券</div>';
     echo '<p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">每筆訂單限用一張優惠券</p>';
-    // 傳入已過濾的券清單，套用後跳回結帳頁
-    ckc_render_coupon_cards( 'checkout', $coupons );
+    ?>
+    <div class="ckc-checkout-coupon-form" style="display:flex;gap:8px;margin-bottom:12px;max-width:440px;">
+        <input type="text" id="ckc-checkout-coupon-code" placeholder="輸入折扣碼" autocomplete="off"
+               style="flex:1;min-width:0;border:1px solid #d6a878;border-radius:8px;padding:10px 12px;font-size:14px;">
+        <button type="button" id="ckc-checkout-coupon-apply"
+                style="border:none;background:#7f6c60;color:#fff;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">套用</button>
+    </div>
+    <?php
+    if ( ! empty( $coupons ) ) {
+        // 傳入已過濾的券清單；套用改由 AJAX 處理（見下方 script），不整頁跳轉
+        ckc_render_coupon_cards( 'checkout', $coupons );
+    }
     echo '</div>';
+
+    ckc_checkout_coupon_ajax_script();
+}
+
+/**
+ * 結帳頁折扣碼 AJAX 套用：以 Store API 套券，成功後彈出提示並更新結帳金額，
+ * 不整頁重載、不自動滾動到頂部。折扣碼輸入框與券卡片「套用去結帳」共用同一流程。
+ */
+function ckc_checkout_coupon_ajax_script() {
+    static $done = false;
+    if ( $done ) {
+        return;
+    }
+    $done = true;
+    ?>
+    <style>
+    #ckc-coupon-toast{
+        position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px);
+        background:#16a34a; color:#fff; padding:14px 24px; border-radius:30px;
+        font-size:15px; font-weight:700; line-height:1.4; z-index:2147483000;
+        max-width:88vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.25);
+        opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+    }
+    #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    </style>
+    <script>
+    jQuery(function($){
+        // 行動版友善的浮出提示（非阻塞、底部置中、自動消失），取代 alert
+        function ckcToast(msg, isError){
+            var $t = $('#ckc-coupon-toast');
+            if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
+            $t.text(msg).css('background', isError ? '#b91c1c' : '#16a34a');
+            requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
+            clearTimeout(window._ckcToastTimer);
+            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+        }
+
+        // 套用後同步券卡片狀態（限一張：套用的顯示「已套用」，其餘恢復可套用），
+        // 修正前端介面沒有連動的問題。
+        function ckcRefreshCouponCards(appliedCode){
+            var ac = (appliedCode || '').toString().toUpperCase();
+            $('.ckc-coupon-card').each(function(){
+                var $c = $(this);
+                if($c.hasClass('is-expired')){ return; }
+                var code = ($c.data('code') || '').toString().toUpperCase();
+                var url  = $c.attr('data-apply-url') || '#';
+                var $action = $c.find('.ckc-coupon-action');
+                if(code === ac){
+                    $c.addClass('is-applied');
+                    $action.html('<span class="ckc-coupon-applied">✓ 已套用</span>');
+                } else {
+                    $c.removeClass('is-applied');
+                    $action.html('<a href="'+url+'" class="ckc-coupon-apply" data-coupon-code="'+code+'">套用去結帳</a>');
+                }
+            });
+        }
+
+        function ckcApplyCoupon(code){
+            code = $.trim(code || '');
+            if(!code){ ckcToast('請輸入折扣碼', true); return; }
+            fetch('/wp-json/wc/store/cart', {credentials:'include'})
+                .then(function(r){ return r.headers.get('Nonce'); })
+                .then(function(nonce){
+                    return fetch('/wp-json/wc/store/v1/cart/apply-coupon', {
+                        method:'POST', credentials:'include',
+                        headers:{'Content-Type':'application/json','Nonce': nonce || ''},
+                        body: JSON.stringify({ code: code })
+                    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); });
+                })
+                .then(function(res){
+                    if(res.ok){
+                        ckcToast('折價券使用成功');
+                        $('#ckc-checkout-coupon-code').val('');
+                        ckcRefreshCouponCards(code);          // 前端券卡片連動
+                        $(document.body).trigger('update_checkout'); // 更新金額，不滾頂
+                    } else {
+                        ckcToast((res.data && res.data.message) ? res.data.message : '折價券套用失敗，請確認代碼或使用條件。', true);
+                    }
+                })
+                .catch(function(){ ckcToast('套用時發生錯誤，請稍後再試。', true); });
+        }
+
+        // 1. 折扣碼輸入框：點「套用」或按 Enter
+        $(document).on('click', '#ckc-checkout-coupon-apply', function(e){
+            e.preventDefault();
+            ckcApplyCoupon($('#ckc-checkout-coupon-code').val());
+        });
+        $(document).on('keydown', '#ckc-checkout-coupon-code', function(e){
+            if(e.key === 'Enter'){ e.preventDefault(); ckcApplyCoupon($(this).val()); }
+        });
+
+        // 2. 券卡片「套用去結帳」：改走 AJAX，避免整頁跳轉回頂部
+        $(document).on('click', '.ckc-coupon-apply', function(e){
+            var code = $(this).data('coupon-code');
+            if(code){ e.preventDefault(); ckcApplyCoupon(code); }
+        });
+    });
+    </script>
+    <?php
 }
 
 // ── 結帳頁加入「紅利點數」折抵面板
 add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_points_panel', 6 );
 function ckc_checkout_points_panel() {
     $user_id = get_current_user_id();
-    $points  = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
+    $points  = ckc_pts_get_user_balance( $user_id );
     
     $log_file = dirname( __FILE__ ) . '/../scratch/checkout_points_debug.txt';
     $log_dir  = dirname( $log_file );
@@ -2252,11 +2472,11 @@ function ckc_checkout_points_panel() {
             
             <div class="ckc-points-action" style="white-space: nowrap;">
                 <?php if ( $is_applied ) : ?>
-                    <button type="button" class="ckc-points-remove-btn" onclick="jQuery('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first().trigger('click');" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    <button type="button" class="ckc-points-remove-btn" onclick="try{sessionStorage.setItem('ckc_pts_act','removed');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first().trigger('click');" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                         移除折抵
                     </button>
                 <?php else : ?>
-                    <button type="button" class="ckc-points-apply-btn" onclick="jQuery('#wps_cart_points').val(<?php echo (int) $points_to_apply; ?>); jQuery('#wps_cart_points_apply').trigger('click');" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    <button type="button" class="ckc-points-apply-btn" onclick="try{sessionStorage.setItem('ckc_pts_act','applied');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_cart_points').val(<?php echo (int) $points_to_apply; ?>); jQuery('#wps_cart_points_apply').trigger('click');" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                         立即折抵
                     </button>
                 <?php endif; ?>
@@ -2269,7 +2489,7 @@ function ckc_checkout_points_panel() {
             <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
-                    <button type="button" onclick="jQuery('#wps_cart_points').val(jQuery('#ckc_custom_points_input').val()); jQuery('#wps_cart_points_apply').trigger('click');" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
+                    <button type="button" onclick="try{sessionStorage.setItem('ckc_pts_act','applied');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_cart_points').val(jQuery('#ckc_custom_points_input').val()); jQuery('#wps_cart_points_apply').trigger('click');" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
                 </div>
             </div>
         <?php endif; ?>
@@ -2285,7 +2505,27 @@ function ckc_checkout_points_panel() {
     .ckc-points-card.is-applied { border-style: solid !important; border-color: #16a34a !important; background: #f0fdf4 !important; }
     .ckc-points-remove-btn:hover { background-color: #ef4444 !important; color: #fff !important; border-color: #ef4444 !important; }
     .ckc-points-apply-btn:hover { background-color: #f86f69 !important; }
+    /* 共用 toast（若折扣券面板未載入，這裡也定義一份） */
+    #ckc-coupon-toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px); background:#16a34a; color:#fff; padding:14px 24px; border-radius:30px; font-size:15px; font-weight:700; line-height:1.4; z-index:2147483000; max-width:88vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; }
+    #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
     </style>
+    <script>
+    // 紅利點數折抵透過 WPS 外掛套用／移除（會整頁重載）。這裡在重載後浮出 toast
+    // 並還原捲動位置，避免停在頁面頂部；狀態已由伺服器端正確渲染（已套用／已移除）。
+    jQuery(function($){
+        var act = null, sc = 0;
+        try { act = sessionStorage.getItem('ckc_pts_act'); sc = parseInt(sessionStorage.getItem('ckc_pts_scroll') || '0', 10); } catch(e){}
+        if(!act){ return; }
+        try { sessionStorage.removeItem('ckc_pts_act'); sessionStorage.removeItem('ckc_pts_scroll'); } catch(e){}
+        if(sc > 0){ window.scrollTo(0, sc); }
+        var msg = (act === 'applied') ? '已套用紅利折抵' : '已移除折抵';
+        var $t = $('#ckc-coupon-toast');
+        if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
+        $t.text(msg).css('background', (act === 'applied') ? '#16a34a' : '#64748b');
+        requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
+        setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+    });
+    </script>
     <?php
 }
 

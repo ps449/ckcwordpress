@@ -747,8 +747,7 @@ function chao_gang_cheng_custom_checkout_fields( $fields ) {
         'class'       => array( 'form-row-wide', 'invoice-type-select' ),
         'required'    => true,
         'options'     => array(
-            'personal' => '個人電子發票 (會員載具)',
-            'carrier'  => '手機條碼載具',
+            'personal' => '個人發票',
             'company'  => '公司用電子發票 (三聯式)',
             'donate'   => '捐贈發票'
         ),
@@ -829,7 +828,7 @@ function chao_gang_cheng_custom_checkout_fields( $fields ) {
  */
 add_action( 'wp_footer', 'chao_gang_cheng_checkout_toggle_js' );
 function chao_gang_cheng_checkout_toggle_js() {
-    if ( ! is_checkout() && ! is_wc_endpoint_url( 'edit-address' ) && ! is_account_page() ) {
+    if ( ! is_checkout() && ! is_cart() && ! is_wc_endpoint_url( 'edit-address' ) && ! is_account_page() ) {
         return;
     }
     ?>
@@ -979,6 +978,53 @@ function chao_gang_cheng_checkout_toggle_js() {
             // Auto-disconnect after 10 seconds to prevent indefinite observation
             setTimeout(function() { translationObserver.disconnect(); }, 10000);
         }
+
+        // ── Coupon success: block auto-scroll & show alert ──────────────────
+        // WooCommerce core scrolls via jQuery.animate({scrollTop:...}) at an
+        // unpredictable time inside its AJAX callback chain. The only reliable
+        // way to neutralise it is to temporarily monkey-patch jQuery.animate
+        // so that any scrollTop animation is silently discarded.
+        var _scrollBlocked = false;
+        var _origAnimate   = $.fn.animate;
+
+        $.fn.animate = function(props, speed, easing, cb) {
+            if (_scrollBlocked && props && typeof props.scrollTop !== 'undefined') {
+                // Drop the scroll animation but still invoke the callback if provided
+                if (typeof speed === 'function') { speed.call(this[0]); }
+                else if (typeof easing === 'function') { easing.call(this[0]); }
+                else if (typeof cb === 'function') { cb.call(this[0]); }
+                return this;
+            }
+            return _origAnimate.apply(this, arguments);
+        };
+
+        $(document.body).on('applied_coupon', function(event, coupon_code) {
+            // Enable scroll-block immediately
+            _scrollBlocked = true;
+
+            // Release block after 1.5 s (well after WC finishes its animate calls)
+            setTimeout(function() { _scrollBlocked = false; }, 1500);
+
+            // Also stop any already-running scroll animation
+            $('html, body').stop(true, false);
+
+            // Read & remove the WooCommerce success notice before WC re-renders
+            var $message = $('.woocommerce-message');
+            var msgText  = $message.length ? $message.text().trim() : '折價券使用成功';
+            $message.remove();
+
+            // Wait until the WC AJAX cycle injects a fresh message, then remove it too
+            $(document.body).one('updated_checkout updated_wc_div', function() {
+                $('.woocommerce-message').remove();
+                $('html, body').stop(true, false);
+            });
+
+            // Show alert after a short delay so the update_checkout cycle has fired
+            setTimeout(function() {
+                $('html, body').stop(true, false);
+                alert(msgText);
+            }, 200);
+        });
     });
     </script>
     <?php
@@ -1046,7 +1092,7 @@ function chao_gang_cheng_admin_invoice_details( $order ) {
     
     switch ( $invoice_type ) {
         case 'personal':
-            $invoice_type_label = '個人電子發票 (會員載具)';
+            $invoice_type_label = '個人發票';
             break;
         case 'carrier':
             $invoice_type_label = '手機條碼載具';
@@ -1093,7 +1139,7 @@ function chao_gang_cheng_email_invoice_details( $order, $sent_to_admin, $plain_t
     $invoice_type_label = '';
     switch ( $invoice_type ) {
         case 'personal':
-            $invoice_type_label = '個人電子發票 (會員載具)';
+            $invoice_type_label = '個人發票';
             break;
         case 'carrier':
             $invoice_type_label = '手機條碼載具';
@@ -2737,11 +2783,21 @@ function chao_gang_cheng_points_signup_message_js_fallback() {
  */
 add_action( 'woocommerce_register_form_start', 'chao_gang_cheng_register_benefits_box' );
 function chao_gang_cheng_register_benefits_box() {
+    $signup = (int) get_option( '_ckc_ref_signup_bonus', 0 );
+    
+    // 取得點數兌換比例
+    $wps = get_option('wps_wpr_settings_gallery', array());
+    $redeem_pts = (int) get_option('_ckc_redeem_pts', $wps['wps_wpr_cart_points_rate'] ?? 1);
+    $redeem_val = (int) get_option('_ckc_redeem_val', $wps['wps_wpr_cart_price_rate']  ?? 1);
+    $rate_text = sprintf( '%d 點可折抵 NT$%d', $redeem_pts, $redeem_val );
     ?>
     <div style="background: #fdfaf7; border: 1px solid #f5ebe6; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
         <div style="font-size: 13px; font-weight: 700; color: #7f6c60; margin-bottom: 8px;">加入會員專屬好處</div>
         <ul style="margin: 0; padding: 0; list-style: none; font-size: 13px; color: #6b7280; line-height: 2;">
-            <li>🎁 紅利點數回饋，1 點可折抵 NT$1</li>
+            <?php if ( $signup > 0 ) : ?>
+                <li style="color: #b91c1c; font-weight: 700;">🎁 註冊即贈 <?php echo $signup; ?> 點紅利點數！</li>
+            <?php endif; ?>
+            <li>🪙 紅利點數回饋，<?php echo $rate_text; ?></li>
             <li>💰 消費享 1% 現金回饋</li>
             <li>📦 訂單查詢、收藏清單、下次結帳免填資料</li>
         </ul>
@@ -2953,7 +3009,13 @@ function chao_gang_cheng_account_dashboard_overview() {
         return;
     }
 
-    $points = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
+    $points = ckc_pts_get_user_balance( $user_id );
+    
+    // 取得點數兌換比例
+    $wps        = get_option('wps_wpr_settings_gallery', array());
+    $redeem_pts = (int) get_option('_ckc_redeem_pts', $wps['wps_wpr_cart_points_rate'] ?? 1);
+    $redeem_val = (int) get_option('_ckc_redeem_val', $wps['wps_wpr_cart_price_rate']  ?? 1);
+    $rate_text  = sprintf( '每 %d 點可折抵 NT$%d', $redeem_pts, $redeem_val );
 
     $recent_orders = wc_get_orders( array(
         'customer_id' => $user_id,
@@ -2980,12 +3042,12 @@ function chao_gang_cheng_account_dashboard_overview() {
     .chao-account-order-row:last-child { border-bottom: none; }
     .chao-order-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #f1f5f9; color: #475569; white-space: nowrap; }
     </style>
-
+ 
     <div class="chao-account-overview">
         <div style="<?php echo esc_attr( $card_style ); ?>">
             <p style="<?php echo esc_attr( $title_style ); ?>">🎁 紅利點數</p>
             <div style="font-size: 32px; font-weight: 700; color: #7f6c60; line-height: 1.2;"><?php echo esc_html( number_format( $points ) ); ?> <span style="font-size: 14px; color: #94a3b8;">點</span></div>
-            <p style="font-size: 12px; color: #94a3b8; margin: 8px 0 14px;">1 點可折抵 NT$1，結帳時直接折抵</p>
+            <p style="font-size: 12px; color: #94a3b8; margin: 8px 0 14px;"><?php echo esc_html( $rate_text ); ?>，結帳時直接折抵</p>
             <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'points' ) ); ?>" style="font-size: 13px; color: #7f6c60; font-weight: 600; text-decoration: underline;">查看點數紀錄 →</a>
         </div>
 
@@ -3467,7 +3529,7 @@ remove_all_actions( 'woocommerce_account_points_endpoint' );
 add_action( 'woocommerce_account_points_endpoint', 'chao_gang_cheng_custom_account_points_content' );
 function chao_gang_cheng_custom_account_points_content() {
     $user_id = get_current_user_id();
-    $points = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
+    $points = ckc_pts_get_user_balance( $user_id );
     
     // Get exchange rate
     $redeem_pts = 1;
@@ -3487,17 +3549,85 @@ function chao_gang_cheng_custom_account_points_content() {
     if ( $redeem_pts > 0 ) {
         $money_val = floor( ($points / $redeem_pts) * $redeem_val );
     }
+
+    // 取得點數起算月與到期日
+    $start_month = get_user_meta( $user_id, '_ckc_points_start_month', true );
+    $expire_text = '';
+    if ( $points > 0 && $start_month ) {
+        $start_time = strtotime( $start_month . '-01 00:00:00' );
+        $expire_time = strtotime( '+2 years -1 day', $start_time );
+        $expire_text = sprintf( '點數到期日：%s（自首月 %s 起算二年有效，並以二年為一期）', date_i18n( 'Y/m/d', $expire_time ), date_i18n( 'Y/m', $start_time ) );
+    }
     ?>
-    <div class="woocommerce-MyAccount-points-card" style="background-color: white; border: 1px solid #e4e7eb; border-radius: 6px; padding: 25px 30px; display: flex; align-items: center; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 80px;">
+    <!-- 可用點數卡片 -->
+    <div class="woocommerce-MyAccount-points-card" style="background-color: white; border: 1px solid #e4e7eb; border-radius: 6px; padding: 25px 30px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 80px;">
         <div style="font-size: 16px; color: #111827; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
             <span style="color: #000; font-size: 18px; font-weight: bold; letter-spacing: 0.5px;">可用點數總計</span>
             <span style="color: #f28b82; font-size: 24px; font-weight: bold; margin-left: 10px; margin-right: 2px;"><?php echo esc_html( $points ); ?></span>
             <span style="color: #f28b82; font-size: 24px; font-weight: bold; margin-right: 10px;">點</span>
             <span style="color: #7f8c8d; font-size: 14px; font-weight: normal; margin-top: 4px;">(等同於NT$<?php echo esc_html( $money_val ); ?>)</span>
         </div>
+        <?php if ( $expire_text ) : ?>
+            <div style="font-size: 12px; color: #64748b; margin-top: 8px; display: flex; align-items: center; gap: 4px;">
+                <span>⌛</span> <?php echo esc_html( $expire_text ); ?>
+            </div>
+        <?php endif; ?>
     </div>
+
+    <?php
+    // 如果有設定註冊禮且尚未發放，顯示提示（已發放者不顯示）
+    $signup_bonus = function_exists( 'ckc_ref_signup_bonus' ) ? ckc_ref_signup_bonus() : (int) get_option( '_ckc_ref_signup_bonus', 0 );
+    $bonus_given  = get_user_meta( $user_id, '_ckc_signup_bonus_given', true );
+    if ( $signup_bonus > 0 && $bonus_given ) : ?>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#15803d;display:flex;align-items:center;gap:10px;">
+        🎁 <span>感謝您加入！新會員註冊禮 <strong><?php echo intval( $bonus_given ); ?> 點</strong>已自動入帳。</span>
+    </div>
+    <?php endif; ?>
+
+    <?php
+    // 近期點數異動紀錄
+    $log = get_user_meta( $user_id, '_ckc_ref_log', true );
+    if ( is_array( $log ) && ! empty( $log ) ) :
+        $log_display = array_reverse( $log ); // 最新在前
+        $log_display = array_slice( $log_display, 0, 10 ); // 最多顯示 10 筆
+    ?>
+    <div style="margin-top:8px;">
+        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:10px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;">🕒 近期點數異動</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">
+                    <th style="padding:6px 8px;text-align:left;font-weight:600">時間</th>
+                    <th style="padding:6px 8px;text-align:left;font-weight:600">說明</th>
+                    <th style="padding:6px 8px;text-align:right;font-weight:600">點數</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $log_display as $entry ) :
+                $pts = intval( $entry['points'] ?? 0 );
+                $is_plus = $pts >= 0;
+            ?>
+                <tr style="border-top:1px solid #f1f5f9;">
+                    <td style="padding:8px;color:#94a3b8;white-space:nowrap;font-size:12px;"><?php echo esc_html( substr( $entry['time'] ?? '', 0, 16 ) ); ?></td>
+                    <td style="padding:8px;color:#475569;"><?php echo esc_html( $entry['reason'] ?? '─' ); ?></td>
+                    <td style="padding:8px;text-align:right;">
+                        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;<?php echo $is_plus ? 'background:#dcfce7;color:#15803d' : 'background:#fee2e2;color:#b91c1c'; ?>">
+                            <?php echo $is_plus ? '+' : ''; echo number_format( $pts ); ?> 點
+                        </span>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php if ( count( $log ) > 10 ) : ?>
+        <p style="margin:8px 0 0;font-size:12px;color:#94a3b8;text-align:right;">顯示最近 10 筆，共 <?php echo count($log); ?> 筆紀錄</p>
+        <?php endif; ?>
+    </div>
+    <?php else : ?>
+    <p style="color:#94a3b8;font-size:13px;margin-top:12px;">尚無點數異動紀錄。<a href="<?php echo home_url('/my-account/referral/'); ?>">推薦好友</a>或完成消費即可累積點數！</p>
+    <?php endif; ?>
     <?php
 }
+
 
 // 13. Render Mobile Sticky Bottom Action Bar on Product Page
 add_action( 'wp_footer', 'chao_gang_cheng_sticky_product_bar' );
@@ -9619,7 +9749,7 @@ function chao_checkout_custom_js_css() {
                             <div class="chao-card-check"></div>
                             <div class="chao-cvs-info">
                                 <div class="chao-cvs-name">7-11 冷凍取貨(先付款)</div>
-                                <div class="chao-cvs-price">NT$280</div>
+                                <div class="chao-cvs-price" id="chao-cvs-rate-price">NT$<?php echo esc_js( intval( chao_get_cvs_shipping_cost() ) ); ?></div>
                             </div>
                             <div class="chao-cvs-free-shipping-msg"></div>
                         </div>
@@ -9766,6 +9896,26 @@ function chao_checkout_custom_js_css() {
                 $('.chao-cvs-options').hide();
             }
             
+            // Sync CVS displayed cost from the actual WooCommerce shipping_method radio label
+            var $cvsRadio = $('input[name^="shipping_method"][value^="Wooecpay_Logistic_CVS_711"]');
+            if ($cvsRadio.length) {
+                // WooCommerce renders cost in the <label> adjacent to the radio, inside a .woocommerce-Price-amount span
+                var $cvsLabel = $cvsRadio.closest('li').find('.woocommerce-Price-amount');
+                var cvsCostText = $cvsLabel.length ? $cvsLabel.text().trim() : '';
+                if (cvsCostText) {
+                    $('#chao-cvs-rate-price').text(cvsCostText);
+                } else {
+                    // Fallback: read full label text and strip the method name prefix
+                    var fullLabel = $cvsRadio.closest('li').find('label').text().trim();
+                    // label typically looks like: "7-11 超商冷凍取貨：NT$280.00"
+                    var colonIdx = fullLabel.lastIndexOf('：');
+                    if (colonIdx === -1) colonIdx = fullLabel.lastIndexOf(':');
+                    if (colonIdx !== -1) {
+                        $('#chao-cvs-rate-price').text(fullLabel.substring(colonIdx + 1).trim());
+                    }
+                }
+            }
+
             // Check if store info is selected
             var storeName = $('#mydybox_cvs_store_name').val() || '';
             var storeAddr = $('#mydybox_cvs_store_addr').val() || '';
@@ -10043,6 +10193,7 @@ require_once get_template_directory() . '/includes/ckc-referral.php'; // 分潤�
 require_once get_template_directory() . '/includes/ckc-referral-partner.php'; // 分潤系統（第二階段夥伴現金軌）
 require_once get_template_directory() . '/includes/ckc-referral-admin.php'; // 分潤系統（後台夥伴管理頁）
 require_once get_template_directory() . '/includes/ckc-coupons.php'; // 折扣券（領券中心＋專屬優惠券頁）
+require_once get_template_directory() . '/includes/ckc-points-admin.php'; // 紅利點數後台管理系統
 
 // Load custom ECPay ECPg 2.0 (站內付 2.0) Payment Gateway
 require_once get_template_directory() . '/includes/ecpay-ecpg-gateway.php';
@@ -10122,25 +10273,41 @@ function chao_checkout_free_shipping_progress() {
     $threshold = chao_get_free_shipping_threshold();
 
     $cart_total = floatval( WC()->cart->get_cart_contents_total() );
-    $remaining = $threshold - $cart_total;
-    
-    // Render progress bar
+    $remaining  = $threshold - $cart_total;
+
+    // 檢查是否已套用含「允許免運費」的折價券
+    $coupon_free_shipping = false;
+    if ( WC()->cart ) {
+        foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
+            $coupon = new WC_Coupon( $coupon_code );
+            if ( $coupon->get_id() && $coupon->get_free_shipping() ) {
+                $coupon_free_shipping = true;
+                break;
+            }
+        }
+    }
+
+    $is_free = $coupon_free_shipping || $remaining <= 0;
     ?>
     <div class="chao-shipping-progress-container" style="margin-bottom: 25px; padding: 18px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: 600;">
             <span style="color: #334155; display: flex; align-items: center; gap: 6px;">
-                <?php if ( $remaining > 0 ) : ?>
-                    <span style="font-size: 16px;">🚚</span> 距離免運門檻還差 <span style="color: #e11d48; font-size: 16px; font-weight: 700;">NT$<?php echo number_format( $remaining ); ?></span>
-                <?php else : ?>
+                <?php if ( $coupon_free_shipping ) : ?>
+                    <span style="font-size: 16px;">🎉</span> 已套用免運優惠券，本次配送免運費！
+                <?php elseif ( $remaining <= 0 ) : ?>
                     <span style="font-size: 16px;">🎉</span> 恭喜！您已達免運門檻，本次配送免運費！
+                <?php else : ?>
+                    <span style="font-size: 16px;">🚚</span> 距離免運門檻還差 <span style="color: #e11d48; font-size: 16px; font-weight: 700;">NT$<?php echo number_format( $remaining ); ?></span>
                 <?php endif; ?>
             </span>
+            <?php if ( ! $coupon_free_shipping ) : ?>
             <span style="color: #64748b; font-size: 13px;">免運門檻 NT$<?php echo number_format( $threshold ); ?></span>
+            <?php endif; ?>
         </div>
         <div class="chao-progress-track" style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden;">
             <?php
-            $percentage = min( 100, max( 0, ( $cart_total / $threshold ) * 100 ) );
-            $bar_color = $remaining > 0 ? 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)' : 'linear-gradient(90deg, #10b981 0%, #047857 100%)';
+            $percentage = $is_free ? 100 : min( 100, max( 0, ( $cart_total / $threshold ) * 100 ) );
+            $bar_color  = $is_free ? 'linear-gradient(90deg, #10b981 0%, #047857 100%)' : 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)';
             ?>
             <div class="chao-progress-bar" style="width: <?php echo esc_attr( $percentage ); ?>%; height: 100%; background: <?php echo esc_attr( $bar_color ); ?>; transition: width 0.4s ease-in-out;"></div>
         </div>
@@ -10397,6 +10564,37 @@ function chao_orderpay_payment_redirect_guard() {
  *        mobile sticky checkout bar
  * ============================================================ */
 
+// 32a-helper-cvs. Get CVS shipping cost from WooCommerce shipping zones (Wooecpay_Logistic_CVS_711).
+// Used for the server-side initial value in the checkout CVS card to avoid hardcoded NT$280.
+function chao_get_cvs_shipping_cost() {
+    static $cached = null;
+    if ( $cached !== null ) {
+        return $cached;
+    }
+    $cached = 280; // default fallback
+    if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
+        return $cached;
+    }
+    $all_zones = array_merge(
+        WC_Shipping_Zones::get_zones(),
+        array( array( 'shipping_methods' => WC_Shipping_Zones::get_zone_by( 'zone_id', 0 )->get_shipping_methods( true ) ) )
+    );
+    foreach ( $all_zones as $zone ) {
+        $methods = isset( $zone['shipping_methods'] ) ? $zone['shipping_methods'] : array();
+        foreach ( $methods as $method ) {
+            // Match ECPay CVS 711 shipping method
+            if ( strpos( $method->id, 'Wooecpay_Logistic_CVS' ) !== false && 'yes' === $method->enabled ) {
+                $cost = $method->get_option( 'cost' );
+                if ( '' !== $cost && is_numeric( $cost ) ) {
+                    $cached = floatval( $cost );
+                    return $cached;
+                }
+            }
+        }
+    }
+    return $cached;
+}
+
 // 32a-helper. Collect enabled paid shipping methods (title => cost) for the estimate display
 function chao_get_estimated_shipping_rates() {
     $rates = array();
@@ -10433,11 +10631,25 @@ add_action( 'woocommerce_cart_totals_before_order_total', 'chao_cart_estimated_s
 function chao_cart_estimated_shipping_row() {
     $threshold = chao_get_free_shipping_threshold();
     $subtotal  = WC()->cart->get_subtotal();
+
+    // 檢查目前購物車是否已套用含「允許免運費」的折價券
+    $coupon_free_shipping = false;
+    if ( WC()->cart ) {
+        foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
+            $coupon = new WC_Coupon( $coupon_code );
+            if ( $coupon->get_id() && $coupon->get_free_shipping() ) {
+                $coupon_free_shipping = true;
+                break;
+            }
+        }
+    }
     ?>
     <tr class="chao-est-shipping">
         <th>預估運費</th>
         <td data-title="預估運費">
-            <?php if ( $subtotal >= $threshold ) : ?>
+            <?php if ( $coupon_free_shipping ) : ?>
+                <strong style="color:#16a34a;">🎉 已套用免運優惠券，本次配送免運費！</strong>
+            <?php elseif ( $subtotal >= $threshold ) : ?>
                 <strong style="color:#16a34a;">免運費 🎉</strong>
             <?php else : ?>
                 <?php
@@ -10526,6 +10738,126 @@ function chao_cart_free_shipping_cross_sell() {
             <?php endforeach; ?>
         </div>
     </div>
+    <?php
+}
+
+// 32c-2. 結帳頁：未達免運門檻時顯示加購商品區（AJAX 加入，不整頁重載）
+add_action( 'woocommerce_checkout_before_order_review', 'chao_checkout_free_shipping_cross_sell', 20 );
+function chao_checkout_free_shipping_cross_sell() {
+    if ( ! WC()->cart || WC()->cart->is_empty() ) {
+        return;
+    }
+    $threshold = chao_get_free_shipping_threshold();
+    $subtotal  = WC()->cart->get_subtotal();
+    if ( $subtotal >= $threshold ) {
+        return;
+    }
+    $diff = $threshold - $subtotal;
+
+    $exclude = array( 0 );
+    foreach ( WC()->cart->get_cart() as $cart_item ) {
+        $exclude[] = $cart_item['product_id'];
+    }
+    $price_cap = max( $diff, 400 );
+    $query = new WP_Query( array(
+        'post_type'      => 'product',
+        'post_status'    => 'publish',
+        'posts_per_page' => 20,
+        'post__not_in'   => $exclude,
+        'meta_key'       => 'total_sales',
+        'orderby'        => 'meta_value_num',
+        'order'          => 'DESC',
+        'no_found_rows'  => true,
+    ) );
+    $picks = array();
+    foreach ( $query->posts as $post ) {
+        $product = wc_get_product( $post->ID );
+        if ( ! $product || ! $product->is_type( 'simple' ) || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
+            continue;
+        }
+        $price = floatval( $product->get_price() );
+        if ( $price <= 0 || $price > $price_cap ) {
+            continue;
+        }
+        $picks[] = $product;
+        if ( count( $picks ) >= 4 ) {
+            break;
+        }
+    }
+    wp_reset_postdata();
+    if ( count( $picks ) < 2 ) {
+        return;
+    }
+    ?>
+    <div class="chao-checkout-cross-sell" data-threshold="<?php echo (int) $threshold; ?>" style="margin-bottom:20px;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">
+        <div style="font-size:14px;font-weight:700;color:#334155;margin-bottom:12px;">還差 <strong style="color:#b91c1c;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
+            <?php foreach ( $picks as $product ) : ?>
+                <div style="display:flex;flex-direction:column;gap:6px;text-align:center;">
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="display:block;"><?php echo $product->get_image( 'woocommerce_thumbnail' ); ?></a>
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="font-size:13px;color:#1e293b;text-decoration:none;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></a>
+                    <span style="font-size:14px;font-weight:700;color:#b91c1c;"><?php echo $product->get_price_html(); ?></span>
+                    <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" style="border:none;background:#7f6c60;color:#fff;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php
+}
+
+// 32c-3. 結帳頁加購 AJAX（Store API add-item）+ toast + 更新結帳金額，不重載
+add_action( 'wp_footer', 'chao_checkout_cross_sell_script' );
+function chao_checkout_cross_sell_script() {
+    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url() ) {
+        return;
+    }
+    ?>
+    <style>
+    #ckc-coupon-toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px); background:#16a34a; color:#fff; padding:14px 24px; border-radius:30px; font-size:15px; font-weight:700; z-index:2147483000; max-width:88vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; }
+    #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    </style>
+    <script>
+    jQuery(function($){
+        function chaoToast(msg){
+            var $t = $('#ckc-coupon-toast');
+            if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
+            $t.text(msg).css('background','#16a34a');
+            requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
+            clearTimeout(window._ckcToastTimer);
+            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+        }
+        $(document).on('click', '.chao-checkout-crosssell-add', function(e){
+            e.preventDefault();
+            var $btn = $(this), pid = parseInt($btn.data('product-id'), 10);
+            if(!pid){ return; }
+            $btn.prop('disabled', true).css('opacity', .6);
+            fetch('/wp-json/wc/store/cart', {credentials:'include'})
+                .then(function(r){ return r.headers.get('Nonce'); })
+                .then(function(nonce){
+                    return fetch('/wp-json/wc/store/v1/cart/add-item', {
+                        method:'POST', credentials:'include',
+                        headers:{'Content-Type':'application/json','Nonce': nonce || ''},
+                        body: JSON.stringify({ id: pid, quantity: 1 })
+                    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); });
+                })
+                .then(function(res){
+                    if(res.ok){
+                        chaoToast('已加入購物車');
+                        // 若加入後已達免運門檻，收起整個加購區
+                        var $wrap = $('.chao-checkout-cross-sell');
+                        var th = parseInt($wrap.data('threshold'), 10) || 0;
+                        var sub = parseInt((res.data && res.data.totals && res.data.totals.total_items) || '0', 10);
+                        if(th > 0 && sub >= th){ $wrap.slideUp(220); }
+                        $(document.body).trigger('update_checkout');
+                    } else {
+                        chaoToast((res.data && res.data.message) ? res.data.message : '加入失敗，請稍後再試');
+                        $btn.prop('disabled', false).css('opacity', 1);
+                    }
+                })
+                .catch(function(){ $btn.prop('disabled', false).css('opacity', 1); });
+        });
+    });
+    </script>
     <?php
 }
 
@@ -10912,5 +11244,78 @@ function ckc_display_order_source_in_admin( $order ) {
         $style,
         esc_html( $source )
     );
+}
+
+/**
+ * 檢查並執行紅利點數過期（累積首月起算二年有效並以二年為一期）
+ */
+function ckc_pts_check_expiration( $user_id ) {
+    $start_month = get_user_meta( $user_id, '_ckc_points_start_month', true );
+    if ( ! $start_month ) {
+        return;
+    }
+    
+    // 起算區間 (例如: 2026-07 -> 2028-06-30 23:59:59，以兩年為一期)
+    $start_time = strtotime( $start_month . '-01 00:00:00' );
+    $expire_time = strtotime( '+2 years -1 day 23:59:59', $start_time );
+    $now = current_time( 'timestamp' );
+    
+    if ( $now > $expire_time ) {
+        global $wpdb;
+        $val = $wpdb->get_var( $wpdb->prepare(
+            "SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = 'wps_wpr_points'",
+            $user_id
+        ) );
+        $current_pts = $val !== null ? (int) $val : 0;
+        
+        if ( $current_pts > 0 ) {
+            // 歸零更新
+            update_user_meta( $user_id, 'wps_wpr_points', 0 );
+            
+            // 寫入 WPS points_details 日誌
+            $details = get_user_meta( $user_id, 'points_details', true );
+            if ( ! is_array( $details ) ) { $details = array(); }
+            if ( ! isset( $details['admin_points'] ) || ! is_array( $details['admin_points'] ) ) {
+                $details['admin_points'] = array();
+            }
+            $details['admin_points'][] = array(
+                'admin_points' => $current_pts,
+                'date'         => date_i18n( 'Y-m-d h:i:sa' ),
+                'sign'         => '-',
+                'reason'       => sprintf( '紅利點數二年到期清除（原額度 %d 點，起算區間：%s）', $current_pts, $start_month ),
+            );
+            update_user_meta( $user_id, 'points_details', $details );
+            
+            // 寫入自訂分潤日誌
+            $log = get_user_meta( $user_id, '_ckc_ref_log', true );
+            if ( ! is_array( $log ) ) { $log = array(); }
+            $log[] = array(
+                'points' => -$current_pts,
+                'reason' => sprintf( '紅利點數二年到期清除（起算區間：%s）', $start_month ),
+                'time'   => current_time( 'mysql' )
+            );
+            update_user_meta( $user_id, '_ckc_ref_log', $log );
+        }
+        
+        // 刪除起算日，下一筆點數累積時會重新起算新的一期
+        delete_user_meta( $user_id, '_ckc_points_start_month' );
+        clean_user_cache( $user_id );
+    }
+}
+
+/**
+ * 取得會員目前點數餘額（繞過 Object Cache 機制，防範不同步）
+ */
+function ckc_pts_get_user_balance( $user_id ) {
+    global $wpdb;
+    
+    // 自動檢查點數是否已過期
+    ckc_pts_check_expiration( $user_id );
+    
+    $val = $wpdb->get_var( $wpdb->prepare(
+        "SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = 'wps_wpr_points'",
+        $user_id
+    ) );
+    return $val !== null ? (int) $val : 0;
 }
 

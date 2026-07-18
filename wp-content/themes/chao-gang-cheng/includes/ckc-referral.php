@@ -18,20 +18,91 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /* ------------------------------------------------------------------
- * 設定（可用 filter 覆寫）
+ * 設定（從後台「⚙️ 發放設定」頁讀取，可用 filter 覆寫）
+ * - 分潤比例、單筆上限、首購禮：後台設定頁寫入 _ckc_ref_* options
+ * - 歸因天數：固定 30 天（不開放後台修改）
  * ---------------------------------------------------------------- */
 function ckc_ref_commission_rate() {
-    return floatval( apply_filters( 'ckc_ref_commission_rate', 0.05 ) ); // 5%
+    // 讀取後台設定，預設 5%（0.05），apply_filters 允許程式覆寫
+    $saved = get_option( '_ckc_ref_commission_rate', 0.05 );
+    return floatval( apply_filters( 'ckc_ref_commission_rate', floatval( $saved ) ) );
 }
 function ckc_ref_commission_cap() {
-    return intval( apply_filters( 'ckc_ref_commission_cap', 300 ) ); // 單筆上限 300 點
+    // 讀取後台設定，預設 300 點
+    $saved = get_option( '_ckc_ref_commission_cap', 300 );
+    return intval( apply_filters( 'ckc_ref_commission_cap', intval( $saved ) ) );
 }
 function ckc_ref_cookie_days() {
     return intval( apply_filters( 'ckc_ref_cookie_days', 30 ) ); // 歸因 30 天
 }
 function ckc_ref_referred_bonus() {
-    return intval( apply_filters( 'ckc_ref_referred_first_order_bonus', 50 ) ); // 被推薦人首購加贈
+    // 讀取後台設定，預設 50 點
+    $saved = get_option( '_ckc_ref_referred_bonus', 50 );
+    return intval( apply_filters( 'ckc_ref_referred_first_order_bonus', intval( $saved ) ) );
 }
+function ckc_ref_signup_bonus() {
+    // 讀取後台設定，預設 0（0 = 停用）
+    $saved = get_option( '_ckc_ref_signup_bonus', 0 );
+    return intval( apply_filters( 'ckc_ref_signup_bonus', intval( $saved ) ) );
+}
+
+/* ------------------------------------------------------------------
+ * 新會員註冊贈點
+ *  - 觸發：user_register（帳號建立後立即執行）
+ *  - 點數：由後台「⚙️ 發放設定」→「新會員註冊禮」控制
+ *  - 防重複：寫入 _ckc_signup_bonus_given user meta
+ * ---------------------------------------------------------------- */
+add_action( 'user_register', 'ckc_ref_give_signup_bonus', 20 );
+function ckc_ref_give_signup_bonus( $user_id ) {
+    $bonus = ckc_ref_signup_bonus();
+    if ( $bonus <= 0 ) {
+        return; // 後台設為 0 時停用
+    }
+    if ( get_user_meta( $user_id, '_ckc_signup_bonus_given', true ) ) {
+        return; // 防止重複發放
+    }
+
+    // 發放點數（與 WPS 外掛相容格式）
+    $balance = ckc_pts_get_user_balance( $user_id );
+    $new_bal = $balance + $bonus;
+    update_user_meta( $user_id, 'wps_wpr_points', $new_bal );
+    
+    // 自點數累積首月起算有效期限
+    $start_month = get_user_meta( $user_id, '_ckc_points_start_month', true );
+    if ( ! $start_month && $new_bal > 0 ) {
+        update_user_meta( $user_id, '_ckc_points_start_month', current_time( 'Y-m' ) );
+    }
+    
+    clean_user_cache( $user_id );
+
+    // 寫入 WPS points_details（後台 Points Table 可見）
+    $details = get_user_meta( $user_id, 'points_details', true );
+    if ( ! is_array( $details ) ) { $details = array(); }
+    if ( ! isset( $details['admin_points'] ) || ! is_array( $details['admin_points'] ) ) {
+        $details['admin_points'] = array();
+    }
+    $details['admin_points'][] = array(
+        'admin_points' => $bonus,
+        'date'         => date_i18n( 'Y-m-d h:i:sa' ),
+        'sign'         => '+',
+        'reason'       => '新會員註冊禮',
+    );
+    update_user_meta( $user_id, 'points_details', $details );
+
+    // 寫入自訂分潤日誌（前台「異動紀錄」可見）
+    $log = get_user_meta( $user_id, '_ckc_ref_log', true );
+    if ( ! is_array( $log ) ) { $log = array(); }
+    $log[] = array(
+        'points' => $bonus,
+        'reason' => '新會員註冊禮',
+        'time'   => current_time( 'mysql' ),
+    );
+    update_user_meta( $user_id, '_ckc_ref_log', $log );
+
+    // 標記已發放，防止重複
+    update_user_meta( $user_id, '_ckc_signup_bonus_given', $bonus );
+}
+
 
 /* ------------------------------------------------------------------
  * 推薦碼
@@ -126,11 +197,25 @@ function ckc_ref_add_points( $user_id, $points, $reason ) {
     if ( $user_id <= 0 || 0 === $points ) {
         return false;
     }
-    $balance = (int) get_user_meta( $user_id, 'wps_wpr_points', true );
+    $balance     = ckc_pts_get_user_balance( $user_id );
     $new_balance = max( 0, $balance + $points );
     update_user_meta( $user_id, 'wps_wpr_points', $new_balance );
+    
+    // 自點數累積首月起算有效期限
+    $start_month = get_user_meta( $user_id, '_ckc_points_start_month', true );
+    if ( ! $start_month && $new_balance > 0 ) {
+        update_user_meta( $user_id, '_ckc_points_start_month', current_time( 'Y-m' ) );
+    }
+    
+    clean_user_cache( $user_id );
 
-    // 寫入 WPS 點數紀錄（admin_points 類別），讓外掛紀錄頁保持一致
+    // 修正：完全依照 WPS Points and Rewards 外掛的 wps_wpr_update_points_details() 格式
+    // 寫入 points_details，確保後台 Points Table 正確顯示增減紀錄。
+    // 欄位規格：admin_points（絕對值）、sign（'+' 或 '-'）、reason、date
+    $sign        = $points > 0 ? '+' : '-';
+    $abs_points  = abs( $points );
+    $today_date  = date_i18n( 'Y-m-d h:i:sa' );
+
     $details = get_user_meta( $user_id, 'points_details', true );
     if ( ! is_array( $details ) ) {
         $details = array();
@@ -139,8 +224,10 @@ function ckc_ref_add_points( $user_id, $points, $reason ) {
         $details['admin_points'] = array();
     }
     $details['admin_points'][] = array(
-        'admin_points' => $points,
-        'date'         => date( 'Y-m-d h:i:sa' ),
+        'admin_points' => $abs_points,  // WPS 需要絕對值，正負由 'sign' 決定
+        'date'         => $today_date,
+        'sign'         => $sign,
+        'reason'       => sanitize_text_field( $reason ),
     );
     update_user_meta( $user_id, 'points_details', $details );
 
@@ -401,4 +488,78 @@ function ckc_ref_admin_report_text() {
         $total_points,
         implode( "\n", $top_lines )
     );
+}
+
+/**
+ * 訂單完成 → 發放消費回饋紅利給買家本人
+ */
+add_action( 'woocommerce_order_status_completed', 'ckc_pts_order_completed_reward', 25 );
+function ckc_pts_order_completed_reward( $order_id ) {
+    $order = wc_get_order( $order_id );
+    if ( ! $order ) {
+        return;
+    }
+    
+    // 檢查是否啟用消費回饋
+    $enabled = get_option( '_ckc_purchase_bonus_enabled', 'no' );
+    if ( 'yes' !== $enabled ) {
+        return;
+    }
+    
+    // 檢查是否已發放過，避免重複
+    if ( $order->get_meta( '_ckc_purchase_bonus_given' ) ) {
+        return;
+    }
+    
+    $customer_id = $order->get_customer_id();
+    if ( $customer_id <= 0 ) {
+        return; // 訪客下單不發放
+    }
+    
+    $purchase_pts = max( 1, intval( get_option( '_ckc_purchase_bonus_pts', 1 ) ) );
+    $purchase_val = max( 1, intval( get_option( '_ckc_purchase_bonus_val', 100 ) ) );
+    
+    // 計算消費基礎：商品小計（不含運費），扣除折讓
+    $basis = floatval( $order->get_subtotal() ) - floatval( $order->get_total_discount() );
+    if ( $basis <= 0 ) {
+        return;
+    }
+    
+    // 計算回饋點數： floor( ( $basis / $purchase_val ) * $purchase_pts )
+    $points = (int) floor( ( $basis / $purchase_val ) * $purchase_pts );
+    
+    if ( $points > 0 ) {
+        if ( ckc_ref_add_points( $customer_id, $points, sprintf( '訂單 #%d 消費回饋紅利', $order_id ) ) ) {
+            $order->update_meta_data( '_ckc_purchase_bonus_given', $points );
+            $order->save();
+            $order->add_order_note( sprintf( '點數系統：已發放消費回饋紅利 %d 點給買家本人。', $points ) );
+        }
+    }
+}
+
+/**
+ * 退款／取消 → 反沖消費回饋紅利
+ */
+add_action( 'woocommerce_order_status_refunded', 'ckc_pts_order_reversed_reward', 25 );
+add_action( 'woocommerce_order_status_cancelled', 'ckc_pts_order_reversed_reward', 25 );
+function ckc_pts_order_reversed_reward( $order_id ) {
+    $order = wc_get_order( $order_id );
+    if ( ! $order ) {
+        return;
+    }
+    
+    $given = intval( $order->get_meta( '_ckc_purchase_bonus_given' ) );
+    if ( $given <= 0 ) {
+        return;
+    }
+    
+    $customer_id = $order->get_customer_id();
+    if ( $customer_id > 0 ) {
+        // 扣回發放的點數
+        if ( ckc_ref_add_points( $customer_id, -$given, sprintf( '訂單 #%d 退款/取消反沖消費回饋紅利', $order_id ) ) ) {
+            $order->delete_meta_data( '_ckc_purchase_bonus_given' );
+            $order->save();
+            $order->add_order_note( sprintf( '點數系統：已扣回原訂單發放之消費回饋紅利 %d 點。', $given ) );
+        }
+    }
 }
