@@ -5498,3 +5498,8 @@ ul.products.list-view li.product a.add_to_cart_button {
 }
 
 
+
+/* 隱藏購物車與結帳頁的禮物卡功能 */
+.add_gift_card_form {
+    display: none !important;
+}
