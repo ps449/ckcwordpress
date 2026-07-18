@@ -5497,6 +5497,24 @@ function chao_gang_cheng_discount_badge_css() {
         text-align: center !important;
         text-transform: uppercase !important;
     }
+    
+    /* 商品頁特價標籤定位修正 (補償 .product 的 padding 以對齊圖片邊緣) */
+    .single-product .product span.onsale.chao-onsale {
+        top: 50px !important; /* Desktop: 40px padding + 10px offset */
+        left: 50px !important;
+    }
+    @media (max-width: 992px) {
+        .single-product .product span.onsale.chao-onsale {
+            top: 30px !important; /* Tablet: 20px padding + 10px offset */
+            left: 30px !important;
+        }
+    }
+    @media (max-width: 768px) {
+        .single-product .product span.onsale.chao-onsale {
+            top: 30px !important; /* Mobile: 20px padding top + 10px */
+            left: 25px !important; /* Mobile: 15px padding left + 10px */
+        }
+    }
     </style>
     <?php
 }
