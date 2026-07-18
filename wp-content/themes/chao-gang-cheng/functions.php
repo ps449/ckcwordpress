@@ -5,9 +5,38 @@
  * @package Chao_Gang_Cheng
  */
 
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────
+ * WC 配送方法數量 Transient 自動修復
+ * 症狀：wc_get_shipping_method_count() 返回 0（快取壞掉），
+ *       導致 WC()->cart->needs_shipping() = false → 結帳頁無配送選項。
+ * 修復：每次 woocommerce_loaded 時若快取為 0 但 DB 有啟用的方法，
+ *       自動刪除壞掉的 transient 讓 WC 重新計算。
+ * ─────────────────────────────────────────────────────────────────
+ */
+add_action( 'woocommerce_loaded', 'ckc_heal_shipping_method_count_transient' );
+function ckc_heal_shipping_method_count_transient() {
+    // 只在快取回傳 0 時介入，避免不必要的 DB 查詢
+    if ( wc_get_shipping_method_count( true ) === 0 ) {
+        global $wpdb;
+        $db_count = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT method_id)
+               FROM {$wpdb->prefix}woocommerce_shipping_zone_methods
+              WHERE is_enabled = 1"
+        );
+        if ( $db_count > 0 ) {
+            // 快取值與 DB 不一致 → 刪除 transient，下次 WC 會重新計算
+            delete_transient( 'wc_shipping_method_count_0' );
+            delete_transient( 'wc_shipping_method_count_1' );
+        }
+    }
+}
+
 
 /**
  * Setup Theme Support
