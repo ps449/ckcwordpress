@@ -1399,23 +1399,20 @@ h1, h2, h3, h4, h5, h6 {
     margin-right: 0;
   }
   .woocommerce-MyAccount-navigation ul {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    justify-content: flex-start;
-    padding: 4px 8px 8px;
-    gap: 7px;
-    /* 隱藏捲軸但保持可滑動 */
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .woocommerce-MyAccount-navigation ul::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 4px;
+    gap: 6px;
   }
   .woocommerce-MyAccount-navigation li a {
-    padding: 9px 15px;
-    font-size: 13.5px;
-    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 18px;
+    text-align: center;
+  }
+  /* 登出在此面板隱藏 */
+  .woocommerce-MyAccount-navigation-link--customer-logout {
+    display: none !important;
   }
 }
 
