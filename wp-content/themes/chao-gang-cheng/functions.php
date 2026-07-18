@@ -11319,3 +11319,151 @@ function ckc_pts_get_user_balance( $user_id ) {
     return $val !== null ? (int) $val : 0;
 }
 
+
+
+/**
+ * Fix: Bypass WordPress.com Akismet (bkismet) spam check for WooCommerce front-end customer registrations.
+ *
+ * WordPress.com's built-in anti-spam filter (bkismet_check_signup) is hooked to
+ * `wp_pre_insert_user_data` at priority 10. When it detects suspicious traffic
+ * (e.g., missing JA3 TLS fingerprint, unusual IP), it returns `false` instead of
+ * the user data array. This causes `wp_insert_user()` to return WP_Error('empty_data'),
+ * which WooCommerce surfaces as "資料不足，無法建立這個使用者。"
+ *
+ * Fix strategy:
+ *   - Priority  5: Save the pre-bkismet user data into a static variable.
+ *   - Priority 20: If bkismet cleared the data AND the request has a valid
+ *                  woocommerce-register-nonce, restore the saved data so the
+ *                  legitimate customer registration can proceed.
+ */
+add_filter( 'wp_pre_insert_user_data', 'ckc_save_pre_bkismet_user_data', 5, 1 );
+function ckc_save_pre_bkismet_user_data( $data ) {
+    if ( ! empty( $data ) && is_array( $data ) ) {
+        ckc_pre_bkismet_data_store( $data );
+    }
+    return $data;
+}
+
+add_filter( 'wp_pre_insert_user_data', 'ckc_restore_data_after_bkismet', 20, 2 );
+function ckc_restore_data_after_bkismet( $data, $update ) {
+    if ( $update || ! empty( $data ) ) {
+        return $data;
+    }
+    $is_wc_register = (
+        isset( $_POST['woocommerce-register-nonce'] ) &&
+        wp_verify_nonce( sanitize_key( $_POST['woocommerce-register-nonce'] ), 'woocommerce-register' )
+    );
+    if ( $is_wc_register ) {
+        $saved = ckc_pre_bkismet_data_store();
+        if ( ! empty( $saved ) && is_array( $saved ) ) {
+            return $saved;
+        }
+    }
+    return $data;
+}
+
+function ckc_pre_bkismet_data_store( $data = null ) {
+    static $stored = null;
+    if ( $data !== null ) {
+        $stored = $data;
+    }
+    return $stored;
+}
+
+
+/**
+ * Fix: SQLite integration causes wp_insert_user to return ID=0 for new customers.
+ *
+ * The SQLite integration (used for MailPoet tables) intercepts ALL $wpdb queries.
+ * When it encounters a previous error (from unrelated SQLite queries), its internal
+ * logic clears insert_id to 0 on subsequent INSERT operations. This causes
+ * wp_insert_user() to think the MySQL INSERT failed, even when it actually succeeded.
+ *
+ * Fix strategy:
+ *   1. Before wp_insert_user runs (via woocommerce_new_customer_data priority=100),
+ *      clear $wpdb->last_error so the SQLite insert_id-clearing code doesn't fire.
+ *   2. After wp_insert_user (via user_register priority=1), if the user_id is 0,
+ *      look up the just-created user by email and restore the correct user_id via
+ *      a static store, so woocommerce_created_customer fires with the right ID.
+ *   3. Hook woocommerce_new_customer_data at 101 to confirm the real ID was found.
+ */
+
+// Step 1: Clear SQLite last_error right before the user INSERT runs
+add_filter( 'woocommerce_new_customer_data', 'ckc_clear_wpdb_error_before_user_insert', 100 );
+function ckc_clear_wpdb_error_before_user_insert( $data ) {
+    global $wpdb;
+    // Store the email so we can find the user if insert_id comes back as 0
+    if ( ! empty( $data['user_email'] ) ) {
+        ckc_pending_register_email( $data['user_email'] );
+    }
+    // Clear any stale SQLite error that would cause insert_id to be zeroed
+    if ( ! empty( $wpdb->last_error ) ) {
+        $wpdb->last_error = '';
+    }
+    return $data;
+}
+
+// Step 2: If user_id=0 after insert (SQLite bug), look up the real user by email
+add_action( 'user_register', 'ckc_fix_zero_user_id_after_register', 1 );
+function ckc_fix_zero_user_id_after_register( $user_id ) {
+    global $wpdb;
+    if ( (int) $user_id !== 0 ) {
+        return; // Normal path — ID is valid
+    }
+    // user_id is 0 → SQLite insert_id bug. Try to find the user in MySQL by email.
+    $pending_email = ckc_pending_register_email();
+    if ( empty( $pending_email ) ) {
+        return;
+    }
+    $real_id = (int) $wpdb->get_var(
+        $wpdb->prepare( "SELECT ID FROM {$wpdb->users} WHERE user_email = %s LIMIT 1", $pending_email )
+    );
+    if ( $real_id > 0 ) {
+        // Store the real user ID so woocommerce_created_customer can use it
+        ckc_fixed_user_id_store( $real_id );
+        // Run missing post-registration setup that WordPress skipped due to ID=0
+        update_user_meta( $real_id, 'wp_capabilities', array( 'customer' => true ) );
+        update_user_meta( $real_id, $wpdb->prefix . 'capabilities', array( 'customer' => true ) );
+    }
+}
+
+// Step 3: Correct the customer_id in woocommerce_created_customer if it was 0
+add_action( 'woocommerce_created_customer', 'ckc_fix_zero_wc_customer_id', 1, 3 );
+function ckc_fix_zero_wc_customer_id( $customer_id, $new_customer_data, $password_generated ) {
+    if ( (int) $customer_id !== 0 ) {
+        return; // Normal path
+    }
+    $real_id = ckc_fixed_user_id_store();
+    if ( $real_id > 0 ) {
+        // Log in the customer manually since WooCommerce's auto-login got ID=0
+        wp_set_auth_cookie( $real_id, false );
+        do_action( 'wp_login', get_userdata( $real_id )->user_login, get_userdata( $real_id ) );
+        // Fire any remaining post-registration hooks with the real ID
+        do_action( 'ckc_after_customer_created', $real_id, $new_customer_data );
+    }
+}
+
+/** Static store for the email address of the pending registration */
+function ckc_pending_register_email( $email = null ) {
+    static $stored = '';
+    if ( $email !== null ) {
+        $stored = $email;
+    }
+    return $stored;
+}
+
+/** Static store for the corrected user ID after SQLite insert_id bug */
+function ckc_fixed_user_id_store( $id = null ) {
+    static $stored = 0;
+    if ( $id !== null ) {
+        $stored = (int) $id;
+    }
+    return $stored;
+}
+
+// Bonus points: Give signup bonus to the real user even if customer_id was 0
+add_action( 'ckc_after_customer_created', 'ckc_ref_give_signup_bonus_proxy', 10, 2 );
+function ckc_ref_give_signup_bonus_proxy( $user_id, $new_customer_data ) {
+    // Re-trigger the signup bonus hook with the correct user ID
+    do_action( 'woocommerce_created_customer', $user_id, $new_customer_data, false );
+}

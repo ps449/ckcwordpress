@@ -21,19 +21,22 @@
 
 // ** Database settings - You can get this info from your web host ** //
 /** The name of the database for WordPress */
-define( 'DB_NAME', 'sqlite' );
+define( 'DB_NAME', '151973492' );
 
 /** Database username */
-define( 'DB_USER', 'sqlite' );
+define( 'DB_USER', '151973492' );
 
 /** Database password */
-define( 'DB_PASSWORD', 'sqlite' );
+define( 'DB_PASSWORD', 'Mr5nTl1mXkiMlnGJANajmka1cc9RWh84DLuVsg6VboQ=' );
 
 /** Database hostname */
-define( 'DB_HOST', 'localhost' );
+define( 'DB_HOST', '127.0.0.1' );
 
 /** Database charset to use in creating database tables. */
-define( 'DB_CHARSET', 'utf8' );
+define( 'DB_CHARSET', 'utf8mb4' );
+
+/** Disable SQLite integration - use real MySQL database */
+define( 'DB_ENGINE', 'mysql' );
 
 /** The database collate type. Don't change this if in doubt. */
 define( 'DB_COLLATE', '' );
