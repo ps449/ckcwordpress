@@ -2479,11 +2479,11 @@ function ckc_checkout_points_panel() {
             
             <div class="ckc-points-action" style="white-space: nowrap;">
                 <?php if ( $is_applied ) : ?>
-                    <button type="button" class="ckc-points-remove-btn" onclick="try{sessionStorage.setItem('ckc_pts_act','removed');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first().trigger('click');" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    <button type="button" class="ckc-points-remove-btn" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                         移除折抵
                     </button>
                 <?php else : ?>
-                    <button type="button" class="ckc-points-apply-btn" onclick="try{sessionStorage.setItem('ckc_pts_act','applied');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_cart_points').val(<?php echo (int) $points_to_apply; ?>); jQuery('#wps_cart_points_apply').trigger('click');" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    <button type="button" class="ckc-points-apply-btn" data-points="<?php echo (int) $points_to_apply; ?>" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                         立即折抵
                     </button>
                 <?php endif; ?>
@@ -2496,16 +2496,10 @@ function ckc_checkout_points_panel() {
             <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
-                    <button type="button" onclick="try{sessionStorage.setItem('ckc_pts_act','applied');sessionStorage.setItem('ckc_pts_scroll',window.scrollY);}catch(e){}jQuery('#wps_cart_points').val(jQuery('#ckc_custom_points_input').val()); jQuery('#wps_cart_points_apply').trigger('click');" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
+                    <button type="button" class="ckc-points-custom-apply-btn" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
                 </div>
             </div>
         <?php endif; ?>
-
-        <!-- 隱藏的實際輸入與提交表單（由 plugin JS 控制） -->
-        <div class="wps_wpr_checkout_points_class" style="display: none !important;">
-            <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" name="wps_cart_points" id="wps_cart_points" value="<?php echo $is_applied ? esc_attr($applied_points) : ''; ?>" />
-            <button type="button" id="wps_cart_points_apply" data-id="<?php echo esc_attr( $user_id ); ?>" data-order-limit="0">Apply</button>
-        </div>
     </div>
 
     <style>
@@ -2517,20 +2511,74 @@ function ckc_checkout_points_panel() {
     #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
     </style>
     <script>
-    // 紅利點數折抵透過 WPS 外掛套用／移除（會整頁重載）。這裡在重載後浮出 toast
-    // 並還原捲動位置，避免停在頁面頂部；狀態已由伺服器端正確渲染（已套用／已移除）。
     jQuery(function($){
-        var act = null, sc = 0;
-        try { act = sessionStorage.getItem('ckc_pts_act'); sc = parseInt(sessionStorage.getItem('ckc_pts_scroll') || '0', 10); } catch(e){}
-        if(!act){ return; }
-        try { sessionStorage.removeItem('ckc_pts_act'); sessionStorage.removeItem('ckc_pts_scroll'); } catch(e){}
-        if(sc > 0){ window.scrollTo(0, sc); }
-        var msg = (act === 'applied') ? '已套用紅利折抵' : '已移除折抵';
-        var $t = $('#ckc-coupon-toast');
-        if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
-        $t.text(msg).css('background', (act === 'applied') ? '#16a34a' : '#64748b');
-        requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
-        setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+        // 點數套用邏輯（自訂點數與立即全額折抵共用）
+        $(document).on('click', '.ckc-points-apply-btn, .ckc-points-custom-apply-btn', function(e){
+            e.preventDefault();
+            var pts = $(this).hasClass('ckc-points-apply-btn') ? $(this).data('points') : $('#ckc_custom_points_input').val();
+            pts = parseInt(pts) || 0;
+            if (pts <= 0) {
+                alert('請輸入有效的折抵點數。');
+                return;
+            }
+            
+            // 尋找由外掛動態輸出且已被 CSS 隱藏的本物元素
+            var $realInput = $('.woocommerce-checkout-review-order #wps_cart_points, #order_review #wps_cart_points, #wps_cart_points').not('#ckc_custom_points_input').first();
+            var $realBtn = $('.woocommerce-checkout-review-order #wps_cart_points_apply, #order_review #wps_cart_points_apply, #wps_cart_points_apply').first();
+            
+            if ($realInput.length && $realBtn.length) {
+                try {
+                    sessionStorage.setItem('ckc_pts_act', 'applied');
+                    sessionStorage.setItem('ckc_pts_scroll', window.scrollY);
+                } catch(err){}
+                $realInput.val(pts);
+                $realBtn.trigger('click');
+            } else {
+                alert('系統目前無法定位紅利套用元件，請重新整理頁面再試。');
+            }
+        });
+
+        // 點數移除邏輯
+        $(document).on('click', '.ckc-points-remove-btn', function(e){
+            e.preventDefault();
+            var $realRemoveBtn = $('#wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first();
+            if ($realRemoveBtn.length) {
+                try {
+                    sessionStorage.setItem('ckc_pts_act', 'removed');
+                    sessionStorage.setItem('ckc_pts_scroll', window.scrollY);
+                } catch(err){}
+                $realRemoveBtn.trigger('click');
+            } else {
+                alert('無法定位移除紅利折抵的按鈕，請重新整理頁面。');
+            }
+        });
+
+        // 監聽結帳頁面更新完成（AJAX 結束）
+        $(document.body).on('updated_checkout updated_cart_totals', function(){
+            var act = null, sc = 0;
+            try { 
+                act = sessionStorage.getItem('ckc_pts_act'); 
+                sc = parseInt(sessionStorage.getItem('ckc_pts_scroll') || '0', 10);
+            } catch(e){}
+            if (!act) { return; }
+            try { 
+                sessionStorage.removeItem('ckc_pts_act'); 
+                sessionStorage.removeItem('ckc_pts_scroll');
+            } catch(e){}
+            
+            if (sc > 0) { window.scrollTo(0, sc); }
+            
+            var msg = (act === 'applied') ? '✅ 已成功套用紅利折抵！' : '已移除點數折抵';
+            var bg = (act === 'applied') ? '#16a34a' : '#64748b';
+            
+            var $t = $('#ckc-coupon-toast');
+            if (!$t.length) { 
+                $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); 
+            }
+            $t.text(msg).css('background', bg);
+            requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
+            setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+        });
     });
     </script>
     <?php
