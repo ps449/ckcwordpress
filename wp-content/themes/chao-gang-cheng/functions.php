@@ -2983,6 +2983,16 @@ function chao_gang_cheng_custom_my_account_menu_items( $items ) {
     if ( isset( $items['backinstock'] ) ) {
         unset( $items['backinstock'] );
     }
+    // 隱藏禮物卡頁籤（功能保留但不顯示於導覽列）
+    if ( isset( $items['gift-card'] ) ) {
+        unset( $items['gift-card'] );
+    }
+    if ( isset( $items['gift_card'] ) ) {
+        unset( $items['gift_card'] );
+    }
+    if ( isset( $items['woo-gift-cards'] ) ) {
+        unset( $items['woo-gift-cards'] );
+    }
     
     // Set Points menu item to "紅利點數" and position it before Logout
     if ( isset( $items['points'] ) ) {
@@ -2996,6 +3006,114 @@ function chao_gang_cheng_custom_my_account_menu_items( $items ) {
         }
     }
     return $items;
+}
+
+/**
+ * My Account 手機版 Tab Bar：右滑提示
+ * 在導覽列右側顯示漸層+箭頭，使用者滑動後自動消失。
+ */
+add_action( 'woocommerce_before_account_navigation', 'ckc_account_nav_scroll_hint' );
+function ckc_account_nav_scroll_hint() {
+    if ( ! is_account_page() ) return;
+    ?>
+    <style>
+    /* 右側漸層遮罩 + 箭頭提示 */
+    .woocommerce-MyAccount-navigation {
+        position: relative;
+    }
+    @media (max-width: 768px) {
+        .woocommerce-MyAccount-navigation::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 6px;   /* 留出捲軸空間 */
+            width: 54px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.92) 55%);
+            pointer-events: none;
+            z-index: 2;
+            border-radius: 0 8px 8px 0;
+            transition: opacity 0.4s ease;
+        }
+        /* 箭頭 icon */
+        .ckc-nav-scroll-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-60%);
+            width: 26px;
+            height: 26px;
+            background: rgba(127, 108, 96, 0.13);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3;
+            transition: opacity 0.4s ease;
+            color: #7f6c60;
+        }
+        .ckc-nav-scroll-arrow svg {
+            width: 14px;
+            height: 14px;
+            display: block;
+        }
+        /* 已滑動：隱藏提示 */
+        .woocommerce-MyAccount-navigation.ckc-scrolled-right::before,
+        .woocommerce-MyAccount-navigation.ckc-scrolled-right .ckc-nav-scroll-arrow {
+            opacity: 0;
+            pointer-events: none;
+        }
+        /* 已到底：也隱藏 */
+        .woocommerce-MyAccount-navigation.ckc-at-end::before,
+        .woocommerce-MyAccount-navigation.ckc-at-end .ckc-nav-scroll-arrow {
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+    </style>
+    <?php
+}
+
+add_action( 'woocommerce_after_account_navigation', 'ckc_account_nav_scroll_hint_js' );
+function ckc_account_nav_scroll_hint_js() {
+    if ( ! is_account_page() ) return;
+    ?>
+    <script>
+    (function(){
+        if ( window.innerWidth > 768 ) return;
+        var nav = document.querySelector('.woocommerce-MyAccount-navigation');
+        if ( ! nav ) return;
+
+        /* 注入箭頭元素 */
+        var arrow = document.createElement('span');
+        arrow.className = 'ckc-nav-scroll-arrow';
+        arrow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        nav.appendChild(arrow);
+
+        var ul = nav.querySelector('ul');
+        if ( ! ul ) return;
+
+        function checkScroll() {
+            var scrollLeft  = ul.scrollLeft;
+            var maxScroll   = ul.scrollWidth - ul.clientWidth;
+            if ( scrollLeft > 20 ) {
+                nav.classList.add('ckc-scrolled-right');
+            }
+            if ( maxScroll - scrollLeft < 20 ) {
+                nav.classList.add('ckc-at-end');
+            } else {
+                nav.classList.remove('ckc-at-end');
+            }
+        }
+
+        ul.addEventListener('scroll', checkScroll, { passive: true });
+        /* 初始檢查（若所有頁籤都在畫面內則無需提示）*/
+        window.addEventListener('load', checkScroll);
+        checkScroll();
+    })();
+    </script>
+    <?php
 }
 
 /**
