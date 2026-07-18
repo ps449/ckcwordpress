@@ -2415,6 +2415,57 @@ function ckc_checkout_coupon_ajax_script() {
     <?php
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 紅利點數折抵：自訂 AJAX 套用 / 取消 + WooCommerce fee 插件
+// ──────────────────────────────────────────────────────────────────────────────
+
+add_action( 'woocommerce_cart_calculate_fees', 'ckc_apply_points_as_fee' );
+function ckc_apply_points_as_fee( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+    if ( ! is_user_logged_in() ) return;
+
+    $pts = WC()->session ? (int) WC()->session->get( 'ckc_redeem_points', 0 ) : 0;
+    if ( $pts <= 0 ) return;
+
+    $wps      = get_option( 'wps_wpr_settings_gallery', [] );
+    $pts_rate = (float) ( $wps['wps_wpr_cart_points_rate'] ?? 1 );
+    $val_rate = (float) ( $wps['wps_wpr_cart_price_rate']  ?? 1 );
+    if ( $pts_rate <= 0 ) $pts_rate = 1;
+    if ( $val_rate <= 0 ) $val_rate = 1;
+
+    $balance = ckc_pts_get_user_balance( get_current_user_id() );
+    $pts     = min( $pts, $balance );
+    if ( $pts <= 0 ) return;
+
+    $discount = round( $pts * ( $val_rate / $pts_rate ), 2 );
+    if ( $discount <= 0 ) return;
+
+    $cart->add_fee( sprintf( '紅利點數折抵（%d 點）', $pts ), -$discount, false );
+}
+
+add_action( 'wp_ajax_ckc_points_apply', 'ckc_ajax_points_apply' );
+function ckc_ajax_points_apply() {
+    check_ajax_referer( 'ckc_points_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error( [ 'msg' => '請先登入' ] );
+
+    $pts = (int) ( $_POST['points'] ?? 0 );
+    if ( $pts <= 0 ) wp_send_json_error( [ 'msg' => '點數無效' ] );
+
+    $balance = ckc_pts_get_user_balance( get_current_user_id() );
+    $pts     = min( $pts, $balance );
+    if ( $pts <= 0 ) wp_send_json_error( [ 'msg' => '點數不足' ] );
+
+    WC()->session->set( 'ckc_redeem_points', $pts );
+    wp_send_json_success( [ 'points' => $pts ] );
+}
+
+add_action( 'wp_ajax_ckc_points_remove', 'ckc_ajax_points_remove' );
+function ckc_ajax_points_remove() {
+    check_ajax_referer( 'ckc_points_nonce', 'nonce' );
+    WC()->session->set( 'ckc_redeem_points', 0 );
+    wp_send_json_success();
+}
+
 // ── 結帳頁加入「紅利點數」折抵面板
 add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_points_panel', 6 );
 function ckc_checkout_points_panel() {
@@ -2450,22 +2501,10 @@ function ckc_checkout_points_panel() {
     $points_needed   = $cart_subtotal / $one_point_value;
     $points_to_apply = min( $points, $points_needed );
 
-    // 檢查目前是否已套用紅利折抵點數（官方 WooCommerce Points and Rewards 外掛）
-    $applied_points     = 0;
-    $applied_coupon_code = '';
-    if ( WC()->session ) {
-        $applied_coupon_code = (string) WC()->session->get( 'wc_points_rewards_discount_code', '' );
-    }
-    // 確認此優惠碼確實已套用在購物車中
-    $cart_coupons = WC()->cart ? WC()->cart->get_applied_coupons() : [];
-    $is_applied   = ( ! empty( $applied_coupon_code ) && in_array( strtolower( $applied_coupon_code ), array_map( 'strtolower', $cart_coupons ), true ) );
-    if ( $is_applied && WC()->cart ) {
-        // 以折扣金額換算回點數（顯示用）
-        $disc_amt = (float) WC()->cart->get_coupon_discount_amount( strtolower( $applied_coupon_code ) );
-        if ( $disc_amt > 0 && $one_point_value > 0 ) {
-            $applied_points = (int) round( $disc_amt / $one_point_value );
-        }
-    }
+    // 檢查目前是否已套用紅利折抵點數
+    $applied_points = WC()->session ? (int) WC()->session->get( 'ckc_redeem_points', 0 ) : 0;
+    $is_applied     = ( $applied_points > 0 );
+    $ckc_pts_nonce  = wp_create_nonce( 'ckc_points_nonce' );
 
     ?>
     <div class="ckc-points-center" style="margin-bottom: 24px;">
@@ -2477,7 +2516,7 @@ function ckc_checkout_points_panel() {
                     🪙 <?php echo $is_applied ? esc_html( $applied_points ) : esc_html( $points_to_apply ); ?> 點
                 </div>
                 <div class="ckc-points-worth" style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
-                    折抵 NT$<?php echo esc_html( number_format( ($is_applied ? $applied_points : $points_to_apply) * $one_point_value ) ); ?>
+                    折抵 NT$<?php echo esc_html( number_format( ( $is_applied ? $applied_points : $points_to_apply ) * $one_point_value ) ); ?>
                 </div>
             </div>
             
@@ -2492,7 +2531,7 @@ function ckc_checkout_points_panel() {
             
             <div class="ckc-points-action" style="white-space: nowrap;">
                 <?php if ( $is_applied ) : ?>
-                    <button type="button" class="ckc-points-remove-btn" data-coupon="<?php echo esc_attr( $applied_coupon_code ); ?>" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    <button type="button" class="ckc-points-remove-btn" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                         移除折抵
                     </button>
                 <?php else : ?>
@@ -2508,17 +2547,15 @@ function ckc_checkout_points_panel() {
             
             <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="number" min="0" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
+                    <input type="number" min="1" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
                     <button type="button" class="ckc-points-custom-apply-btn" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
                 </div>
             </div>
         <?php endif; ?>
 
-        <!-- 隱藏的實際輸入與提交表單（配合官方 WooCommerce Points and Rewards 外掛規格） -->
-        <form class="wc_points_rewards_apply_discount" method="post" style="display: none !important;">
-            <input type="number" name="wc_points_rewards_apply_discount_amount" class="wc_points_rewards_apply_discount_amount" value="<?php echo $is_applied ? esc_attr($applied_points) : ''; ?>" />
-            <input type="submit" class="button wc_points_rewards_apply_discount" name="wc_points_rewards_apply_discount" value="Apply" />
-        </form>
+        <!-- AJAX nonce -->
+        <input type="hidden" id="ckc-pts-nonce" value="<?php echo esc_attr( $ckc_pts_nonce ); ?>" />
+        <input type="hidden" id="ckc-pts-max" value="<?php echo (int) $points_to_apply; ?>" />
     </div>
 
     <style>
@@ -2531,120 +2568,81 @@ function ckc_checkout_points_panel() {
     </style>
     <script>
     jQuery(function($){
-        var _ckcScrollY = 0;
+        var _ckcScrollY    = 0;
         var _ckcScrollLock = false;
+        var _ckcNonce   = $('#ckc-pts-nonce').val();
+        var _ckcAjaxUrl = (typeof wc_checkout_params !== 'undefined' && wc_checkout_params.ajax_url)
+                        ? wc_checkout_params.ajax_url : '/wp-admin/admin-ajax.php';
 
         // 覆寫 WooCommerce 原生的 scroll_to_notices，鎖定期間完全不捲動
         if ($.scroll_to_notices) {
-            var _wcOriginalScroll = $.scroll_to_notices;
+            var _wcOrigScroll = $.scroll_to_notices;
             $.scroll_to_notices = function(el) {
-                if (_ckcScrollLock) {
-                    // 立即停止所有 html/body 動畫捲動
-                    $('html, body').stop(true, false);
-                    return;
-                }
-                _wcOriginalScroll.call(this, el);
+                if (_ckcScrollLock) { $('html,body').stop(true,false); return; }
+                _wcOrigScroll.call(this, el);
             };
         }
 
         function ckcLockScroll() {
-            _ckcScrollY = window.scrollY || window.pageYOffset;
+            _ckcScrollY    = window.scrollY || window.pageYOffset;
             _ckcScrollLock = true;
         }
-
         function ckcUnlockScroll() {
             _ckcScrollLock = false;
-            $('html, body').stop(true, false);
+            $('html,body').stop(true,false);
             window.scrollTo(0, _ckcScrollY);
         }
-
-        // 點數套用邏輯（自訂點數與立即全額折抵共用）
-        $(document).on('click', '.ckc-points-apply-btn, .ckc-points-custom-apply-btn', function(e){
-            e.preventDefault();
-            var pts = $(this).hasClass('ckc-points-apply-btn') ? $(this).data('points') : $('#ckc_custom_points_input').val();
-            pts = parseInt(pts) || 0;
-            if (pts <= 0) {
-                alert('請輸入有效的折抵點數。');
-                return;
-            }
-            
-            // 定位官方外掛的隱藏輸入欄與表單
-            var $realInput = $('input.wc_points_rewards_apply_discount_amount').not('#ckc_custom_points_input').first();
-            var $realForm  = $('form.wc_points_rewards_apply_discount').first();
-            
-            if ($realInput.length && $realForm.length) {
-                try { sessionStorage.setItem('ckc_pts_act', 'applied'); } catch(err){}
-                ckcLockScroll();
-                $realInput.val(pts);
-                $realForm.submit();
-            } else {
-                alert('系統目前無法定位紅利套用元件，請重新整理頁面再試。');
-            }
-        });
-
-        // 點數移除邏輯：直接呼叫 WooCommerce remove_coupon AJAX
-        $(document).on('click', '.ckc-points-remove-btn', function(e){
-            e.preventDefault();
-            var couponCode = $(this).data('coupon') || '';
-            
-            if (!couponCode) {
-                // fallback: 找 DOM 上原生的移除連結
-                var $fallback = $('.woocommerce-remove-coupon, #wps_wpr_remove_cart_point, .wps_remove_virtual_coupon').first();
-                if ($fallback.length) {
-                    try { sessionStorage.setItem('ckc_pts_act', 'removed'); } catch(err){}
-                    ckcLockScroll();
-                    $fallback.trigger('click');
-                } else {
-                    alert('無法定位移除紅利折抵的按鈕，請重新整理頁面。');
-                }
-                return;
-            }
-
-            try { sessionStorage.setItem('ckc_pts_act', 'removed'); } catch(err){}
-            ckcLockScroll();
-
-            // 直接呼叫 WooCommerce remove_coupon AJAX
-            var nonce = (typeof wc_checkout_params !== 'undefined' && wc_checkout_params.apply_coupon_nonce)
-                        ? wc_checkout_params.apply_coupon_nonce
-                        : (typeof woocommerce_params !== 'undefined' ? woocommerce_params.apply_coupon_nonce : '');
-
-            $.ajax({
-                type: 'POST',
-                url: typeof wc_checkout_params !== 'undefined' ? wc_checkout_params.ajax_url : '/wp-admin/admin-ajax.php',
-                data: {
-                    action:   'woocommerce_remove_coupon',
-                    coupon:   couponCode,
-                    security: nonce
-                },
-                success: function() {
-                    $(document.body).trigger('update_checkout');
-                },
-                error: function() {
-                    ckcUnlockScroll();
-                    alert('移除折抵時發生錯誤，請重新整理頁面。');
-                }
-            });
-        });
-
-        // 監聽結帳頁面更新完成（AJAX 結束）
-        $(document.body).on('updated_checkout updated_cart_totals', function(){
-            var act = null;
-            try { act = sessionStorage.getItem('ckc_pts_act'); } catch(e){}
-            if (!act) { return; }
-            try { sessionStorage.removeItem('ckc_pts_act'); } catch(e){}
-
-            ckcUnlockScroll();
-            
-            var msg = (act === 'applied') ? '已套用紅利折抵' : '已取消套用紅利折抵';
-            var bg  = (act === 'applied') ? '#16a34a' : '#64748b';
-            
+        function showToast(msg, bg) {
             var $t = $('#ckc-coupon-toast');
-            if (!$t.length) {
-                $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body');
-            }
+            if (!$t.length) { $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
             $t.text(msg).css('background', bg);
             requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
             setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+        }
+
+        // 點數套用（立即全額 + 自訂）
+        $(document).on('click', '.ckc-points-apply-btn, .ckc-points-custom-apply-btn', function(e){
+            e.preventDefault();
+            var pts = $(this).hasClass('ckc-points-apply-btn')
+                      ? parseInt($('#ckc-pts-max').val(), 10)
+                      : parseInt($('#ckc_custom_points_input').val(), 10);
+            if (!(pts > 0)) { alert('請輸入有效的折抵點數。'); return; }
+
+            ckcLockScroll();
+            $.post(_ckcAjaxUrl, { action:'ckc_points_apply', points:pts, nonce:_ckcNonce },
+                function(res) {
+                    if (res && res.success) {
+                        $(document.body).trigger('update_checkout');
+                        $(document.body).one('updated_checkout', function(){
+                            ckcUnlockScroll();
+                            showToast('已套用紅利折抵', '#16a34a');
+                        });
+                    } else {
+                        ckcUnlockScroll();
+                        alert((res && res.data && res.data.msg) || '套用失敗，請重試。');
+                    }
+                }
+            ).fail(function(){ ckcUnlockScroll(); alert('網路錯誤，請重試。'); });
+        });
+
+        // 點數移除
+        $(document).on('click', '.ckc-points-remove-btn', function(e){
+            e.preventDefault();
+            ckcLockScroll();
+            $.post(_ckcAjaxUrl, { action:'ckc_points_remove', nonce:_ckcNonce },
+                function(res) {
+                    if (res && res.success) {
+                        $(document.body).trigger('update_checkout');
+                        $(document.body).one('updated_checkout', function(){
+                            ckcUnlockScroll();
+                            showToast('已取消套用紅利折抵', '#64748b');
+                        });
+                    } else {
+                        ckcUnlockScroll();
+                        alert('取消失敗，請重試。');
+                    }
+                }
+            ).fail(function(){ ckcUnlockScroll(); alert('網路錯誤，請重試。'); });
         });
     });
     </script>
