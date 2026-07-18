@@ -38,6 +38,13 @@ function ckc_is_marketing_coupon( $code ) {
     if ( '' === $code ) {
         return false;
     }
+    
+    // 排除點數折抵等系統虛擬券（不視為行銷優惠券，使其可與行銷優惠券同時使用）
+    // WPS 產生的點數折抵券通常包含 wps_ 或 points_ 等關鍵字
+    if ( false !== strpos( $code, 'wps' ) || false !== strpos( $code, 'points' ) ) {
+        return false;
+    }
+    
     $coupon = new WC_Coupon( $code );
     if ( ! $coupon->get_id() ) {
         return false; // 虛擬券（如點數折抵）或券不存在 → 不視為行銷優惠券
