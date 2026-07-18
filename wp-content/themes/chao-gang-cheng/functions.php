@@ -11520,3 +11520,121 @@ function ckc_ref_give_signup_bonus_proxy( $user_id, $new_customer_data ) {
     // Re-trigger the signup bonus hook with the correct user ID
     do_action( 'woocommerce_created_customer', $user_id, $new_customer_data, false );
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────
+ * 行動版跳轉頁面 - 讀取動畫 (Premium Glassmorphism Loader)
+ * ─────────────────────────────────────────────────────────────────
+ */
+add_action('wp_footer', 'ckc_mobile_page_transition_loader', 99);
+function ckc_mobile_page_transition_loader() {
+    ?>
+    <style>
+    /* 預設隱藏且限定行動版 */
+    #ckc-page-loader {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        z-index: 9999999;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+    }
+    #ckc-page-loader.is-active {
+        display: flex;
+        opacity: 1;
+    }
+    /* Premium Ring Animation */
+    .ckc-loader-container {
+        position: relative;
+        width: 50px;
+        height: 50px;
+    }
+    .ckc-loader-ring {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        border: 3px solid transparent;
+        border-top-color: #7f6c60; /* 主色 */
+        animation: ckc-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    }
+    .ckc-loader-ring:nth-child(1) { animation-delay: -0.45s; }
+    .ckc-loader-ring:nth-child(2) { animation-delay: -0.3s; }
+    .ckc-loader-ring:nth-child(3) { animation-delay: -0.15s; }
+    
+    @keyframes ckc-spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* 確保桌面版不顯示，並避免誤判 */
+    @media (min-width: 769px) {
+        #ckc-page-loader {
+            display: none !important;
+        }
+    }
+    </style>
+
+    <div id="ckc-page-loader">
+        <div class="ckc-loader-container">
+            <div class="ckc-loader-ring"></div>
+            <div class="ckc-loader-ring"></div>
+            <div class="ckc-loader-ring"></div>
+            <div class="ckc-loader-ring"></div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.innerWidth > 768) return; // 僅限行動版
+        
+        var loader = document.getElementById('ckc-page-loader');
+        
+        // 監聽所有 A 連結點擊
+        document.body.addEventListener('click', function(e) {
+            var link = e.target.closest('a');
+            if (!link) return;
+            
+            var href = link.getAttribute('href');
+            var target = link.getAttribute('target');
+            
+            // 排除不換頁、無效或 JS 的行為
+            if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) return;
+            if (target === '_blank') return;
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return; 
+            
+            // 排除 WooCommerce 內建的 AJAX 按鈕
+            if (link.classList.contains('add_to_cart_button') && link.classList.contains('ajax_add_to_cart')) return;
+            if (link.classList.contains('remove')) return; 
+
+            // 稍微延遲顯示以防止極快跳轉閃爍
+            setTimeout(function() {
+                loader.classList.add('is-active');
+            }, 100);
+        });
+        
+        // 監聽一般表單提交
+        document.body.addEventListener('submit', function(e) {
+            // 排除會觸發 AJAX 阻擋層的 WooCommerce 表單
+            if (e.target.classList.contains('woocommerce-cart-form')) return; 
+            if (e.target.classList.contains('checkout')) return;
+            
+            setTimeout(function() {
+                loader.classList.add('is-active');
+            }, 100);
+        });
+
+        // 處理 BFCache：返回上一頁時隱藏 loading
+        window.addEventListener('pageshow', function(e) {
+            if (loader.classList.contains('is-active')) {
+                loader.classList.remove('is-active');
+            }
+        });
+    });
+    </script>
+    <?php
+}
