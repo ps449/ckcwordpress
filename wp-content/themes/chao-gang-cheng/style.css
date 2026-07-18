@@ -1389,21 +1389,21 @@ h1, h2, h3, h4, h5, h6 {
 /* ── 手機版：可橫向滾動的 Tab Bar ── */
 @media (max-width: 768px) {
   .woocommerce-MyAccount-navigation {
-    /* 整個 nav 讓它可橫向滾動 */
-    margin-left: -16px !important;
-    margin-right: -16px !important;
-    width: calc(100% + 32px) !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    overflow: hidden;
   }
   .woocommerce-MyAccount-navigation::after {
-    margin-left: 16px;
-    margin-right: 16px;
+    margin-left: 0;
+    margin-right: 0;
   }
   .woocommerce-MyAccount-navigation ul {
     flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
     justify-content: flex-start;
-    padding: 4px 16px 8px;
+    padding: 4px 8px 8px;
     gap: 7px;
     /* 隱藏捲軸但保持可滑動 */
     -ms-overflow-style: none;

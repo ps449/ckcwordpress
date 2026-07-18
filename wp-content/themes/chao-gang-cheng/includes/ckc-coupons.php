@@ -2456,7 +2456,13 @@ function ckc_ajax_points_apply() {
     if ( $pts <= 0 ) wp_send_json_error( [ 'msg' => '點數不足' ] );
 
     WC()->session->set( 'ckc_redeem_points', $pts );
-    wp_send_json_success( [ 'points' => $pts ] );
+    $wps      = get_option( 'wps_wpr_settings_gallery', [] );
+    $pts_rate = (float) ( $wps['wps_wpr_cart_points_rate'] ?? 1 );
+    $val_rate = (float) ( $wps['wps_wpr_cart_price_rate']  ?? 1 );
+    if ( $pts_rate <= 0 ) $pts_rate = 1;
+    if ( $val_rate <= 0 ) $val_rate = 1;
+    $discount = (int) round( $pts * ( $val_rate / $pts_rate ) );
+    wp_send_json_success( [ 'points' => $pts, 'discount' => $discount ] );
 }
 
 add_action( 'wp_ajax_ckc_points_remove', 'ckc_ajax_points_remove' );
@@ -2530,28 +2536,26 @@ function ckc_checkout_points_panel() {
             </div>
             
             <div class="ckc-points-action" style="white-space: nowrap;">
-                <?php if ( $is_applied ) : ?>
-                    <button type="button" class="ckc-points-remove-btn" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
-                        移除折抵
-                    </button>
-                <?php else : ?>
-                    <button type="button" class="ckc-points-apply-btn" data-points="<?php echo (int) $points_to_apply; ?>" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
-                        立即折抵
-                    </button>
-                <?php endif; ?>
+                <?php // 兩顆按鈕都輸出，由 CSS 依 .is-applied 顯示其一，AJAX 後前端切換即可即時刷新 ?>
+                <button type="button" class="ckc-points-remove-btn" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    移除折抵
+                </button>
+                <button type="button" class="ckc-points-apply-btn" data-points="<?php echo (int) $points_to_apply; ?>" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                    立即折抵
+                </button>
             </div>
         </div>
 
-        <?php if ( ! $is_applied ) : ?>
+        <div class="ckc-points-extra"<?php echo $is_applied ? ' style="display:none;"' : ''; ?>>
             <a href="javascript:void(0);" onclick="jQuery('#ckc-custom-points-wrap').toggle();" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #7f6c60; text-decoration: underline;">自訂折抵點數</a>
-            
+
             <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <input type="number" min="1" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
                     <button type="button" class="ckc-points-custom-apply-btn" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
                 </div>
             </div>
-        <?php endif; ?>
+        </div>
 
         <!-- AJAX nonce -->
         <input type="hidden" id="ckc-pts-nonce" value="<?php echo esc_attr( $ckc_pts_nonce ); ?>" />
@@ -2562,6 +2566,9 @@ function ckc_checkout_points_panel() {
     .ckc-points-card.is-applied { border-style: solid !important; border-color: #16a34a !important; background: #f0fdf4 !important; }
     .ckc-points-remove-btn:hover { background-color: #ef4444 !important; color: #fff !important; border-color: #ef4444 !important; }
     .ckc-points-apply-btn:hover { background-color: #f86f69 !important; }
+    /* 依套用狀態顯示對應按鈕（AJAX 後前端切換 .is-applied 即可即時刷新） */
+    .ckc-points-card:not(.is-applied) .ckc-points-remove-btn { display: none !important; }
+    .ckc-points-card.is-applied .ckc-points-apply-btn { display: none !important; }
     /* 共用 toast（若折扣券面板未載入，這裡也定義一份） */
     #ckc-coupon-toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px); background:#16a34a; color:#fff; padding:14px 24px; border-radius:30px; font-size:15px; font-weight:700; line-height:1.4; z-index:2147483000; max-width:88vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; }
     #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -2600,6 +2607,27 @@ function ckc_checkout_points_panel() {
             setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
         }
 
+        // 即時切換面板狀態（不重載），修正「套用/移除後面板狀態不刷新」的問題
+        function ckcPtsSetApplied(pts, discount) {
+            var $card = $('.ckc-points-card');
+            var d = (discount != null) ? discount : pts;
+            $card.addClass('is-applied');
+            $card.find('.ckc-points-value').html('🪙 ' + pts + ' 點');
+            $card.find('.ckc-points-worth').text('折抵 NT$' + Number(d).toLocaleString());
+            $card.find('.ckc-points-title').text('已套用紅利折抵');
+            $('.ckc-points-extra').hide();
+            $('#ckc-custom-points-wrap').hide();
+        }
+        function ckcPtsSetUnapplied() {
+            var max = parseInt($('#ckc-pts-max').val(), 10) || 0;
+            var $card = $('.ckc-points-card');
+            $card.removeClass('is-applied');
+            $card.find('.ckc-points-value').html('🪙 ' + max + ' 點');
+            $card.find('.ckc-points-worth').text('折抵 NT$' + Number(max).toLocaleString());
+            $card.find('.ckc-points-title').text('紅利點數全額折抵');
+            $('.ckc-points-extra').show();
+        }
+
         // 點數套用（立即全額 + 自訂）
         $(document).on('click', '.ckc-points-apply-btn, .ckc-points-custom-apply-btn', function(e){
             e.preventDefault();
@@ -2612,6 +2640,7 @@ function ckc_checkout_points_panel() {
             $.post(_ckcAjaxUrl, { action:'ckc_points_apply', points:pts, nonce:_ckcNonce },
                 function(res) {
                     if (res && res.success) {
+                        ckcPtsSetApplied(res.data && res.data.points ? res.data.points : pts, res.data && res.data.discount);
                         $(document.body).trigger('update_checkout');
                         $(document.body).one('updated_checkout', function(){
                             ckcUnlockScroll();
@@ -2632,6 +2661,7 @@ function ckc_checkout_points_panel() {
             $.post(_ckcAjaxUrl, { action:'ckc_points_remove', nonce:_ckcNonce },
                 function(res) {
                     if (res && res.success) {
+                        ckcPtsSetUnapplied();
                         $(document.body).trigger('update_checkout');
                         $(document.body).one('updated_checkout', function(){
                             ckcUnlockScroll();
