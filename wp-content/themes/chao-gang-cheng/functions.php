@@ -11535,9 +11535,7 @@ function ckc_mobile_page_transition_loader() {
         display: none;
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.95); /* 移除透視感，改為近乎不透明的白色 */
         z-index: 9999999;
         align-items: center;
         justify-content: center;
@@ -11619,9 +11617,13 @@ function ckc_mobile_page_transition_loader() {
         
         // 監聽一般表單提交
         document.body.addEventListener('submit', function(e) {
-            // 排除會觸發 AJAX 阻擋層的 WooCommerce 表單
+            // 排除會觸發 AJAX 的 WooCommerce 表單 (購物車、結帳、折價券、登入/註冊)
             if (e.target.classList.contains('woocommerce-cart-form')) return; 
             if (e.target.classList.contains('checkout')) return;
+            if (e.target.classList.contains('checkout_coupon')) return;
+            if (e.target.classList.contains('woocommerce-form-coupon')) return;
+            if (e.target.classList.contains('woocommerce-form-login')) return;
+            if (e.target.classList.contains('woocommerce-form-register')) return;
             
             setTimeout(function() {
                 loader.classList.add('is-active');
