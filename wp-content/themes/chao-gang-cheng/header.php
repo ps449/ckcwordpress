@@ -26,7 +26,7 @@
                 <!-- Centered Brand Logo -->
                 <div class="logo" style="flex: 1; display: flex; justify-content: center; text-align: center;">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: inline-block;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="80" height="80" style="max-height: 80px; height: auto;">
+                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo-horizontal.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" style="max-height: 80px; width: auto; object-fit: contain;">
                     </a>
                 </div>
 
