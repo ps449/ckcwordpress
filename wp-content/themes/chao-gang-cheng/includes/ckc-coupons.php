@@ -2572,7 +2572,12 @@ function ckc_checkout_points_panel() {
                 sessionStorage.removeItem('ckc_pts_scroll');
             } catch(e){}
             
-            if (sc > 0) { window.scrollTo(0, sc); }
+            if (sc > 0) {
+                // 延遲 100ms 執行，以覆蓋 WooCommerce 原生在 updated_checkout 結束後的自動向上捲動行為
+                setTimeout(function(){
+                    window.scrollTo(0, sc);
+                }, 100);
+            }
             
             var msg = (act === 'applied') ? '已套用紅利折抵' : '已取消套用紅利折抵';
             var bg = (act === 'applied') ? '#16a34a' : '#64748b';
