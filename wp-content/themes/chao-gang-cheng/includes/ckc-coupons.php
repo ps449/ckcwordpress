@@ -2298,9 +2298,18 @@ function ckc_checkout_coupon_panel() {
         $coupons[] = $coupon;
     }
 
+    echo '<style>';
+    echo 'details.ckc-coupon-details summary::-webkit-details-marker { display: none; }';
+    echo 'details.ckc-coupon-details[open] .ckc-details-icon { transform: rotate(180deg); }';
+    echo 'details.ckc-coupon-details summary { list-style: none; }';
+    echo '</style>';
     echo '<div class="ckc-coupon-center" style="margin-bottom: 24px;">';
-    echo '<div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 4px;">🎟️ 我的優惠券</div>';
-    echo '<p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">每筆訂單限用一張優惠券</p>';
+    echo '<details class="ckc-coupon-details" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 0.3s ease;">';
+    echo '<summary style="font-size: 15px; font-weight: 700; color: #334155; cursor: pointer; display: flex; align-items: center; justify-content: space-between; outline: none; margin: -12px; padding: 12px; border-radius: 8px; user-select: none;">';
+    echo '<span style="display: flex; align-items: center; gap: 8px;">🎟️ 我的優惠券 <span style="font-size:12px;color:#94a3b8;font-weight:normal;">每筆訂單限用一張</span></span>';
+    echo '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ckc-details-icon" style="color: #94a3b8; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    echo '</summary>';
+    echo '<div style="padding-top: 16px; margin-top: 4px; border-top: 1px dashed #e2e8f0;">';
     ?>
     <div class="ckc-checkout-coupon-form" style="display:flex;gap:8px;margin-bottom:12px;max-width:440px;">
         <input type="text" id="ckc-checkout-coupon-code" placeholder="輸入折扣碼" autocomplete="off"
@@ -2313,6 +2322,8 @@ function ckc_checkout_coupon_panel() {
         // 傳入已過濾的券清單；套用改由 AJAX 處理（見下方 script），不整頁跳轉
         ckc_render_coupon_cards( 'checkout', $coupons );
     }
+    echo '</div>';
+    echo '</details>';
     echo '</div>';
 
     ckc_checkout_coupon_ajax_script();
