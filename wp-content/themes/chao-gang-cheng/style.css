@@ -3728,6 +3728,22 @@ body.show-register-form .u-column1.col-1 {
 }
 
 /* --- Header Layout Wrappers --- */
+
+
+/* --- Move Checkout Progress Bar to Very Top --- */
+.woocommerce-checkout .woocommerce {
+  display: flex;
+  flex-direction: column;
+}
+.woocommerce-checkout .woocommerce > .ts-checkout-steps {
+  order: -999 !important;
+  width: 100%;
+}
+.woocommerce-checkout .woocommerce::before,
+.woocommerce-checkout .woocommerce::after {
+  display: none; /* fix clearfix interfering with flexbox */
+}
+
 .desktop-header-wrapper {
   display: block;
 }
