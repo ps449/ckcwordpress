@@ -3112,6 +3112,7 @@ body.show-register-form .u-column1.col-1 {
 .woocommerce ul.products li.product .button,
 .woocommerce-page ul.products li.product .button {
   margin-top: auto !important;
+  text-align: center !important;
 }
 
 /* --- Global Product Title Height Constrain (Exactly 2 Lines) --- */
