@@ -11535,3 +11535,16 @@ function ckc_ref_give_signup_bonus_proxy( $user_id, $new_customer_data ) {
  */
 add_filter( 'yotuwp_next_text', function() { return '下一頁'; } );
 add_filter( 'yotuwp_prev_text', function() { return '上一頁'; } );
+
+/**
+ * ─────────────────────────────────────────────────────────────────
+ * 變更 WooCommerce 新台幣 (TWD) 貨幣符號
+ * ─────────────────────────────────────────────────────────────────
+ */
+add_filter( 'woocommerce_currency_symbol', 'change_twd_currency_symbol_to_plain_text', 10, 2 );
+function change_twd_currency_symbol_to_plain_text( $currency_symbol, $currency ) {
+    if ( 'TWD' === $currency ) {
+        return 'NT$'; 
+    }
+    return $currency_symbol;
+}
