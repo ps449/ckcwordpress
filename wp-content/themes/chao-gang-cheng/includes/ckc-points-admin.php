@@ -7,7 +7,7 @@
  *  👥 會員點數   ─ 列表 + AJAX 單筆調整
  *  📋 異動紀錄   ─ 全站流水帳（含篩選）
  *  🎁 批量發放   ─ 依角色/標籤/上傳名單批量給點
- *  ⚙️ 發放設定   ─ 分潤比例、首購禮、單筆上限
+ *  發放設定   ─ 分潤比例、首購禮、單筆上限
  *
  * 與 WPS Points and Rewards 外掛完全相容
  */
@@ -29,7 +29,7 @@ function ckc_pts_register_menu() {
         'manage_woocommerce', 'ckc-points-log',      'ckc_pts_page_log' );
     add_submenu_page( 'ckc-points-admin', '批量發放',   '🎁 批量發放',
         'manage_woocommerce', 'ckc-points-batch',    'ckc_pts_page_batch' );
-    add_submenu_page( 'ckc-points-admin', '發放設定',   '⚙️ 發放設定',
+    add_submenu_page( 'ckc-points-admin', '發放設定',   '發放設定',
         'manage_woocommerce', 'ckc-points-settings', 'ckc_pts_page_settings' );
 }
 
@@ -601,7 +601,7 @@ function ckc_pts_page_overview() {
             <div class="ckc-dash-hero-sub"><?php echo date_i18n('Y 年 m 月'); ?></div>
         </div>
         <div style="margin-left:auto">
-            <a href="<?php echo admin_url('admin.php?page=ckc-points-settings'); ?>" class="ckc-action-btn outline" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff;text-decoration:none">⚙️ 設定</a>
+            <a href="<?php echo admin_url('admin.php?page=ckc-points-settings'); ?>" class="ckc-action-btn outline" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff;text-decoration:none">設定</a>
         </div>
     </div>
 
@@ -663,7 +663,7 @@ function ckc_pts_page_overview() {
         <a href="<?php echo admin_url('admin.php?page=ckc-points-members'); ?>" class="ckc-action-btn primary">👥 查看會員點數</a>
         <a href="<?php echo admin_url('admin.php?page=ckc-points-batch'); ?>" class="ckc-action-btn green">🎁 批量發放</a>
         <a href="<?php echo admin_url('admin.php?page=ckc-points-log'); ?>" class="ckc-action-btn outline">📋 完整異動紀錄</a>
-        <a href="<?php echo admin_url('admin.php?page=ckc-points-settings'); ?>" class="ckc-action-btn outline">⚙️ 發放設定</a>
+        <a href="<?php echo admin_url('admin.php?page=ckc-points-settings'); ?>" class="ckc-action-btn outline">發放設定</a>
     </div>
 
     <!-- 雙欄：Top 10 + 近期異動 -->
@@ -1035,7 +1035,7 @@ function ckc_pts_page_batch() {
 }
 
 /* ============================================================
- * 11. ⚙️ 發放設定
+ * 11. 發放設定
  * ============================================================ */
 function ckc_pts_page_settings() {
     if ( ! current_user_can( 'manage_woocommerce' ) ) { wp_die( '權限不足' ); }
@@ -1052,7 +1052,7 @@ function ckc_pts_page_settings() {
     $purchase_pts     = (int) get_option('_ckc_purchase_bonus_pts', 1);
     $purchase_val     = (int) get_option('_ckc_purchase_bonus_val', 100);
     ?>
-    <div class="wrap ckc-pts"><h1>⚙️ 紅利點數 發放設定</h1>
+    <div class="wrap ckc-pts"><h1>紅利點數 發放設定</h1>
     <p style="color:#64748b;margin-bottom:20px">控制紅利點數的兌換比例與發放邏輯，修改後即時同步前台。</p>
     <div id="ckc-set-ntc" class="ckc-ntc"></div>
 

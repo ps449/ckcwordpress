@@ -1238,7 +1238,7 @@ function chao_gang_cheng_cart_free_shipping_progress() {
     
     if ( $cart_subtotal >= $threshold ) {
         $percent = 100;
-        $message = '🎉 太棒了！已符合免運條件，本筆訂單免運費！';
+        $message = '太棒了！已符合免運條件，本筆訂單免運費！';
     } else {
         $diff = $threshold - $cart_subtotal;
         $percent = round( ($cart_subtotal / $threshold) * 100 );
@@ -2048,7 +2048,7 @@ function chao_gang_cheng_wishlist_loyalty_info() {
     }
     ?>
     <div class="loyalty-points-notice-box" style="background-color: #fdfaf7; border: 1px solid #f5ebe6; border-radius: 6px; padding: 10px 15px; margin-top: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #7f6c60; font-size: 13px; width: 100%;">
-        <span style="font-size: 16px; line-height: 1;">🎁</span>
+        <span style="font-size: 16px; line-height: 1;"></span>
         <span><?php echo esc_html( $loyalty_text ); ?></span>
     </div>
     <div class="product-wishlist-section" style="margin-top: 10px; margin-bottom: 20px;">
@@ -2778,7 +2778,7 @@ function chao_gang_cheng_translate_points_signup_message( $translated, $text, $d
     if ( false !== strpos( $text, 'points for a successful signup' ) ) {
         $translated = str_replace(
             array( 'You will get ', ' points for a successful signup.' ),
-            array( '🎁 註冊成功即可獲得 ', ' 點紅利點數（1 點可折抵 NT$1）！' ),
+            array( '註冊成功即可獲得 ', ' 點紅利點數（1 點可折抵 NT$1）！' ),
             $translated
         );
     }
@@ -2798,7 +2798,7 @@ function chao_gang_cheng_points_signup_message_js_fallback() {
             if (this.childElementCount === 0 && /points for a successful signup/i.test($(this).text())) {
                 var m = $(this).text().match(/(\d+)/);
                 var pts = m ? m[1] : '5';
-                $(this).text('🎁 註冊成功即可獲得 ' + pts + ' 點紅利點數（1 點可折抵 NT$1）！');
+                $(this).text('註冊成功即可獲得 ' + pts + ' 點紅利點數（1 點可折抵 NT$1）！');
             }
         });
     });
@@ -2824,11 +2824,11 @@ function chao_gang_cheng_register_benefits_box() {
         <div style="font-size: 13px; font-weight: 700; color: #7f6c60; margin-bottom: 8px;">加入會員專屬好處</div>
         <ul style="margin: 0; padding: 0; list-style: none; font-size: 13px; color: #6b7280; line-height: 2;">
             <?php if ( $signup > 0 ) : ?>
-                <li style="color: #b91c1c; font-weight: 700;">🎁 註冊即贈 <?php echo $signup; ?> 點紅利點數！</li>
+                <li style="color: #b91c1c; font-weight: 700;">註冊即贈 <?php echo $signup; ?> 點紅利點數！</li>
             <?php endif; ?>
             <li>🪙 紅利點數回饋，<?php echo $rate_text; ?></li>
             <li>💰 消費享 1% 現金回饋</li>
-            <li>📦 訂單查詢、收藏清單、下次結帳免填資料</li>
+            <li>訂單查詢、收藏清單、下次結帳免填資料</li>
         </ul>
     </div>
     <?php
@@ -3080,14 +3080,20 @@ function chao_gang_cheng_account_dashboard_overview() {
  
     <div class="chao-account-overview">
         <div style="<?php echo esc_attr( $card_style ); ?>">
-            <p style="<?php echo esc_attr( $title_style ); ?>">🎁 紅利點數</p>
+            <p style="<?php echo esc_attr( $title_style ); ?>; display: flex; align-items: center; gap: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
+                紅利點數
+            </p>
             <div style="font-size: 32px; font-weight: 700; color: #7f6c60; line-height: 1.2;"><?php echo esc_html( number_format( $points ) ); ?> <span style="font-size: 14px; color: #94a3b8;">點</span></div>
             <p style="font-size: 12px; color: #94a3b8; margin: 8px 0 14px;"><?php echo esc_html( $rate_text ); ?>，結帳時直接折抵</p>
             <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'points' ) ); ?>" style="font-size: 13px; color: #7f6c60; font-weight: 600; text-decoration: underline;">查看點數紀錄 →</a>
         </div>
 
         <div style="<?php echo esc_attr( $card_style ); ?>">
-            <p style="<?php echo esc_attr( $title_style ); ?>">📦 近期訂單</p>
+            <p style="<?php echo esc_attr( $title_style ); ?>; display: flex; align-items: center; gap: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                近期訂單
+            </p>
             <?php if ( ! empty( $recent_orders ) ) : ?>
                 <?php foreach ( $recent_orders as $order ) : ?>
                     <div class="chao-account-order-row">
@@ -3106,11 +3112,26 @@ function chao_gang_cheng_account_dashboard_overview() {
     </div>
 
     <div class="chao-account-quicklinks">
-        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>">📦 我的訂單</a>
-        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'downloads' ) ); ?>">❤️ 收藏清單</a>
-        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'edit-address' ) ); ?>">🏠 收件地址</a>
-        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'edit-account' ) ); ?>">⚙️ 帳戶資料</a>
-        <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>">🛒 繼續購物</a>
+        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            我的訂單
+        </a>
+        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'downloads' ) ); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            收藏清單
+        </a>
+        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'edit-address' ) ); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            收件地址
+        </a>
+        <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'edit-account' ) ); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            帳戶資料
+        </a>
+        <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            繼續購物
+        </a>
     </div>
     <?php
 }
@@ -3615,7 +3636,7 @@ function chao_gang_cheng_custom_account_points_content() {
     $bonus_given  = get_user_meta( $user_id, '_ckc_signup_bonus_given', true );
     if ( $signup_bonus > 0 && $bonus_given ) : ?>
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#15803d;display:flex;align-items:center;gap:10px;">
-        🎁 <span>感謝您加入！新會員註冊禮 <strong><?php echo intval( $bonus_given ); ?> 點</strong>已自動入帳。</span>
+        <span>感謝您加入！新會員註冊禮 <strong><?php echo intval( $bonus_given ); ?> 點</strong>已自動入帳。</span>
     </div>
     <?php endif; ?>
 
@@ -6043,7 +6064,7 @@ function ckc_popup_page_html() {
                 <div style="display:flex;flex-direction:column;gap:12px;">
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border:1px solid #eee;border-radius:8px;transition:background .15s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='#fff'">
                         <input type="checkbox" name="chao_gang_cheng_popup[show_home]" value="1" <?php checked( '1', $opts['show_home'] ); ?> style="width:18px;height:18px;cursor:pointer;">
-                        <span style="font-size:24px;">🏠</span>
+                        <span style="font-size:24px;"></span>
                         <div>
                             <strong style="font-size:14px;">首頁</strong>
                             <p style="margin:2px 0 0;font-size:12px;color:#aaa;">網站首頁（front-page / home）</p>
@@ -6059,7 +6080,7 @@ function ckc_popup_page_html() {
                     </label>
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border:1px solid #eee;border-radius:8px;transition:background .15s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='#fff'">
                         <input type="checkbox" name="chao_gang_cheng_popup[show_product]" value="1" <?php checked( '1', $opts['show_product'] ); ?> style="width:18px;height:18px;cursor:pointer;">
-                        <span style="font-size:24px;">📦</span>
+                        <span style="font-size:24px;"></span>
                         <div>
                             <strong style="font-size:14px;">商品詳情頁</strong>
                             <p style="margin:2px 0 0;font-size:12px;color:#aaa;">所有單一商品頁面</p>
@@ -6070,7 +6091,7 @@ function ckc_popup_page_html() {
 
             <!-- ── 顯示設定 ── -->
             <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:20px 24px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.05);">
-                <h3 style="margin:0 0 14px;">⚙️ 顯示設定</h3>
+                <h3 style="margin:0 0 14px;">顯示設定</h3>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <div style="background:#f9f9f9;border-radius:7px;padding:14px 16px;">
                         <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:8px;">🍪 顯示頻率</label>
@@ -6647,14 +6668,14 @@ function ckc_gemini_agent_page() {
 
                 <!-- 出貨與庫存作業 (Agent 功能) -->
                 <div class="gemini-card">
-                    <h3>📦 出貨與庫存作業 (Agent 功能)</h3>
+                    <h3>出貨與庫存作業 (Agent 功能)</h3>
                     <p style="color: #64748b; font-size: 12px; margin-bottom: 12px;">點擊直接讀取 WooCommerce 資料庫，或對訂單執行狀態更新：</p>
                     <div class="quick-prompts-list">
                         <button class="quick-prompt-btn" data-prompt="請幫我統計目前所有「處理中」訂單中的商品總量，合併計算並產生今日的「配貨與撿貨清單」，以便我到倉庫備貨。">📋 產生今日出貨「配貨與撿貨清單」</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我產生所有「處理中」訂單的物流宅配名冊，包含訂單號、收件人、電話、地址與商品，以便我匯入物流系統。">🚚 匯出今日待出貨「物流宅配名冊」</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我執行批次自動化出貨：一鍵將目前系統中所有狀態為「處理中」的訂單更新為「已出貨」狀態。">🤖 動作：一鍵批次自動化出貨</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我將黑貓託運單號 【請貼上託運單號】 填入訂單 #【請輸入訂單號】，並通知客戶。">🐈‍⬛ 動作：填入黑貓託運單號（單筆）</button>
-                        <button class="quick-prompt-btn" data-prompt="請幫我批次匯入以下黑貓託運單號清單（每行一組：訂單號 託運單號）：&#10;【請在此貼上黑貓契客系統匯出的清單，例如：&#10;#265 9031234567890&#10;#271 9031234567891】">📦 動作：批次匯入黑貓託運單號</button>
+                        <button class="quick-prompt-btn" data-prompt="請幫我批次匯入以下黑貓託運單號清單（每行一組：訂單號 託運單號）：&#10;【請在此貼上黑貓契客系統匯出的清單，例如：&#10;#265 9031234567890&#10;#271 9031234567891】">動作：批次匯入黑貓託運單號</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我自動抓取所有已填託運單號訂單的黑貓貨運狀態，並回填至後台訂單紀錄。">📡 動作：自動抓取黑貓貨態回填後台</button>
                         <button class="quick-prompt-btn" data-prompt="請給我推薦分潤報表：推薦訂單數、推薦營收、已發放點數與 Top 推薦人。">🤝 查詢推薦分潤報表</button>
                         <button class="quick-prompt-btn" data-prompt="請產生夥伴分潤對帳單，包含每位夥伴的待確認、可出金、已出金金額與稅務試算。">💰 產生夥伴分潤對帳單</button>
@@ -6664,7 +6685,7 @@ function ckc_gemini_agent_page() {
                         <button class="quick-prompt-btn" data-prompt="請幫我查詢最新的一筆處理中訂單的詳細資訊，包含收件人、電話、地址與商品清單。">🔍 查詢特定訂單狀況</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我搜尋收件人是「王小明」的訂單記錄與目前的配送狀態。">👤 搜尋收件人訂單記錄</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我更新訂單 #10246 的狀態為已出貨。">✏️ 動作：將訂單標記為已出貨</button>
-                        <button class="quick-prompt-btn" data-prompt="請幫我將商品「潮港城一斤肉牛肉爐」的庫存數量更新為 50 件。">⚙️ 動作：更新特定商品庫存</button>
+                        <button class="quick-prompt-btn" data-prompt="請幫我將商品「潮港城一斤肉牛肉爐」的庫存數量更新為 50 件。">動作：更新特定商品庫存</button>
                         <button class="quick-prompt-btn" data-prompt="請幫我統計今日與本月的出貨數量、訂單總額，以及暢銷商品排行與庫存周轉警告。">📈 統計今日/本月銷售與出貨概況</button>
                     </div>
                 </div>
@@ -8626,7 +8647,7 @@ function ckc_customer_tags_sync_page_html() {
                                 runBatch();
                             } else {
                                 $progressBar.css('width', '100%');
-                                $statusText.text('🎉 恭喜！全體顧客標籤重新整理完畢！').css('color', '#10b981');
+                                $statusText.text('恭喜！全體顧客標籤重新整理完畢！').css('color', '#10b981');
                                 $btn.prop('disabled', false).text('重新開始同步');
                             }
                         } else {
@@ -9332,7 +9353,7 @@ function ckc_ajax_generate_ai_seo_copy() {
         $html_content .= "<ul>\n";
         $html_content .= "  <li><strong>✨ 頂級食材嚴選</strong>：從源頭嚴格控管食材品質，口口吃得到真實好料，口感扎實有層次，香氣四溢。</li>\n";
         $html_content .= "  <li><strong>🍲 主廚研發秘製配方</strong>：傳承潮港城宴會等級經典風味，完美調和比例，回甘不膩，令人吮指回味。</li>\n";
-        $html_content .= "  <li><strong>📦 急速冷凍真空包裝</strong>：採用先進急速冷凍技術，鎖住第一手現做美味與極致鮮度，簡單加熱即刻享用。</li>\n";
+        $html_content .= "  <li><strong>急速冷凍真空包裝</strong>：採用先進急速冷凍技術，鎖住第一手現做美味與極致鮮度，簡單加熱即刻享用。</li>\n";
         $html_content .= "</ul>\n\n";
         
         $html_content .= "<h3>💡 食用與加熱建議</h3>\n";
@@ -10170,7 +10191,7 @@ function chao_checkout_custom_js_css() {
             var triggerHtml = `
             <div id="chao-collapsible-summary-trigger" style="display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; cursor: pointer; font-size: 14px; font-weight: 600; color: #0f172a;">
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <span>🛒</span>
+                    <span></span>
                     <span>顯示訂單明細</span>
                     <span id="chao-summary-arrow" style="font-size: 10px; transition: transform 0.2s;">▼</span>
                 </div>
@@ -10353,9 +10374,9 @@ function chao_checkout_free_shipping_progress() {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: 600;">
             <span style="color: #334155; display: flex; align-items: center; gap: 6px;">
                 <?php if ( $coupon_free_shipping ) : ?>
-                    <span style="font-size: 16px;">🎉</span> 已套用免運優惠券，本次配送免運費！
+                    <span style="font-size: 16px;"></span> 已套用免運優惠券，本次配送免運費！
                 <?php elseif ( $remaining <= 0 ) : ?>
-                    <span style="font-size: 16px;">🎉</span> 恭喜！您已達免運門檻，本次配送免運費！
+                    <span style="font-size: 16px;"></span> 恭喜！您已達免運門檻，本次配送免運費！
                 <?php else : ?>
                     <span style="font-size: 16px;">🚚</span> 距離免運門檻還差 <span style="color: #e11d48; font-size: 16px; font-weight: 700;">NT$<?php echo number_format( $remaining ); ?></span>
                 <?php endif; ?>
@@ -10396,7 +10417,7 @@ function chao_thankyou_guest_registration_form( $order_id ) {
     ?>
     <div class="chao-thankyou-register-card" style="margin: 30px 0; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
         <h3 style="margin-top: 0; color: #1e293b; font-size: 18px; display: flex; align-items: center; gap: 8px;">
-            <span>🎁</span> 一鍵建立帳號，隨時查詢訂單進度！
+            <span></span> 一鍵建立帳號，隨時查詢訂單進度！
         </h3>
         <p style="color: #64748b; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">
             免去重複填寫資料的麻煩，還能即時追蹤您的出貨進度。我們已為您帶入此訂單的電子郵件：<strong><?php echo esc_html( $email ); ?></strong>，只需設定密碼即可立即啟用帳號！
@@ -10508,7 +10529,7 @@ function chao_ajax_thankyou_guest_register_handler() {
     wp_set_current_user( $customer_id );
     wp_set_auth_cookie( $customer_id );
     
-    wp_send_json_success( array( 'message' => '🎉 帳號建立成功，系統已為您自動登入！' ) );
+    wp_send_json_success( array( 'message' => '帳號建立成功，系統已為您自動登入！' ) );
 }
 
 /**
@@ -10708,9 +10729,9 @@ function chao_cart_estimated_shipping_row() {
         <th>預估運費</th>
         <td data-title="預估運費">
             <?php if ( $coupon_free_shipping ) : ?>
-                <strong style="color:#16a34a;">🎉 已套用免運優惠券，本次配送免運費！</strong>
+                <strong style="color:#16a34a;">已套用免運優惠券，本次配送免運費！</strong>
             <?php elseif ( $subtotal >= $threshold ) : ?>
-                <strong style="color:#16a34a;">免運費 🎉</strong>
+                <strong style="color:#16a34a;">免運費</strong>
             <?php else : ?>
                 <?php
                 $rates = chao_get_estimated_shipping_rates();
@@ -11029,7 +11050,7 @@ function chao_cart_ux_footer_assets() {
             var percent, message;
             if (subtotal >= chaoFreeShipThreshold) {
                 percent = 100;
-                message = '🎉 太棒了！已符合免運條件，本筆訂單免運費！';
+                message = '太棒了！已符合免運條件，本筆訂單免運費！';
             } else {
                 percent = Math.round((subtotal / chaoFreeShipThreshold) * 100);
                 message = '🚚 還差 <strong>' + chaoFormatNTD(chaoFreeShipThreshold - subtotal) + '</strong> 即可享冷凍宅配、超商取貨免運費！';
