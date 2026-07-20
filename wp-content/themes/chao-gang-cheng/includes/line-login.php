@@ -280,8 +280,15 @@ function chao_handle_line_login_start() {
         setcookie( 'chao_line_login_state', $state, time() + 600, '/; samesite=Lax', '', is_ssl(), true );
         setcookie( 'chao_line_login_redirect', $redirect_to, time() + 600, '/; samesite=Lax', '', is_ssl(), true );
     }
+    
+    // Fallback: Also store state in a transient tied to IP for mobile/in-app browsers where cookies drop
+    $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+    set_transient( 'chao_line_login_' . $state, array(
+        'ip' => $ip,
+        'redirect' => $redirect_to
+    ), 600 );
 
-    chao_line_login_log( "Login Start Handler. State set: {$state}. Redirect URL saved: {$redirect_to}" );
+    chao_line_login_log( "Login Start Handler. State set: {$state}. Redirect URL saved: {$redirect_to}. IP: {$ip}" );
 
     $redirect_uri = add_query_arg( 'line-login-callback', '1', home_url( '/' ) );
     $auth_url = add_query_arg( array(
@@ -316,13 +323,37 @@ function chao_line_login_handle_callback() {
     $cookie_state = isset( $_COOKIE['chao_line_login_state'] ) ? $_COOKIE['chao_line_login_state'] : '';
     $get_state = isset( $_GET['state'] ) ? $_GET['state'] : '';
     
-    if ( empty( $get_state ) || empty( $cookie_state ) || $cookie_state !== $get_state ) {
+    $is_valid = false;
+    global $chao_line_login_final_redirect;
+    $chao_line_login_final_redirect = isset( $_COOKIE['chao_line_login_redirect'] ) ? $_COOKIE['chao_line_login_redirect'] : wc_get_page_permalink( 'myaccount' );
+    
+    if ( ! empty( $get_state ) ) {
+        if ( ! empty( $cookie_state ) && $cookie_state === $get_state ) {
+            $is_valid = true;
+        } else {
+            // Fallback to transient check
+            $transient_data = get_transient( 'chao_line_login_' . $get_state );
+            if ( $transient_data && is_array( $transient_data ) ) {
+                $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+                if ( $transient_data['ip'] === $ip ) {
+                    $is_valid = true;
+                    if ( ! empty( $transient_data['redirect'] ) ) {
+                        $chao_line_login_final_redirect = $transient_data['redirect'];
+                    }
+                    chao_line_login_log( "CSRF validated via Transient IP Match: {$ip}" );
+                }
+            }
+        }
+    }
+    
+    if ( ! $is_valid ) {
         chao_line_login_log( "CSRF Check Failed. Cookie state: '{$cookie_state}', GET state: '{$get_state}'" );
         wp_die( '錯誤的狀態驗證 (CSRF)，請重新嘗試登入。', '安全驗證失敗' );
     }
     
-    // Clear the state cookie
+    // Clear the state cookie and transient
     setcookie( 'chao_line_login_state', '', time() - 3600, '/', '' );
+    delete_transient( 'chao_line_login_' . $get_state );
     
     // Get authorization code
     $code = isset( $_GET['code'] ) ? $_GET['code'] : '';
@@ -502,10 +533,8 @@ function chao_line_login_handle_callback() {
     chao_line_login_log( "User logged in. ID: {$user->ID}." );
     
     // Get redirect URL
-    $redirect_url = isset( $_COOKIE['chao_line_login_redirect'] ) ? $_COOKIE['chao_line_login_redirect'] : '';
-    if ( empty( $redirect_url ) ) {
-        $redirect_url = wc_get_page_permalink( 'myaccount' );
-    }
+    global $chao_line_login_final_redirect;
+    $redirect_url = ! empty( $chao_line_login_final_redirect ) ? $chao_line_login_final_redirect : wc_get_page_permalink( 'myaccount' );
     
     // Clear redirect cookie
     setcookie( 'chao_line_login_redirect', '', time() - 3600, '/', '' );
