@@ -153,39 +153,19 @@ function chao_line_login_render_button() {
         return;
     }
     
-    // Generate secure state ONCE per page request to prevent multiple button renders from overriding the state cookie
-    static $state = null;
-    static $redirect_to = null;
-    
-    if ( null === $state ) {
-        $state = wp_generate_password( 24, false );
-        // Set cookie domain to '' and path to '/' to support custom mapped domain
-        setcookie( 'chao_line_login_state', $state, time() + 600, '/', '', is_ssl(), true );
-        
-        // Save the redirect URL
-        if ( is_checkout() ) {
-            $redirect_to = wc_get_checkout_url();
-        } elseif ( isset( $_GET['redirect_to'] ) ) {
-            $redirect_to = esc_url_raw( $_GET['redirect_to'] );
-        } else {
-            $redirect_to = wc_get_page_permalink( 'myaccount' );
-        }
-        
-        setcookie( 'chao_line_login_redirect', $redirect_to, time() + 600, '/', '', is_ssl(), true );
-        chao_line_login_log( "Button rendered. State set: {$state}. Redirect URL saved: {$redirect_to}" );
+    // Save the redirect URL
+    if ( is_checkout() ) {
+        $redirect_to = wc_get_checkout_url();
+    } elseif ( isset( $_GET['redirect_to'] ) ) {
+        $redirect_to = esc_url_raw( $_GET['redirect_to'] );
+    } else {
+        $redirect_to = wc_get_page_permalink( 'myaccount' );
     }
     
-    $redirect_uri = add_query_arg( 'line-login-callback', '1', home_url( '/' ) );
-    
-    // Build LINE Auth URL
-    $auth_url = add_query_arg( array(
-        'response_type' => 'code',
-        'client_id'     => $channel_id,
-        'redirect_uri'  => urlencode( $redirect_uri ),
-        'state'         => $state,
-        'scope'         => 'profile openid email',
-        'nonce'         => wp_generate_password( 16, false )
-    ), 'https://access.line.me/oauth2/v2.1/authorize' );
+    $login_start_url = add_query_arg( array(
+        'action' => 'chao_line_login',
+        'redirect_to' => urlencode( $redirect_to )
+    ), admin_url( 'admin-post.php' ) );
     
     // Render inline style once
     static $style_rendered = false;
@@ -197,7 +177,7 @@ function chao_line_login_render_button() {
     ?>
     <div class="line-login-container">
         <div class="line-login-divider"><span>或使用社群帳號快速登入</span></div>
-        <a href="<?php echo esc_url( $auth_url ); ?>" class="line-login-button">
+        <a href="<?php echo esc_url( $login_start_url ); ?>" class="line-login-button">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
                 <path fill="#FFFFFF" d="M24 10.3c0-5.7-5.4-10.3-12-10.3S0 4.6 0 10.3c0 5.1 4.3 9.3 10.1 10.1.4.1.9.3 1 .7.1.3.1.8 0 1.1l-.4 2.4c-.1.7.3.7.6.5 2.7-1.8 11.7-6.9 12.3-11.8.3-.9.4-1.9.4-3zm-15.6 2.3c0 .2-.2.4-.4.4H6.5c-.2 0-.4-.2-.4-.4V8.5c0-.2.2-.4.4-.4h.8c.2 0 .4.2.4.4v3.1h1.3c.2 0 .4.2.4.4v.6zm2.3 0c0 .2-.2.4-.4.4h-.8c-.2 0-.4-.2-.4-.4V8.5c0-.2.2-.4.4-.4h.8c.2 0 .4.2.4.4v4.1zm5.2 0c0 .2-.2.4-.4.4h-.8c-.2 0-.3-.1-.4-.2l-2-2.7v2.5c0 .2-.2.4-.4.4h-.8c-.2 0-.4-.2-.4-.4V8.5c0-.2.2-.4.4-.4h.8c.2 0 .3.1.4.2l2 2.7V8.5c0-.2.2-.4.4-.4h.8c.2 0 .4.2.4.4v4.1zm3.8-1.5c0 .2-.2.4-.4.4h-1.6v.7h1.6c.2 0 .4.2.4.4v.6c0 .2-.2.4-.4.4h-2.8c-.2 0-.4-.2-.4-.4V8.5c0-.2.2-.4.4-.4h2.8c.2 0 .4.2.4.4v.6c0 .2-.2.4-.4.4h-1.6v.7h1.6c.2 0 .4.2.4.4v.6z"/>
             </svg>
@@ -269,6 +249,52 @@ function chao_line_login_render_styles() {
         }
     </style>
     <?php
+}
+
+// 2.5 Hook to process the login start via admin-post (Bypasses caching)
+add_action( 'admin_post_nopriv_chao_line_login', 'chao_handle_line_login_start' );
+add_action( 'admin_post_chao_line_login', 'chao_handle_line_login_start' );
+
+function chao_handle_line_login_start() {
+    $channel_id = get_option( 'chao_line_login_channel_id', '' );
+    if ( empty( $channel_id ) ) {
+        wp_die( 'LINE Login channel ID is not configured.' );
+    }
+
+    $state = wp_generate_password( 24, false );
+    $redirect_to = isset( $_GET['redirect_to'] ) ? esc_url_raw( $_GET['redirect_to'] ) : wc_get_page_permalink( 'myaccount' );
+
+    // Determine cookie options (Use an array if PHP >= 7.3, otherwise use the path hack)
+    if ( PHP_VERSION_ID >= 70300 ) {
+        $cookie_opts = array(
+            'expires'  => time() + 600,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax'
+        );
+        setcookie( 'chao_line_login_state', $state, $cookie_opts );
+        setcookie( 'chao_line_login_redirect', $redirect_to, $cookie_opts );
+    } else {
+        setcookie( 'chao_line_login_state', $state, time() + 600, '/; samesite=Lax', '', is_ssl(), true );
+        setcookie( 'chao_line_login_redirect', $redirect_to, time() + 600, '/; samesite=Lax', '', is_ssl(), true );
+    }
+
+    chao_line_login_log( "Login Start Handler. State set: {$state}. Redirect URL saved: {$redirect_to}" );
+
+    $redirect_uri = add_query_arg( 'line-login-callback', '1', home_url( '/' ) );
+    $auth_url = add_query_arg( array(
+        'response_type' => 'code',
+        'client_id'     => $channel_id,
+        'redirect_uri'  => urlencode( $redirect_uri ),
+        'state'         => $state,
+        'scope'         => 'profile openid email',
+        'nonce'         => wp_generate_password( 16, false )
+    ), 'https://access.line.me/oauth2/v2.1/authorize' );
+
+    wp_redirect( $auth_url );
+    exit;
 }
 
 // 3. Hook to handle LINE callback extremely early (before Jetpack SSO intercepts it)
