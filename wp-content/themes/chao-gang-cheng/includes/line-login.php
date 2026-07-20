@@ -319,23 +319,10 @@ function chao_line_login_handle_callback() {
         'code'          => $code,
         'redirect_uri'  => $redirect_uri,
         'client_id'     => $channel_id,
+        'client_secret' => $channel_secret,
     );
 
-    // Use JWT (client_assertion) if kid and private_key are provided
-    if ( ! empty( $kid ) && ! empty( $private_key ) ) {
-        $jwt = chao_line_login_generate_jwt( $channel_id, $kid, $private_key );
-        if ( $jwt ) {
-            $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
-            $body['client_assertion'] = $jwt;
-            chao_line_login_log( "Using JWT client_assertion for token exchange." );
-        } else {
-            $body['client_secret'] = $channel_secret; // Fallback
-            chao_line_login_log( "Failed to generate JWT. Falling back to client_secret." );
-        }
-    } else {
-        $body['client_secret'] = $channel_secret;
-        chao_line_login_log( "Using client_secret for token exchange." );
-    }
+    chao_line_login_log( "Using client_secret for token exchange." );
 
     $response = wp_remote_post( 'https://api.line.me/oauth2/v2.1/token', array(
         'headers' => array(
