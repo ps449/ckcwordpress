@@ -49,6 +49,8 @@ function chao_line_login_settings_page() {
         update_option( 'chao_line_login_enabled', isset( $_POST['enabled'] ) ? '1' : '0' );
         update_option( 'chao_line_login_channel_id', sanitize_text_field( $_POST['channel_id'] ) );
         update_option( 'chao_line_login_channel_secret', sanitize_text_field( $_POST['channel_secret'] ) );
+        update_option( 'chao_line_login_kid', sanitize_text_field( $_POST['kid'] ) );
+        update_option( 'chao_line_login_private_key', wp_unslash( $_POST['private_key'] ) );
         echo '<div class="updated"><p><strong>設定已儲存。</strong></p></div>';
     }
     
@@ -60,6 +62,8 @@ function chao_line_login_settings_page() {
     $enabled = get_option( 'chao_line_login_enabled', '0' );
     $channel_id = get_option( 'chao_line_login_channel_id', '' );
     $channel_secret = get_option( 'chao_line_login_channel_secret', '' );
+    $kid = get_option( 'chao_line_login_kid', '' );
+    $private_key = get_option( 'chao_line_login_private_key', '' );
     $default_redirect_uri = add_query_arg( 'line-login-callback', '1', home_url( '/' ) );
     
     ?>
@@ -87,6 +91,20 @@ function chao_line_login_settings_page() {
                         <th scope="row">LINE Channel Secret</th>
                         <td>
                             <input name="channel_secret" type="password" value="<?php echo esc_attr( $channel_secret ); ?>" class="regular-text">
+                            <p class="description">如果設定了下方的 Assertion Key，則優先使用新版 JWT 認證。</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Assertion Key ID (kid)</th>
+                        <td>
+                            <input name="kid" type="text" value="<?php echo esc_attr( $kid ); ?>" class="regular-text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Assertion Private Key (PEM)</th>
+                        <td>
+                            <textarea name="private_key" rows="5" class="large-text code"><?php echo esc_textarea( $private_key ); ?></textarea>
+                            <p class="description">請貼上包含 <code>-----BEGIN PRIVATE KEY-----</code> 的完整私鑰內容。</p>
                         </td>
                     </tr>
                     <tr>
@@ -290,21 +308,40 @@ function chao_line_login_handle_callback() {
     // 2. Exchange authorization code for access token
     $channel_id = get_option( 'chao_line_login_channel_id' );
     $channel_secret = get_option( 'chao_line_login_channel_secret' );
+    $kid = get_option( 'chao_line_login_kid' );
+    $private_key = get_option( 'chao_line_login_private_key' );
     $redirect_uri = add_query_arg( 'line-login-callback', '1', home_url( '/' ) );
     
     chao_line_login_log( "Exchanging code for token... Channel ID: {$channel_id}" );
     
+    $body = array(
+        'grant_type'    => 'authorization_code',
+        'code'          => $code,
+        'redirect_uri'  => $redirect_uri,
+        'client_id'     => $channel_id,
+    );
+
+    // Use JWT (client_assertion) if kid and private_key are provided
+    if ( ! empty( $kid ) && ! empty( $private_key ) ) {
+        $jwt = chao_line_login_generate_jwt( $channel_id, $kid, $private_key );
+        if ( $jwt ) {
+            $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+            $body['client_assertion'] = $jwt;
+            chao_line_login_log( "Using JWT client_assertion for token exchange." );
+        } else {
+            $body['client_secret'] = $channel_secret; // Fallback
+            chao_line_login_log( "Failed to generate JWT. Falling back to client_secret." );
+        }
+    } else {
+        $body['client_secret'] = $channel_secret;
+        chao_line_login_log( "Using client_secret for token exchange." );
+    }
+
     $response = wp_remote_post( 'https://api.line.me/oauth2/v2.1/token', array(
         'headers' => array(
             'Content-Type' => 'application/x-www-form-urlencoded',
         ),
-        'body' => array(
-            'grant_type'    => 'authorization_code',
-            'code'          => $code,
-            'redirect_uri'  => $redirect_uri,
-            'client_id'     => $channel_id,
-            'client_secret' => $channel_secret,
-        ),
+        'body' => $body,
     ));
     
     if ( is_wp_error( $response ) ) {
