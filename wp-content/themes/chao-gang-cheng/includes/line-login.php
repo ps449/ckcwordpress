@@ -575,3 +575,42 @@ function chao_line_login_sync_checkout_email_to_profile( $customer_id, $data ) {
         chao_line_login_log( "Updated user {$customer_id} email from temporary to checkout email: {$new_email}" );
     }
 }
+
+/**
+ * Generate JWT for LINE client_assertion
+ */
+function chao_line_login_generate_jwt( $channel_id, $kid, $private_key ) {
+    $header = array(
+        'alg' => 'RS256',
+        'typ' => 'JWT',
+        'kid' => $kid,
+    );
+    $payload = array(
+        'iss' => $channel_id,
+        'sub' => $channel_id,
+        'aud' => 'https://api.line.me/',
+        'exp' => time() + 1800,
+        'token_exp' => 2592000,
+    );
+
+    // Base64Url encode helper
+    $base64url_encode = function( $data ) {
+        return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
+    };
+
+    $segments = array();
+    $segments[] = $base64url_encode( wp_json_encode( $header ) );
+    $segments[] = $base64url_encode( wp_json_encode( $payload ) );
+    
+    $signing_input = implode( '.', $segments );
+    
+    $signature = '';
+    $success = openssl_sign( $signing_input, $signature, $private_key, OPENSSL_ALGO_SHA256 );
+    if ( ! $success ) {
+        return false;
+    }
+    
+    $segments[] = $base64url_encode( $signature );
+    return implode( '.', $segments );
+}
+
