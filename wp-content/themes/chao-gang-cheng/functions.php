@@ -1528,7 +1528,7 @@ function chao_gang_cheng_heritage_badge_admin_fields() {
         'label'       => '隱藏口碑徽章',
         'description' => '勾選後，此商品頁不顯示「🏆 口碑徽章」',
     ) );
-    woocommerce_wp_text_field( array(
+    woocommerce_wp_text_input( array(
         'id'          => '_chao_heritage_badge_text',
         'label'       => '口碑徽章文字',
         'placeholder' => '潮港城 30 年辦桌口碑',

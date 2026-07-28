@@ -108,7 +108,7 @@ function ckc_refp_save_user_fields( $user_id ) {
 add_action( 'woocommerce_product_options_general_product_data', 'ckc_refp_product_rate_field' );
 function ckc_refp_product_rate_field() {
     echo '<div class="options_group">';
-    woocommerce_wp_text_field( array(
+    woocommerce_wp_text_input( array(
         'id'          => '_ckc_ref_product_rate',
         'label'       => '分潤費率（%）',
         'placeholder' => '留空用夥伴費率',
