@@ -8,6 +8,35 @@
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
+<style>
+/* Brand Logo Interactivity */
+@media (min-width: 769px) {
+    header .logo a {
+        display: inline-block !important;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important;
+    }
+    header .logo a:hover {
+        transform: scale(1.05) !important;
+        opacity: 0.9 !important;
+    }
+}
+@media (max-width: 768px) {
+    header .mobile-logo-section a {
+        display: inline-flex !important;
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+    }
+    header .mobile-logo-section a:active {
+        transform: scale(0.92) !important;
+        opacity: 0.8 !important;
+    }
+}
+</style>
+
+
+<!-- Global Page Transition Loader -->
+<div id="chao-page-transition-overlay">
+    <div class="chao-spinner"></div>
+</div>
 
 <div id="page" class="site">
     <!-- Announcement Bar -->

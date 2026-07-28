@@ -138,8 +138,25 @@ function ckc_refp_calc_commission( $order, $partner_rate ) {
         if ( ! empty( $excluded ) && has_term( $excluded, 'product_cat', $pid ) ) {
             continue;
         }
-        $override = get_post_meta( $pid, '_ckc_ref_product_rate', true );
-        $rate = ( '' !== $override && is_numeric( $override ) ) ? floatval( $override ) / 100 : $partner_rate;
+        
+        // 依照商品分類層級給予不同費率 (熱銷/常態/低銷/未設定)
+        $tier = get_post_meta( $pid, '_ckc_ref_tier', true );
+        if ( ! $tier ) {
+            $tier = 'uncategorized';
+        }
+
+        if ( 'hot' === $tier ) {
+            $rate_pct = get_option( '_ckc_ref_tier_rate_hot', 3 );
+        } elseif ( 'regular' === $tier ) {
+            $rate_pct = get_option( '_ckc_ref_tier_rate_regular', 6 );
+        } elseif ( 'slow' === $tier ) {
+            $rate_pct = get_option( '_ckc_ref_tier_rate_slow', 12 );
+        } else {
+            $rate_pct = 0; // 未設定分潤商品 = 0%
+        }
+        
+        $rate = floatval( $rate_pct ) / 100;
+
         if ( $rate <= 0 ) {
             continue;
         }
@@ -366,8 +383,13 @@ function ckc_refp_account_section() {
         $rate_display = rtrim( rtrim( number_format( ckc_refp_partner_rate( $user_id ) * 100, 1 ), '0' ), '.' );
         $qr = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' . rawurlencode( ckc_ref_link( $user_id ) );
         ?>
+        <?php
+        $hot_rate = get_option( '_ckc_ref_tier_rate_hot', '3' );
+        $normal_rate = get_option( '_ckc_ref_tier_rate_normal', '6' );
+        $slow_rate = get_option( '_ckc_ref_tier_rate_slow', '12' );
+        ?>
         <div style="background: #fff; border: 2px solid #7f6c60; border-radius: 10px; padding: 20px; margin-top: 20px;">
-            <h3 style="margin: 0 0 12px; font-size: 17px; color: #7f6c60;">⭐ 推廣夥伴儀表板（<?php echo 'kol' === $type ? 'KOL' : '團購主'; ?>・現金分潤 <?php echo esc_html( $rate_display ); ?>%）</h3>
+            <h3 style="margin: 0 0 12px; font-size: 17px; color: #7f6c60;">⭐ 推廣夥伴儀表板（<?php echo 'kol' === $type ? 'KOL' : '團購主'; ?>・現金分潤）；熱銷 <?php echo esc_html( $hot_rate ); ?>%；常態 <?php echo esc_html( $normal_rate ); ?>%；低銷 <?php echo esc_html( $slow_rate ); ?>%</h3>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
                 <div style="background: #f8fafc; border-radius: 8px; padding: 14px;">
                     <div style="font-size: 12px; color: #64748b;">待確認（鑑賞期中）</div>

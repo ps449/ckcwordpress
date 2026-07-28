@@ -26,6 +26,62 @@ function ckc_refadm_register_menu() {
     );
 }
 
+// 出金紀錄匯出 CSV
+add_action( 'admin_init', 'ckc_refadm_export_payouts_csv' );
+function ckc_refadm_export_payouts_csv() {
+    if ( ! isset( $_POST['ckc_refadm_action'] ) || 'export_payouts' !== $_POST['ckc_refadm_action'] ) {
+        return;
+    }
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        return;
+    }
+    if ( ! isset( $_POST['ckc_refadm_export_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ckc_refadm_export_nonce'] ) ), 'ckc_refadm_export' ) ) {
+        return;
+    }
+
+    $partners = function_exists( 'ckc_refp_all_partners' ) ? ckc_refp_all_partners() : array();
+    $payout_rows = array();
+    foreach ( $partners as $p ) {
+        $payouts = get_user_meta( $p->ID, '_ckc_ref_payouts', true );
+        if ( is_array( $payouts ) ) {
+            foreach ( $payouts as $po ) {
+                $po['name'] = $p->display_name;
+                $po['uid']  = $p->ID;
+                $po['phone'] = get_user_meta( $p->ID, 'billing_phone', true );
+                $po['join_date'] = $p->user_registered;
+                $payout_rows[] = $po;
+            }
+        }
+    }
+    usort( $payout_rows, function ( $a, $b ) {
+        return strcmp( $b['time'], $a['time'] );
+    } );
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=ckc_payout_records_' . date('Ymd') . '.csv');
+    
+    // Add BOM for Excel
+    echo "\xEF\xBB\xBF";
+    $output = fopen('php://output', 'w');
+    fputcsv($output, array('時間', '加入時間', '夥伴姓名', '夥伴ID', '電話', '出金總額', '扣繳稅款', '二代健保', '實付金額'));
+    
+    foreach ( $payout_rows as $po ) {
+        fputcsv($output, array(
+            $po['time'],
+            date('Y-m-d H:i', strtotime($po['join_date'])),
+            $po['name'],
+            $po['uid'],
+            $po['phone'],
+            $po['amount'],
+            $po['withholding'],
+            $po['nhi'],
+            $po['net']
+        ));
+    }
+    fclose($output);
+    exit;
+}
+
 // 動作處理（核准／拒絕／出金／調費率）
 function ckc_refadm_handle_actions() {
     if ( empty( $_POST['ckc_refadm_action'] ) || ! current_user_can( 'manage_woocommerce' ) ) {
@@ -42,12 +98,8 @@ function ckc_refadm_handle_actions() {
 
     if ( 'approve' === $action ) {
         $type = isset( $_POST['ckc_refadm_type'] ) && 'groupbuyer' === $_POST['ckc_refadm_type'] ? 'groupbuyer' : 'kol';
-        $rate = isset( $_POST['ckc_refadm_rate'] ) ? sanitize_text_field( wp_unslash( $_POST['ckc_refadm_rate'] ) ) : '';
         update_user_meta( $user_id, '_ckc_ref_partner', $type );
         delete_user_meta( $user_id, '_ckc_ref_partner_apply' );
-        if ( is_numeric( $rate ) && floatval( $rate ) > 0 ) {
-            update_user_meta( $user_id, '_ckc_ref_partner_rate', $rate );
-        }
         return sprintf( '已核准會員 ID %d 為%s。', $user_id, 'kol' === $type ? 'KOL' : '團購主' );
     }
     if ( 'reject' === $action ) {
@@ -57,11 +109,6 @@ function ckc_refadm_handle_actions() {
     if ( 'revoke' === $action ) {
         update_user_meta( $user_id, '_ckc_ref_partner', '' );
         return sprintf( '已停用會員 ID %d 的夥伴身分（現金帳本保留）。', $user_id );
-    }
-    if ( 'rate' === $action ) {
-        $rate = isset( $_POST['ckc_refadm_rate'] ) ? sanitize_text_field( wp_unslash( $_POST['ckc_refadm_rate'] ) ) : '';
-        update_user_meta( $user_id, '_ckc_ref_partner_rate', is_numeric( $rate ) ? $rate : '' );
-        return sprintf( '已更新會員 ID %d 的費率。', $user_id );
     }
     if ( 'payout' === $action && function_exists( 'ckc_refp_mark_paid' ) ) {
         return ckc_refp_mark_paid( $user_id );
@@ -126,6 +173,8 @@ function ckc_refadm_render_page() {
             foreach ( $payouts as $po ) {
                 $po['name'] = $row['user']->display_name;
                 $po['uid']  = $row['user']->ID;
+                $po['phone'] = get_user_meta( $row['user']->ID, 'billing_phone', true );
+                $po['join_date'] = $row['user']->user_registered;
                 $payout_rows[] = $po;
             }
         }
@@ -186,7 +235,6 @@ function ckc_refadm_render_page() {
                                     <option value="kol">KOL</option>
                                     <option value="groupbuyer">團購主</option>
                                 </select>
-                                <input type="number" name="ckc_refadm_rate" step="0.1" min="0" max="50" placeholder="8%">
                                 <button type="submit" name="ckc_refadm_action" value="approve" class="button button-primary">核准</button>
                                 <button type="submit" name="ckc_refadm_action" value="reject" class="button">拒絕</button>
                             </form>
@@ -201,7 +249,7 @@ function ckc_refadm_render_page() {
         <div class="ckc-refadm-section">
             <h2>⭐ 夥伴列表（<?php echo esc_html( count( $partner_rows ) ); ?>）</h2>
             <table class="widefat striped">
-                <thead><tr><th>夥伴</th><th>身分</th><th>推薦碼</th><th>費率</th><th>待確認</th><th>可出金</th><th>已出金</th><th style="width:300px;">動作</th></tr></thead>
+                <thead><tr><th>夥伴</th><th>身分</th><th>推薦碼</th><th>待確認</th><th>可出金</th><th>已出金</th><th style="width:300px;">動作</th></tr></thead>
                 <tbody>
                 <?php if ( empty( $partner_rows ) ) : ?>
                     <tr><td colspan="8">尚未有推廣夥伴。可於「待審核申請」核准，或在會員資料頁直接指定。</td></tr>
@@ -212,14 +260,6 @@ function ckc_refadm_render_page() {
                         <td><a href="<?php echo esc_url( get_edit_user_link( $pu->ID ) ); ?>"><?php echo esc_html( $pu->display_name ); ?></a>（ID <?php echo esc_html( $pu->ID ); ?>）</td>
                         <td><?php echo 'kol' === $row['type'] ? 'KOL' : '團購主'; ?></td>
                         <td><code><?php echo esc_html( ckc_ref_get_code( $pu->ID ) ); ?></code></td>
-                        <td>
-                            <form method="post" class="ckc-refadm-inline-form">
-                                <?php wp_nonce_field( 'ckc_refadm', 'ckc_refadm_nonce' ); ?>
-                                <input type="hidden" name="ckc_refadm_user" value="<?php echo esc_attr( $pu->ID ); ?>">
-                                <input type="number" name="ckc_refadm_rate" step="0.1" min="0" max="50" value="<?php echo esc_attr( $rate_pc ); ?>">%
-                                <button type="submit" name="ckc_refadm_action" value="rate" class="button button-small">更新</button>
-                            </form>
-                        </td>
                         <td>NT$<?php echo esc_html( number_format( $row['sums']['pending'] ) ); ?></td>
                         <td style="font-weight:700;color:<?php echo $row['sums']['confirmed'] >= $threshold ? '#b32d2e' : '#1d2327'; ?>;">NT$<?php echo esc_html( number_format( $row['sums']['confirmed'] ) ); ?></td>
                         <td>NT$<?php echo esc_html( number_format( $row['sums']['paid'] ) ); ?></td>
@@ -239,16 +279,25 @@ function ckc_refadm_render_page() {
 
         <!-- 出金紀錄 -->
         <div class="ckc-refadm-section">
-            <h2>💰 出金紀錄（<?php echo esc_html( count( $payout_rows ) ); ?>）</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin: 0;">💰 出金紀錄（<?php echo esc_html( count( $payout_rows ) ); ?>）</h2>
+                <form method="post" style="margin: 0;">
+                    <?php wp_nonce_field( 'ckc_refadm_export', 'ckc_refadm_export_nonce' ); ?>
+                    <button type="submit" name="ckc_refadm_action" value="export_payouts" class="button button-primary">下載 CSV</button>
+                </form>
+            </div>
+            <p class="description">備註：依稅法規定，單筆給付達 $20,010（含）以上，需代扣 10% 所得稅；個人單筆領取費用達 $20,000（含）以上時，需扣取 2.11% 的補充保費。稅務金額僅供參考試算，實際申報請依會計師指示。</p>
             <table class="widefat striped">
-                <thead><tr><th>時間</th><th>夥伴</th><th>出金總額</th><th>扣繳稅款</th><th>二代健保</th><th>實付金額</th></tr></thead>
+                <thead><tr><th>時間</th><th>加入時間</th><th>夥伴</th><th>電話</th><th>出金總額</th><th>扣繳稅款</th><th>二代健保</th><th>實付金額</th></tr></thead>
                 <tbody>
                 <?php if ( empty( $payout_rows ) ) : ?>
-                    <tr><td colspan="6">尚無出金紀錄。</td></tr>
+                    <tr><td colspan="8">尚無出金紀錄。</td></tr>
                 <?php else : foreach ( array_slice( $payout_rows, 0, 50 ) as $po ) : ?>
                     <tr>
                         <td><?php echo esc_html( $po['time'] ); ?></td>
+                        <td><?php echo esc_html( date('Y-m-d H:i', strtotime($po['join_date'])) ); ?></td>
                         <td><?php echo esc_html( $po['name'] ); ?>（ID <?php echo esc_html( $po['uid'] ); ?>）</td>
+                        <td><?php echo esc_html( $po['phone'] ); ?></td>
                         <td>NT$<?php echo esc_html( number_format( intval( $po['amount'] ) ) ); ?></td>
                         <td>NT$<?php echo esc_html( number_format( intval( $po['withholding'] ) ) ); ?></td>
                         <td>NT$<?php echo esc_html( number_format( intval( $po['nhi'] ) ) ); ?></td>

@@ -34,31 +34,38 @@ add_filter( 'woocommerce_coupons_enabled', '__return_true', 20 );
  * 系統虛擬券等不算，可與優惠券並存、不會被單券邏輯移除。
  */
 function ckc_is_marketing_coupon( $code ) {
+    // 效能：同一 request 內以 static 快取結果，避免重複建立 WC_Coupon（每次都是 DB 查詢）。
+    // 此函式會在 cart 載入、套券、結帳等多個 hook 中對同一批券碼反覆呼叫。
+    static $cache = array();
+
     $code = wc_format_coupon_code( is_scalar( $code ) ? (string) $code : '' );
     if ( '' === $code ) {
         return false;
     }
-    
+    if ( isset( $cache[ $code ] ) ) {
+        return $cache[ $code ];
+    }
+
     // 排除點數折抵等系統虛擬券（不視為行銷優惠券，使其可與行銷優惠券同時使用）
     // WPS 產生的點數折抵券通常包含 wps_ 或 points_ 等關鍵字
     if ( false !== strpos( $code, 'wps' ) || false !== strpos( $code, 'points' ) ) {
-        return false;
+        return $cache[ $code ] = false;
     }
-    
+
     $coupon = new WC_Coupon( $code );
     if ( ! $coupon->get_id() ) {
-        return false; // 虛擬券（如點數折抵）或券不存在 → 不視為行銷優惠券
+        return $cache[ $code ] = false; // 虛擬券（如點數折抵）或券不存在 → 不視為行銷優惠券
     }
     // 修正：只要折價券在資料庫中存在（有 ID），且折扣類型為一般折扣型（非 shipping 等系統特殊類型），
     // 一律視為「行銷優惠券」納入單張限制，防止多張疊加導致折扣超額。
     // _ckc_coupon_public / _ckc_coupon_claim_public 不再是唯一判斷依據。
     $discount_types = array( 'fixed_cart', 'percent', 'fixed_product' );
     if ( in_array( $coupon->get_discount_type(), $discount_types, true ) ) {
-        return true;
+        return $cache[ $code ] = true;
     }
     // 其餘特殊類型（如第三方插件自訂類型）維持以 meta 為判斷
-    return 'yes' === $coupon->get_meta( '_ckc_coupon_public' )
-        || 'yes' === $coupon->get_meta( '_ckc_coupon_claim_public' );
+    return $cache[ $code ] = ( 'yes' === $coupon->get_meta( '_ckc_coupon_public' )
+        || 'yes' === $coupon->get_meta( '_ckc_coupon_claim_public' ) );
 }
 
 /**
@@ -2280,6 +2287,50 @@ function ckc_remove_checkout_coupon_form() {
     remove_action( 'woocommerce_before_checkout_form', 'woocommerce_checkout_coupon_form', 10 );
 }
 
+/* ================================================================
+ * 效能重構：結帳頁「單一往返」套券
+ *
+ * 舊流程（慢）：點「套用」→ wc-ajax=apply_coupon（往返 1）→ 成功後
+ * 前端再 trigger update_checkout → wc-ajax=update_order_review（往返 2）
+ * → 金額才更新。兩次請求各自跑完整個購物車運算，使用者等待時間加倍。
+ *
+ * 新流程（快）：前端把折扣碼塞進 form.checkout 的隱藏欄位
+ * ckc_apply_coupon_now，直接 trigger update_checkout；後端在
+ * woocommerce_checkout_update_order_review（update_order_review 內、
+ * calculate_totals 之前）先套券，同一次請求就回傳套券後的新金額。
+ * ================================================================ */
+add_action( 'woocommerce_checkout_update_order_review', 'ckc_checkout_apply_coupon_inline', 5 );
+function ckc_checkout_apply_coupon_inline( $post_data ) {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        return;
+    }
+    parse_str( (string) $post_data, $data );
+    if ( empty( $data['ckc_apply_coupon_now'] ) ) {
+        return;
+    }
+    $code = wc_format_coupon_code( sanitize_text_field( wp_unslash( $data['ckc_apply_coupon_now'] ) ) );
+    if ( '' === $code || WC()->cart->has_discount( $code ) ) {
+        return;
+    }
+    if ( WC()->cart->apply_coupon( $code ) ) {
+        // 成功訊息交給前端 toast 呈現；清掉原生 success/notice，
+        // 避免結帳表單頂端出現通知區塊並觸發自動捲動到頂部。
+        // 失敗時不清（錯誤訊息保留給前端解析顯示）。
+        wc_clear_notices();
+    }
+}
+
+// 隨 update_order_review 回傳「目前已套用的券碼」，前端在 updated_checkout
+// 事件中即可直接判斷套券成功與否，免再發任何請求。
+// （非選擇器的 fragment key 在 checkout.js 端是安全的 no-op）
+add_filter( 'woocommerce_update_order_review_fragments', 'ckc_fragments_applied_coupons' );
+function ckc_fragments_applied_coupons( $fragments ) {
+    $fragments['ckc_applied_coupons'] = ( function_exists( 'WC' ) && WC()->cart )
+        ? array_values( array_map( 'wc_format_coupon_code', WC()->cart->get_applied_coupons() ) )
+        : array();
+    return $fragments;
+}
+
 // ── 結帳頁加入「我的優惠券」面板
 add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_coupon_panel', 5 );
 function ckc_checkout_coupon_panel() {
@@ -2349,6 +2400,23 @@ function ckc_checkout_coupon_ajax_script() {
         opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
     }
     #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    
+    @keyframes ckc-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    @keyframes ckc-price-highlight {
+        0% { background-color: transparent; }
+        15% { background-color: #d1fae5; color: #047857; transform: scale(1.05); }
+        85% { background-color: #d1fae5; color: #047857; transform: scale(1.05); }
+        100% { background-color: transparent; transform: scale(1); }
+    }
+    .ckc-price-highlight {
+        display: inline-block;
+        padding: 0 4px;
+        border-radius: 4px;
+        animation: ckc-price-highlight 1.5s ease-out;
+    }
     </style>
     <script>
     jQuery(function($){
@@ -2359,20 +2427,32 @@ function ckc_checkout_coupon_ajax_script() {
             $t.text(msg).css('background', isError ? '#b91c1c' : '#16a34a');
             requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
             clearTimeout(window._ckcToastTimer);
-            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 2600);
+            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 1500);
         }
 
-        // 套用後同步券卡片狀態（限一張：套用的顯示「已套用」，其餘恢復可套用），
-        // 修正前端介面沒有連動的問題。
+        // 套用後同步券卡片狀態（自動偵測或強制指定），
+        // 修正前端手動移除折價券時介面沒有連動的問題。
         function ckcRefreshCouponCards(appliedCode){
-            var ac = (appliedCode || '').toString().toUpperCase();
+            var appliedCodes = [];
+            
+            if (typeof appliedCode !== 'undefined' && appliedCode) {
+                appliedCodes.push(appliedCode.toString().toUpperCase());
+            } else {
+                // 自動從畫面中偵測已套用的折價券 (限定在結帳明細或購物車主表單，避免被未更新的 mini-cart 影響)
+                $('.woocommerce-checkout-review-order-table .cart-discount, .woocommerce-cart-form .cart-discount, .cart_totals .cart-discount').each(function(){
+                    var cls = $(this).attr('class') || '';
+                    var m = cls.match(/coupon-([a-zA-Z0-9_-]+)/i);
+                    if (m && m[1]) { appliedCodes.push(m[1].toUpperCase()); }
+                });
+            }
+
             $('.ckc-coupon-card').each(function(){
                 var $c = $(this);
                 if($c.hasClass('is-expired')){ return; }
                 var code = ($c.data('code') || '').toString().toUpperCase();
                 var url  = $c.attr('data-apply-url') || '#';
                 var $action = $c.find('.ckc-coupon-action');
-                if(code === ac){
+                if($.inArray(code, appliedCodes) !== -1){
                     $c.addClass('is-applied');
                     $action.html('<span class="ckc-coupon-applied">✓ 已套用</span>');
                 } else {
@@ -2382,44 +2462,182 @@ function ckc_checkout_coupon_ajax_script() {
             });
         }
 
-        function ckcApplyCoupon(code){
+        // 監聽結帳頁/購物車更新事件，手動移除折價券時同步卡片狀態
+        $(document.body).on('updated_checkout updated_cart_totals', function(){
+            ckcRefreshCouponCards();
+        });
+
+        // ── 套券時防止 WooCommerce 原生自動捲動到頂部通知區 ──
+        function ckcScrollLockOn(){
+            window._ckcCouponScrollY = window.scrollY || window.pageYOffset;
+            window._ckcCouponScrollLock = true;
+        }
+        function ckcScrollLockOff(){
+            if(!window._ckcCouponScrollLock){ return; }
+            window._ckcCouponScrollLock = false;
+            $('html,body').stop(true,false);
+            window.scrollTo(0, window._ckcCouponScrollY || 0);
+        }
+        if ($.scroll_to_notices) {
+            var _ckcOrigScrollCoupon = $.scroll_to_notices;
+            $.scroll_to_notices = function(el){
+                if (window._ckcCouponScrollLock) { $('html,body').stop(true,false); return; }
+                _ckcOrigScrollCoupon.call(this, el);
+            };
+        }
+
+        function ckcBtnSpinner($btn){
+            var isCardApply = $btn.hasClass('ckc-coupon-apply');
+            $btn.prop('disabled', true).css({ 'opacity': '0.7', 'cursor': 'not-allowed', 'pointer-events': 'none' });
+            $btn.html('<svg class="ckc-spin" style="animation: ckc-spin 1s linear infinite; width: 14px; height: 14px; margin-right: 6px; vertical-align: middle; display: inline-block;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' + (isCardApply ? '套用中' : '驗證中'));
+        }
+        function ckcBtnRestore($btn, originalHtml){
+            if ($btn && $btn.length) {
+                $btn.prop('disabled', false).css({ 'opacity': '1', 'cursor': 'pointer', 'pointer-events': 'auto' }).html(originalHtml);
+            }
+        }
+        function ckcApplySuccessUI(code, $btn){
+            if ($btn && $btn.length) { $btn.css({ 'background': '#10b981', 'color': '#fff' }).html('✓ 成功'); }
+            $('#ckc-checkout-coupon-code').val('');
+            ckcRefreshCouponCards(code);
+            
+            // 金額折抵高亮特效 (Highlight)
+            var $orderTotal = $('.order-total .woocommerce-Price-amount').first();
+            if($orderTotal.length) {
+                $orderTotal.addClass('ckc-price-highlight');
+                // 動畫大約 600ms，結束後再跳出 Toast 提示
+                setTimeout(function(){ 
+                    ckcToast('折價券使用成功'); 
+                }, 800);
+                setTimeout(function(){ 
+                    $orderTotal.removeClass('ckc-price-highlight'); 
+                }, 1500);
+            } else {
+                ckcToast('折價券使用成功');
+            }
+        }
+
+        /**
+         * 效能重構：單一往返套券。
+         * 舊流程要打兩次 AJAX（apply_coupon → update_order_review），等待時間加倍；
+         * 新流程把折扣碼放進 form.checkout 的隱藏欄位 ckc_apply_coupon_now，
+         * 直接 trigger update_checkout —— 後端在同一次 update_order_review 請求內
+         * 先套券再算金額，一次往返完成套用＋金額更新。
+         */
+        function ckcApplyCoupon(code, $btn){
             code = $.trim(code || '');
             if(!code){ ckcToast('請輸入折扣碼', true); return; }
-            fetch('/wp-json/wc/store/cart', {credentials:'include'})
-                .then(function(r){ return r.headers.get('Nonce'); })
-                .then(function(nonce){
-                    return fetch('/wp-json/wc/store/v1/cart/apply-coupon', {
-                        method:'POST', credentials:'include',
-                        headers:{'Content-Type':'application/json','Nonce': nonce || ''},
-                        body: JSON.stringify({ code: code })
-                    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); });
-                })
-                .then(function(res){
-                    if(res.ok){
-                        ckcToast('折價券使用成功');
-                        $('#ckc-checkout-coupon-code').val('');
-                        ckcRefreshCouponCards(code);          // 前端券卡片連動
-                        $(document.body).trigger('update_checkout'); // 更新金額，不滾頂
-                    } else {
-                        ckcToast((res.data && res.data.message) ? res.data.message : '折價券套用失敗，請確認代碼或使用條件。', true);
+            if (window._ckcApplyPending) { return; } // 防連點
+
+            var originalBtnText = ($btn && $btn.length) ? $btn.html() : '';
+            if ($btn && $btn.length) { ckcBtnSpinner($btn); }
+
+            var $form = $('form.checkout');
+            if ($form.length && typeof wc_checkout_params !== 'undefined') {
+                // ── 快速路徑：單一往返 ──
+                var $field = $form.find('input[name="ckc_apply_coupon_now"]');
+                if(!$field.length){
+                    $field = $('<input type="hidden" name="ckc_apply_coupon_now" />').appendTo($form);
+                }
+                $field.val(code);
+                window._ckcApplyPending = { code: code, $btn: $btn, original: originalBtnText };
+                ckcScrollLockOn();
+                $(document.body).trigger('update_checkout');
+                // 保險絲：逾時未收到 updated_checkout 就還原按鈕
+                clearTimeout(window._ckcApplyTimer);
+                window._ckcApplyTimer = setTimeout(function(){
+                    var p = window._ckcApplyPending;
+                    if (p) {
+                        window._ckcApplyPending = null;
+                        $('form.checkout').find('input[name="ckc_apply_coupon_now"]').val('');
+                        ckcBtnRestore(p.$btn, p.original);
+                        ckcScrollLockOff();
+                        ckcToast('連線逾時，請再試一次。', true);
                     }
-                })
-                .catch(function(){ ckcToast('套用時發生錯誤，請稍後再試。', true); });
+                }, 15000);
+                return;
+            }
+
+            // ── 後備路徑（checkout 參數不可用時）：原本的兩段式流程 ──
+            var ajaxUrl = '/?wc-ajax=apply_coupon';
+            var nonce = '';
+            if (typeof wc_checkout_params !== 'undefined') {
+                ajaxUrl = wc_checkout_params.wc_ajax_url.toString().replace( '%%endpoint%%', 'apply_coupon' );
+                nonce = wc_checkout_params.apply_coupon_nonce;
+            }
+            $.ajax({
+                type: 'POST',
+                url: ajaxUrl,
+                data: { security: nonce, coupon_code: code },
+                dataType: 'html',
+                success: function( htmlResponse ) {
+                    if (htmlResponse.indexOf('woocommerce-error') !== -1) {
+                        ckcBtnRestore($btn, originalBtnText);
+                        var errMsg = $(htmlResponse).text().trim() || '折價券套用失敗，請確認代碼或使用條件。';
+                        ckcToast(errMsg, true);
+                    } else {
+                        ckcApplySuccessUI(code, $btn);
+                        $(document.body).trigger('update_checkout');
+                    }
+                },
+                error: function() {
+                    ckcBtnRestore($btn, originalBtnText);
+                    ckcToast('套用時發生錯誤，請稍後再試。', true);
+                }
+            });
         }
+
+        // 監聽結帳頁更新完畢事件：判斷單一往返套券的結果並收尾
+        $(document.body).on('updated_checkout', function(e, data) {
+            var p = window._ckcApplyPending;
+            if (!p) { return; }
+            window._ckcApplyPending = null;
+            clearTimeout(window._ckcApplyTimer);
+            $('form.checkout').find('input[name="ckc_apply_coupon_now"]').val('');
+
+            // 判斷是否套用成功：優先用後端回傳的 fragments 清單，其次檢查訂單摘要 DOM
+            var codeLower = (p.code || '').toString().toLowerCase();
+            var applied;
+            var list = data && data.fragments && data.fragments.ckc_applied_coupons;
+            if (list && list.length !== undefined) {
+                applied = false;
+                for (var i = 0; i < list.length; i++) {
+                    if ((list[i] || '').toString().toLowerCase() === codeLower) { applied = true; break; }
+                }
+            } else {
+                var cls = 'coupon-' + codeLower.replace(/[^a-z0-9_-]/g, '');
+                applied = $('.cart-discount.' + cls).length > 0;
+            }
+
+            if (applied) {
+                ckcApplySuccessUI(p.code, p.$btn);
+                // 移除 update_order_review 可能塞進表單頂端的通知（訊息已由 toast 呈現）
+                $('.woocommerce-NoticeGroup-updateOrderReview').remove();
+            } else {
+                ckcBtnRestore(p.$btn, p.original);
+                var $ng = $('.woocommerce-NoticeGroup-updateOrderReview');
+                var errText = $.trim($ng.find('.woocommerce-error li').first().text())
+                           || $.trim($ng.find('.woocommerce-error').first().text())
+                           || '折價券套用失敗，請確認代碼或使用條件。';
+                $ng.remove();
+                ckcToast(errText, true);
+            }
+            ckcScrollLockOff();
+        });
 
         // 1. 折扣碼輸入框：點「套用」或按 Enter
         $(document).on('click', '#ckc-checkout-coupon-apply', function(e){
             e.preventDefault();
-            ckcApplyCoupon($('#ckc-checkout-coupon-code').val());
+            ckcApplyCoupon($('#ckc-checkout-coupon-code').val(), $(this));
         });
         $(document).on('keydown', '#ckc-checkout-coupon-code', function(e){
-            if(e.key === 'Enter'){ e.preventDefault(); ckcApplyCoupon($(this).val()); }
+            if(e.key === 'Enter'){ e.preventDefault(); ckcApplyCoupon($(this).val(), $('#ckc-checkout-coupon-apply')); }
         });
 
         // 2. 券卡片「套用去結帳」：改走 AJAX，避免整頁跳轉回頂部
         $(document).on('click', '.ckc-coupon-apply', function(e){
             var code = $(this).data('coupon-code');
-            if(code){ e.preventDefault(); ckcApplyCoupon(code); }
+            if(code){ e.preventDefault(); ckcApplyCoupon(code, $(this)); }
         });
     });
     </script>
@@ -2488,19 +2706,6 @@ add_action( 'woocommerce_before_checkout_form', 'ckc_checkout_points_panel', 6 )
 function ckc_checkout_points_panel() {
     $user_id = get_current_user_id();
     $points  = ckc_pts_get_user_balance( $user_id );
-    
-    $log_file = dirname( __FILE__ ) . '/../scratch/checkout_points_debug.txt';
-    $log_dir  = dirname( $log_file );
-    if ( ! is_dir( $log_dir ) ) {
-        @mkdir( $log_dir, 0755, true );
-    }
-    $log_msg = sprintf( "[%s] user_id=%d, points=%d, is_logged_in=%d\n", 
-        date( 'Y-m-d H:i:s' ),
-        $user_id, 
-        $points, 
-        is_user_logged_in() ? 1 : 0
-    );
-    @file_put_contents( $log_file, $log_msg, FILE_APPEND );
 
     if ( ! is_user_logged_in() ) return;
     if ( $points <= 0 ) return; // 沒有點數就不顯示

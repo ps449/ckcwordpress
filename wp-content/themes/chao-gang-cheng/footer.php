@@ -86,5 +86,48 @@
 </div><!-- #page -->
 
 <?php wp_footer(); ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var overlay = document.getElementById('chao-page-transition-overlay');
+    if (!overlay) return;
+
+    document.addEventListener('click', function(e) {
+        var target = e.target.closest('a');
+        if (!target) return;
+        
+        var href = target.getAttribute('href');
+        var targetAttr = target.getAttribute('target');
+        
+        // Prevent loader on internal links, mailto, tel, empty hrefs, or new tabs
+        if (
+            !href || 
+            href.startsWith('#') || 
+            href.startsWith('javascript:') || 
+            href.startsWith('mailto:') || 
+            href.startsWith('tel:') ||
+            targetAttr === '_blank' ||
+            e.ctrlKey || e.metaKey || e.shiftKey || e.altKey ||
+            target.classList.contains('no-loader') ||
+            target.closest('.no-loader') ||
+            (href.indexOf(window.location.hostname) === -1 && href.startsWith('http'))
+        ) {
+            return;
+        }
+        
+        overlay.classList.add('is-active');
+        
+        // Fallback safety timeout (hides loader after 8 seconds)
+        setTimeout(function() {
+            overlay.classList.remove('is-active');
+        }, 8000);
+    });
+
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+            overlay.classList.remove('is-active');
+        }
+    });
+});
+</script>
 </body>
 </html>

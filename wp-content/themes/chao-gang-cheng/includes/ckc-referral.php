@@ -258,19 +258,21 @@ function ckc_ref_pay_commission( $order_id ) {
     if ( $referrer_id <= 0 ) {
         return;
     }
-    if ( $order->get_meta( '_ckc_ref_commission_paid' ) ) {
-        return; // 已發放，避免重複
-    }
 
-    // 佣金基礎：商品小計（不含運費），扣除折讓
-    $basis  = floatval( $order->get_subtotal() ) - floatval( $order->get_total_discount() );
-    $points = (int) floor( max( 0, $basis ) * ckc_ref_commission_rate() );
-    $points = min( $points, ckc_ref_commission_cap() );
+    // 檢查推薦人是否為分潤夥伴，若為分潤夥伴則不發放點數軌佣金
+    $is_partner = get_user_meta( $referrer_id, '_ckc_ref_partner', true );
 
-    if ( $points > 0 && ckc_ref_add_points( $referrer_id, $points, sprintf( '推薦訂單 #%d 分潤', $order_id ) ) ) {
-        $order->update_meta_data( '_ckc_ref_commission_paid', $points );
-        $order->save();
-        $order->add_order_note( sprintf( '分潤系統：已發放 %d 點紅利給推薦人（會員 ID %d，推薦碼 %s）。', $points, $referrer_id, $order->get_meta( '_ckc_ref_code' ) ) );
+    if ( ! $is_partner && ! $order->get_meta( '_ckc_ref_commission_paid' ) ) {
+        // 佣金基礎：商品小計（不含運費），扣除折讓
+        $basis  = floatval( $order->get_subtotal() ) - floatval( $order->get_total_discount() );
+        $points = (int) floor( max( 0, $basis ) * ckc_ref_commission_rate() );
+        $points = min( $points, ckc_ref_commission_cap() );
+
+        if ( $points > 0 && ckc_ref_add_points( $referrer_id, $points, sprintf( '推薦訂單 #%d 分潤', $order_id ) ) ) {
+            $order->update_meta_data( '_ckc_ref_commission_paid', $points );
+            $order->save();
+            $order->add_order_note( sprintf( '分潤系統：已發放 %d 點紅利給推薦人（會員 ID %d，推薦碼 %s）。', $points, $referrer_id, $order->get_meta( '_ckc_ref_code' ) ) );
+        }
     }
 
     // 被推薦人首購加贈
@@ -321,6 +323,12 @@ function ckc_ref_register_endpoint() {
 
 add_filter( 'woocommerce_account_menu_items', 'ckc_ref_account_menu_item', 20 );
 function ckc_ref_account_menu_item( $items ) {
+    // 如果是分潤夥伴（且非 KOL），則不顯示「推薦好友」頁籤
+    $partner_type = get_user_meta( get_current_user_id(), '_ckc_ref_partner', true );
+    if ( $partner_type && 'kol' !== $partner_type ) {
+        return $items;
+    }
+
     $new = array();
     foreach ( $items as $key => $label ) {
         if ( 'customer-logout' === $key ) {
@@ -344,6 +352,22 @@ function ckc_ref_account_referral_content() {
     if ( ! $user_id ) {
         return;
     }
+
+    // 如果是分潤夥伴（且非 KOL），則提示已轉換為夥伴身分並停止顯示推薦點數資訊
+    $partner_type = get_user_meta( $user_id, '_ckc_ref_partner', true );
+    if ( $partner_type && 'kol' !== $partner_type ) {
+        echo '<div class="woocommerce-Message woocommerce-Message--info woocommerce-info">';
+        echo '您已成為專屬分潤夥伴！請聯繫專員查看您的專屬推廣後台。原「推薦好友」點數功能已為您關閉。';
+        echo '</div>';
+        return;
+    }
+
+    if ( 'kol' === $partner_type ) {
+        echo '<div class="woocommerce-Message woocommerce-Message--info woocommerce-info" style="background-color: #fffbeb; color: #b45309; border-top-color: #f59e0b;">';
+        echo '【專屬 KOL 提醒】因您具備分潤身分，此處「推薦點數」將暫停發放，改依您專屬的夥伴分潤（現金）規則進行結算。';
+        echo '</div>';
+    }
+
     $code = ckc_ref_get_code( $user_id );
     $link = ckc_ref_link( $user_id );
 

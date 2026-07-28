@@ -442,10 +442,24 @@ h1, h2, h3, h4, h5, h6 {
 .section-header h2 a {
   color: inherit;
   text-decoration: none;
-  transition: var(--transition);
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.section-header h2 a:hover {
+@media (hover: hover) {
+  .section-header h2 a:hover {
+    color: var(--accent-color);
+    background-color: rgba(0,0,0,0.03);
+    transform: translateY(-2px);
+  }
+}
+
+.section-header h2 a:active {
+  transform: scale(0.95);
+  background-color: rgba(0,0,0,0.05);
   color: var(--accent-color);
 }
 
@@ -3339,9 +3353,11 @@ body.show-register-form .u-column1.col-1 {
     background-color: var(--white) !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
     border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
-    padding: 8px 12px !important;
+    padding: 12px 16px !important;
     z-index: 99998 !important; /* Stacked below drawer overlay but above standard items */
     box-sizing: border-box !important;
+    transform: none !important; /* Prevent scroll-based disappearing */
+    transition: none !important; /* Prevent scroll-based animations */
   }
 
   /* Adjust page padding bottom to make room for both the bottom nav (56px) and sticky cart bar (54px) */
@@ -3392,7 +3408,7 @@ body.show-register-form .u-column1.col-1 {
 
   /* Price styling on mobile */
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-price {
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
     color: var(--accent-color) !important;
     margin: 0 !important;
@@ -3404,7 +3420,7 @@ body.show-register-form .u-column1.col-1 {
 
 
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-price ins {
-    font-size: 14px !important;
+    font-size: 15px !important;
     color: var(--accent-color) !important;
     text-decoration: none !important;
     display: inline-block !important;
@@ -3414,7 +3430,7 @@ body.show-register-form .u-column1.col-1 {
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-action {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     flex: 1 1 auto !important;
     justify-content: flex-end !important;
   }
@@ -3424,10 +3440,10 @@ body.show-register-form .u-column1.col-1 {
     display: flex !important;
     align-items: center !important;
     border: 1px solid var(--border-color) !important;
-    border-radius: 4px !important;
-    height: 36px !important;
-    width: 90px !important;
-    flex: 0 0 90px !important;
+    border-radius: 6px !important;
+    height: 40px !important;
+    width: 95px !important;
+    flex: 0 0 95px !important;
     background-color: var(--white) !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
@@ -3436,12 +3452,12 @@ body.show-register-form .u-column1.col-1 {
   }
 
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .ts-sticky-qty-btn {
-    width: 28px !important;
+    width: 30px !important;
     height: 100% !important;
     border: none !important;
     background: transparent !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
+    font-size: 18px !important;
+    font-weight: 500 !important;
     color: #333 !important;
     cursor: pointer !important;
     padding: 0 !important;
@@ -3456,14 +3472,14 @@ body.show-register-form .u-column1.col-1 {
   }
 
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .ts-sticky-qty-input {
-    width: 34px !important;
+    width: 35px !important;
     height: 100% !important;
     border: none !important;
     background: transparent !important;
     border-left: 1px solid var(--border-color) !important;
     border-right: 1px solid var(--border-color) !important;
     text-align: center !important;
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-weight: 700 !important;
     color: #111 !important;
     padding: 0 !important;
@@ -3480,13 +3496,13 @@ body.show-register-form .u-column1.col-1 {
   /* Add to Cart button on mobile sticky bar */
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .ts-sticky-add-to-cart-btn {
     flex: 1 1 50% !important;
-    max-width: 105px !important;
-    height: 36px !important;
+    max-width: 110px !important;
+    height: 40px !important;
     background-color: var(--white) !important;
-    color: var(--secondary-color) !important;
-    border: 1.5px solid var(--secondary-color) !important;
+    color: #7c6767 !important;
+    border: 1.5px solid #7c6767 !important;
     border-radius: 20px !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     display: inline-flex !important;
@@ -3494,28 +3510,35 @@ body.show-register-form .u-column1.col-1 {
     justify-content: center !important;
     padding: 0 4px !important;
     box-sizing: border-box !important;
-    transition: var(--transition) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s !important;
+  }
+  html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .ts-sticky-add-to-cart-btn:active {
+    transform: scale(0.95) !important;
+    background-color: rgba(124, 103, 103, 0.05) !important;
   }
 
   /* Buy Now button on mobile sticky bar */
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn {
     flex: 1 1 50% !important;
-    max-width: 105px !important;
-    height: 36px !important;
-    background-color: var(--secondary-color) !important; /* Premium brown background matching theme */
+    max-width: 110px !important;
+    height: 40px !important;
+    background-color: #1a56db !important; /* Switch to a bright primary blue for Buy Now to distinguish it clearly */
     color: var(--white) !important;
     border: none !important;
     border-radius: 20px !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     padding: 0 4px !important;
-    box-shadow: 0 2px 6px rgba(124, 103, 103, 0.2) !important;
+    box-shadow: 0 4px 10px rgba(26, 86, 219, 0.3) !important;
     box-sizing: border-box !important;
-    transition: var(--transition) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn:active {
+    transform: scale(0.95) !important;
   }
 
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn .dashicons {
@@ -3772,7 +3795,7 @@ body.show-register-form .u-column1.col-1 {
 
 .mobile-menu-toggle,
 .mobile-search-toggle {
-  background: none !important;
+  background: transparent !important;
   border: none !important;
   padding: 6px !important;
   cursor: pointer !important;
@@ -3781,9 +3804,24 @@ body.show-register-form .u-column1.col-1 {
   align-items: center !important;
   justify-content: center !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   width: 40px !important;
   height: 40px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+@media (hover: hover) {
+  .mobile-menu-toggle:hover,
+  .mobile-search-toggle:hover {
+    background-color: rgba(0,0,0,0.03) !important;
+  }
+}
+
+.mobile-menu-toggle:active,
+.mobile-search-toggle:active {
+  transform: scale(0.92) !important;
+  background-color: rgba(0,0,0,0.06) !important;
 }
 
 .mobile-menu-toggle svg,
@@ -5521,4 +5559,66 @@ ul.products.list-view li.product a.add_to_cart_button {
 /* 隱藏購物車與結帳頁的禮物卡功能 */
 .add_gift_card_form {
     display: none !important;
+}
+
+/* Global Page Transition Loader */
+#chao-page-transition-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+#chao-page-transition-overlay.is-active {
+    opacity: 1;
+    visibility: visible;
+}
+.chao-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(248, 111, 105, 0.2);
+    border-top: 3px solid var(--accent-color);
+    border-radius: 50%;
+    animation: chao-spin 0.8s linear infinite;
+}
+@keyframes chao-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Brand Logo Interactivity
+   ========================================================================== */
+/* Desktop Logo Hover */
+@media (min-width: 769px) {
+    header .logo a {
+        display: inline-block !important;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important;
+    }
+    header .logo a:hover {
+        transform: scale(1.05) !important;
+        opacity: 0.9 !important;
+    }
+}
+
+/* Mobile Logo Touch/Active */
+@media (max-width: 768px) {
+    header .mobile-logo-section a {
+        display: inline-flex !important;
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+    }
+    header .mobile-logo-section a:active {
+        transform: scale(0.92) !important;
+        opacity: 0.8 !important;
+    }
 }
