@@ -1048,10 +1048,9 @@ function chao_gang_cheng_checkout_toggle_js() {
                 $('html, body').stop(true, false);
             });
 
-            // Show alert after a short delay so the update_checkout cycle has fired
+            // Toast 提示已由 ckc-coupons.php 處理，此處避免跳出原生的 blocking alert
             setTimeout(function() {
                 $('html, body').stop(true, false);
-                alert(msgText);
             }, 200);
         });
     });

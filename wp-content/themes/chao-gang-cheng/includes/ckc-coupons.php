@@ -2505,12 +2505,10 @@ function ckc_checkout_coupon_ajax_script() {
             var $orderTotal = $('.order-total .woocommerce-Price-amount').first();
             if($orderTotal.length) {
                 $orderTotal.addClass('ckc-price-highlight');
-                // 動畫大約 600ms，結束後再跳出 Toast 提示
-                setTimeout(function(){ 
-                    ckcToast('折價券使用成功'); 
-                }, 800);
+                // 動畫 (1.5秒) 完全結束後，才跳出折價券使用成功 Toast 提示
                 setTimeout(function(){ 
                     $orderTotal.removeClass('ckc-price-highlight'); 
+                    ckcToast('折價券使用成功'); 
                 }, 1500);
             } else {
                 ckcToast('折價券使用成功');
