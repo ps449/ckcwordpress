@@ -1,0 +1,358 @@
+/**
+ * 潮港城後台 UI/UX 全站統一風格
+ * ----------------------------------------------------------------
+ * 目標：簡約商務、直覺清晰、色彩與圖示系統統一，套用品牌色系
+ * （與前台 style.css 的 --primary-color / --accent-color 一致）。
+ * 純視覺層 CSS，不影響任何後台功能邏輯。
+ */
+
+:root {
+	--ckc-admin-primary: #1c1c1c;      /* 深色主色（選單／頂欄），對應前台 --primary-color */
+	--ckc-admin-primary-light: #2c2c2c;
+	--ckc-admin-accent: #f86f69;       /* 品牌珊瑚紅，對應前台 --accent-color */
+	--ckc-admin-accent-dark: #e2564f;
+	--ckc-admin-secondary: #7c6767;    /* 品牌駝棕色 */
+	--ckc-admin-bg: #f6f5f3;
+	--ckc-admin-card-bg: #ffffff;
+	--ckc-admin-border: #e5e2df;
+	--ckc-admin-text: #2b2b2b;
+	--ckc-admin-text-muted: #8c8577;
+	--ckc-admin-radius: 8px;
+	--ckc-admin-radius-sm: 6px;
+	--ckc-admin-shadow: 0 1px 3px rgba(28, 28, 28, 0.06), 0 1px 2px rgba(28, 28, 28, 0.04);
+}
+
+/* ==========================================================================
+   1. 整體背景與文字
+   ========================================================================== */
+body.wp-admin,
+body.wp-admin #wpcontent,
+body.wp-admin #wpbody-content {
+	background: var(--ckc-admin-bg);
+	color: var(--ckc-admin-text);
+}
+
+body.wp-admin .wrap h1.wp-heading-inline,
+body.wp-admin .wrap > h1,
+body.wp-admin .wrap > h2:first-child {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	color: var(--ckc-admin-text);
+}
+
+/* ==========================================================================
+   2. 頂部管理列（Admin Bar）
+   ========================================================================== */
+#wpadminbar {
+	background: var(--ckc-admin-primary) !important;
+}
+#wpadminbar .ab-item,
+#wpadminbar a.ab-item,
+#wpadminbar > #wp-toolbar span.ab-label,
+#wpadminbar > #wp-toolbar span.noticon {
+	color: #e9e6e2 !important;
+}
+#wpadminbar .ab-top-menu > li:hover > .ab-item,
+#wpadminbar .ab-top-menu > li.hover > .ab-item,
+#wpadminbar.nojq .quicklinks .ab-top-menu > li:hover > .ab-item {
+	background: var(--ckc-admin-primary-light) !important;
+	color: #fff !important;
+}
+#wpadminbar #wp-admin-bar-my-account.with-avatar #wp-admin-bar-user-info .display-name {
+	color: #e9e6e2;
+}
+
+/* ==========================================================================
+   3. 左側主選單（Admin Menu）— 統一色彩與圖示系統
+   ========================================================================== */
+#adminmenuback,
+#adminmenuwrap,
+#adminmenu {
+	background: var(--ckc-admin-primary);
+}
+#adminmenu a {
+	color: #d8d4cf;
+}
+#adminmenu div.wp-menu-image:before {
+	color: #a9a39a;
+	transition: color .15s ease;
+}
+#adminmenu li.menu-top:hover,
+#adminmenu li.opensub > a.menu-top,
+#adminmenu li > a.menu-top:focus {
+	background: var(--ckc-admin-primary-light);
+}
+#adminmenu li.menu-top:hover div.wp-menu-image:before,
+#adminmenu li.opensub > a.menu-top div.wp-menu-image:before {
+	color: var(--ckc-admin-accent);
+}
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
+#adminmenu li.current a.menu-top {
+	background: var(--ckc-admin-accent) !important;
+	color: #fff !important;
+	box-shadow: none;
+}
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu div.wp-menu-image:before,
+#adminmenu li.current a.menu-top div.wp-menu-image:before {
+	color: #fff;
+}
+#adminmenu .wp-submenu,
+#adminmenu .wp-has-current-submenu .wp-submenu,
+.folded #adminmenu .wp-has-current-submenu .wp-submenu {
+	background: #171717;
+}
+#adminmenu .wp-submenu a,
+#adminmenu .wp-has-current-submenu .wp-submenu a {
+	color: #c9c5c0;
+}
+#adminmenu .wp-submenu a:hover,
+#adminmenu .wp-submenu a:focus,
+#adminmenu li.current .wp-submenu a.current,
+#adminmenu a.wp-has-current-submenu:focus + .wp-submenu a.current {
+	color: var(--ckc-admin-accent);
+}
+#adminmenu li.current .wp-submenu a.current {
+	font-weight: 600;
+}
+/* 自建選單分區標題（網站內容／電商營運／系統配置） */
+#adminmenu li.menu-section-header {
+	color: #7a746c;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	padding: 14px 12px 6px;
+	background: transparent;
+}
+/* 收合狀態下的 icon 顏色維持一致 */
+.folded #adminmenu .wp-menu-image:before {
+	color: #a9a39a;
+}
+
+/* ==========================================================================
+   4. 按鈕系統
+   ========================================================================== */
+body.wp-admin .button,
+body.wp-admin .button-secondary {
+	border-radius: var(--ckc-admin-radius-sm);
+	border-color: var(--ckc-admin-border);
+	color: var(--ckc-admin-text);
+	box-shadow: none;
+	transition: all .15s ease;
+}
+body.wp-admin .button:hover,
+body.wp-admin .button-secondary:hover {
+	border-color: var(--ckc-admin-secondary);
+	color: var(--ckc-admin-secondary);
+}
+body.wp-admin .button-primary,
+body.wp-admin .button.button-primary {
+	background: var(--ckc-admin-accent);
+	border-color: var(--ckc-admin-accent-dark);
+	color: #fff;
+	border-radius: var(--ckc-admin-radius-sm);
+	box-shadow: none;
+	text-shadow: none;
+}
+body.wp-admin .button-primary:hover,
+body.wp-admin .button-primary:focus {
+	background: var(--ckc-admin-accent-dark);
+	border-color: var(--ckc-admin-accent-dark);
+	color: #fff;
+}
+body.wp-admin .button-primary:disabled,
+body.wp-admin .button-primary.disabled {
+	background: #e8b3af;
+	border-color: #e8b3af;
+}
+
+/* ==========================================================================
+   5. 卡片／面板（Postbox、Card、meta box）
+   ========================================================================== */
+body.wp-admin .postbox,
+body.wp-admin .stuffbox,
+body.wp-admin .card {
+	background: var(--ckc-admin-card-bg);
+	border: 1px solid var(--ckc-admin-border);
+	border-radius: var(--ckc-admin-radius);
+	box-shadow: var(--ckc-admin-shadow);
+}
+body.wp-admin .postbox .postbox-header,
+body.wp-admin .postbox > h2.hndle,
+body.wp-admin .postbox > .hndle {
+	border-radius: var(--ckc-admin-radius) var(--ckc-admin-radius) 0 0;
+	border-bottom: 1px solid var(--ckc-admin-border);
+	background: #fbfaf9;
+}
+body.wp-admin .postbox .postbox-header h2,
+body.wp-admin .postbox .hndle {
+	font-weight: 700;
+	color: var(--ckc-admin-text);
+}
+
+/* ==========================================================================
+   6. 表格（WP_List_Table）
+   ========================================================================== */
+body.wp-admin .wp-list-table {
+	border: 1px solid var(--ckc-admin-border);
+	border-radius: var(--ckc-admin-radius);
+	overflow: hidden;
+}
+body.wp-admin .wp-list-table thead th,
+body.wp-admin .wp-list-table thead td,
+body.wp-admin .wp-list-table tfoot th {
+	background: #fbfaf9;
+	color: var(--ckc-admin-text);
+	font-weight: 700;
+	border-bottom: 1px solid var(--ckc-admin-border);
+}
+body.wp-admin .wp-list-table tbody tr {
+	transition: background .1s ease;
+}
+body.wp-admin .wp-list-table tbody tr:hover {
+	background: #fff7f6;
+}
+body.wp-admin .wp-list-table .row-actions a {
+	color: var(--ckc-admin-secondary);
+}
+body.wp-admin .wp-list-table .row-actions a:hover,
+body.wp-admin a.row-title:hover,
+body.wp-admin .wp-list-table td.column-title a.row-title:hover {
+	color: var(--ckc-admin-accent);
+}
+body.wp-admin .wp-list-table .row-actions .delete a {
+	color: #b3413c;
+}
+body.wp-admin .subsubsub a.current {
+	color: var(--ckc-admin-text);
+	font-weight: 700;
+}
+body.wp-admin .subsubsub a {
+	color: var(--ckc-admin-secondary);
+}
+
+/* ==========================================================================
+   7. 表單元件
+   ========================================================================== */
+body.wp-admin input[type=text],
+body.wp-admin input[type=search],
+body.wp-admin input[type=number],
+body.wp-admin input[type=email],
+body.wp-admin input[type=url],
+body.wp-admin input[type=password],
+body.wp-admin input[type=tel],
+body.wp-admin select,
+body.wp-admin textarea {
+	border-radius: var(--ckc-admin-radius-sm);
+	border-color: var(--ckc-admin-border);
+}
+body.wp-admin input[type=text]:focus,
+body.wp-admin input[type=search]:focus,
+body.wp-admin input[type=number]:focus,
+body.wp-admin input[type=email]:focus,
+body.wp-admin input[type=url]:focus,
+body.wp-admin input[type=password]:focus,
+body.wp-admin select:focus,
+body.wp-admin textarea:focus {
+	border-color: var(--ckc-admin-accent);
+	box-shadow: 0 0 0 1px var(--ckc-admin-accent);
+}
+body.wp-admin input[type=checkbox]:checked::before,
+body.wp-admin input[type=radio]:checked::before {
+	color: var(--ckc-admin-accent);
+}
+body.wp-admin input[type=checkbox]:checked,
+body.wp-admin input[type=radio]:checked {
+	border-color: var(--ckc-admin-accent);
+}
+
+/* ==========================================================================
+   8. 通知訊息（Notices）
+   ========================================================================== */
+body.wp-admin .notice,
+body.wp-admin div.updated,
+body.wp-admin div.error {
+	border-radius: 0 var(--ckc-admin-radius-sm) var(--ckc-admin-radius-sm) 0;
+	box-shadow: none;
+	border-left-width: 4px;
+}
+body.wp-admin .notice-success,
+body.wp-admin div.updated {
+	border-left-color: #4c9a6a;
+}
+body.wp-admin .notice-warning {
+	border-left-color: #d99a2b;
+}
+body.wp-admin .notice-error,
+body.wp-admin div.error {
+	border-left-color: #c9504a;
+}
+body.wp-admin .notice-info {
+	border-left-color: var(--ckc-admin-secondary);
+}
+
+/* ==========================================================================
+   9. 分頁、Tab 導覽
+   ========================================================================== */
+body.wp-admin .nav-tab-wrapper {
+	border-bottom-color: var(--ckc-admin-border);
+}
+body.wp-admin .nav-tab {
+	border-radius: var(--ckc-admin-radius-sm) var(--ckc-admin-radius-sm) 0 0;
+	color: var(--ckc-admin-text-muted);
+	border-color: transparent;
+	background: transparent;
+}
+body.wp-admin .nav-tab-active,
+body.wp-admin .nav-tab-active:hover {
+	color: var(--ckc-admin-text);
+	border-color: var(--ckc-admin-border);
+	border-bottom-color: var(--ckc-admin-card-bg);
+	background: var(--ckc-admin-card-bg);
+	font-weight: 700;
+}
+body.wp-admin .tablenav-pages a.page-numbers.current,
+body.wp-admin .tablenav-pages span.current {
+	background: var(--ckc-admin-accent);
+	border-color: var(--ckc-admin-accent-dark);
+	color: #fff;
+}
+
+/* ==========================================================================
+   10. 儀表板 Widgets
+   ========================================================================== */
+body.wp-admin #dashboard-widgets .postbox .hndle {
+	cursor: default;
+}
+
+/* ==========================================================================
+   11. WooCommerce 主要畫面元件（訂單／商品列表沿用第6～9節通用樣式）
+   ========================================================================== */
+body.wp-admin .woocommerce-BlankState,
+body.wp-admin .woocommerce-layout__header {
+	border-radius: var(--ckc-admin-radius);
+}
+body.wp-admin mark.instock,
+body.wp-admin mark.onbackorder {
+	color: #2f7d4f;
+}
+body.wp-admin mark.outofstock {
+	color: #c9504a;
+}
+body.wp-admin .order-status {
+	border-radius: 999px;
+	font-weight: 600;
+}
+
+/* ==========================================================================
+   12. 自建後台頁面（首頁編輯／彈窗管理／分類 Banner）與全站風格對齊
+   ========================================================================== */
+body.wp-admin .ckc-hb-module,
+body.wp-admin #ckc_shop_banner_box,
+body.wp-admin .ckc-category-banner-field {
+	border-radius: var(--ckc-admin-radius);
+}
+body.wp-admin .ckc-hb-module-header,
+body.wp-admin .ckc-popup-admin-wrap h2 {
+	color: var(--ckc-admin-text);
+}

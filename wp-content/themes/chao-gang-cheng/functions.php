@@ -7741,6 +7741,9 @@ require_once get_template_directory() . '/includes/homepage-modules-render.php';
 // 分類頁／商店主頁 Banner 圖片管理（掛在 WooCommerce 編輯分類頁、商店頁編輯畫面）
 require_once get_template_directory() . '/includes/admin/category-banner.php';
 
+// 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
+require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
+
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
  */
