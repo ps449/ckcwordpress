@@ -4213,8 +4213,19 @@ function chao_gang_cheng_mobile_shortcut_bar() {
 // 死路（不會再被任何前台渲染邏輯讀取），故整組移除，避免造成操作者混淆，
 // 誤以為改這裡也能調整首頁內容。
 
+// 17b. 移除 Customizer 內建的「小工具」面板與「首頁設定」區塊
+// 小工具：小工具管理已可從「外觀 > 小工具」獨立頁面操作，不需要在 Customizer 重複出現。
+// 首頁設定（static_front_page）：WordPress 樣板優先權規則下，只要佈景主題有
+// front-page.php（本站就有），首頁一律使用該樣板，「您的首頁顯示」這個切換
+// 完全不會影響實際顯示內容，留著只會讓操作者誤以為改這裡有用，故移除。
+add_action( 'customize_register', 'chao_gang_cheng_remove_legacy_customizer_panels', 999 );
+function chao_gang_cheng_remove_legacy_customizer_panels( $wp_customize ) {
+    $wp_customize->remove_panel( 'widgets' );
+    $wp_customize->remove_section( 'static_front_page' );
+}
 
-// 17b. Remove WooCommerce taxonomy/archive description from below the controls bar
+
+// 17c. Remove WooCommerce taxonomy/archive description from below the controls bar
 // (Description is already shown in the custom category hero banner above the grid)
 remove_action( 'woocommerce_archive_description', 'woocommerce_taxonomy_archive_description', 10 );
 remove_action( 'woocommerce_archive_description', 'woocommerce_product_archive_description', 10 );
