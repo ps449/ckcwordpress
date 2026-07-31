@@ -2415,7 +2415,7 @@ function ckc_checkout_coupon_ajax_script() {
         display: inline-block;
         padding: 0 4px;
         border-radius: 4px;
-        animation: ckc-price-highlight 1.5s ease-out;
+        animation: ckc-price-highlight 0.6s ease-out;
     }
     </style>
     <script>
@@ -2505,11 +2505,11 @@ function ckc_checkout_coupon_ajax_script() {
             var $orderTotal = $('.order-total .woocommerce-Price-amount').first();
             if($orderTotal.length) {
                 $orderTotal.addClass('ckc-price-highlight');
-                // 動畫 (1.5秒) 完全結束後，才跳出折價券使用成功 Toast 提示
-                setTimeout(function(){ 
-                    $orderTotal.removeClass('ckc-price-highlight'); 
-                    ckcToast('折價券使用成功'); 
-                }, 1500);
+                // 動畫 (0.6秒) 完全結束後，才跳出折價券使用成功 Toast 提示（原為 1.5 秒，縮短以加快套用流程回饋）
+                setTimeout(function(){
+                    $orderTotal.removeClass('ckc-price-highlight');
+                    ckcToast('折價券使用成功');
+                }, 600);
             } else {
                 ckcToast('折價券使用成功');
             }

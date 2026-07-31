@@ -94,8 +94,8 @@ wp-content/themes/chao-gang-cheng/
   - 在 `form.checkout` 中注入隱藏欄位 `ckc_apply_coupon_now`。
   - 當使用者輸入折扣碼或點擊券卡片時，直接觸發 `update_checkout`，後端於同一次 `update_order_review` 請求內完成「套券 + 計算最終金額」，減少等待時間。
 - **套券高亮動畫與提示同步**:
-  - 套用成功時，訂單總金額觸發 1.5 秒的 `.ckc-price-highlight` 綠色高亮動畫。
-  - **提示時機**：待 1.5 秒高亮動畫完全播放結束後，才在頁面底部浮出 `ckcToast('折價券使用成功')`，確保動畫流暢不中斷。
+  - 套用成功時，訂單總金額觸發 0.6 秒的 `.ckc-price-highlight` 綠色高亮動畫（原為 1.5 秒，為縮短套用流程的回饋等待時間而調整）。
+  - **提示時機**：待 0.6 秒高亮動畫完全播放結束後，才在頁面底部浮出 `ckcToast('折價券使用成功')`，確保動畫流暢不中斷。
 
 ### 3.2 省下金額與動態運費計算 (Order Savings & Dynamic Shipping)
 - **檔案位置**: `includes/woocommerce/order-savings.php`
