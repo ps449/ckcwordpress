@@ -4,16 +4,20 @@
 // =============================================================================
 
 /**
- * 21a. 後台選單 — 外觀 > 彈窗廣告設定
+ * 21a. 後台選單 — 獨立頂層選單「彈窗管理」
+ * （原本掛在「外觀 > 彈窗廣告設定」下面，比較不容易被找到，
+ * 改成獨立頂層選單，位置 58：緊接在「電商營運」分類最後一項之後）
  */
 add_action( 'admin_menu', 'ckc_popup_add_menu' );
 function ckc_popup_add_menu() {
-    add_theme_page(
-        '彈窗廣告設定',
-        '彈窗廣告設定',
+    add_menu_page(
+        '彈窗管理',
+        '彈窗管理',
         'manage_options',
         'ckc-popup-settings',
-        'ckc_popup_page_html'
+        'ckc_popup_page_html',
+        'dashicons-megaphone',
+        58
     );
 }
 
@@ -22,7 +26,7 @@ function ckc_popup_add_menu() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_popup_enqueue_admin_scripts' );
 function ckc_popup_enqueue_admin_scripts( $hook ) {
-    if ( $hook !== 'appearance_page_ckc-popup-settings' ) return;
+    if ( $hook !== 'toplevel_page_ckc-popup-settings' ) return;
     wp_enqueue_media();
 }
 
@@ -50,6 +54,8 @@ function ckc_popup_sanitize( $input ) {
     $clean['show_home']      = ! empty( $input['show_home'] )     ? '1' : '';
     $clean['show_shop']      = ! empty( $input['show_shop'] )     ? '1' : '';
     $clean['show_product']   = ! empty( $input['show_product'] )  ? '1' : '';
+    $clean['show_mobile']    = ! empty( $input['show_mobile'] )   ? '1' : '';
+    $clean['show_desktop']   = ! empty( $input['show_desktop'] )  ? '1' : '';
     $clean['cookie_days']    = isset( $input['cookie_days'] )     ? intval( $input['cookie_days'] )                     : 1;
     $clean['delay_seconds']  = isset( $input['delay_seconds'] )   ? max( 0, intval( $input['delay_seconds'] ) )         : 0;
     return $clean;
@@ -73,6 +79,8 @@ function ckc_popup_page_html() {
             'show_home'     => '1',
             'show_shop'     => '1',
             'show_product'  => '1',
+            'show_mobile'   => '1',
+            'show_desktop'  => '1',
             'cookie_days'   => 1,
             'delay_seconds' => 0,
         )
@@ -187,6 +195,30 @@ function ckc_popup_page_html() {
                 </div>
             </div>
 
+            <!-- ── 顯示裝置 ── -->
+            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+                <h3 style="margin:0 0 14px;">📱💻 顯示裝置</h3>
+                <p style="margin:0 0 14px;color:#666;font-size:13px;">選擇彈窗要在哪種裝置上顯示（可複選，兩個都不勾等於全部裝置都不顯示）</p>
+                <div style="display:flex;gap:16px;">
+                    <label style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border:1px solid #eee;border-radius:8px;transition:background .15s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='#fff'">
+                        <input type="checkbox" name="chao_gang_cheng_popup[show_mobile]" value="1" <?php checked( '1', $opts['show_mobile'] ); ?> style="width:18px;height:18px;cursor:pointer;">
+                        <span style="font-size:24px;">📱</span>
+                        <div>
+                            <strong style="font-size:14px;">手機版</strong>
+                            <p style="margin:2px 0 0;font-size:12px;color:#aaa;">手機瀏覽器造訪時顯示</p>
+                        </div>
+                    </label>
+                    <label style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border:1px solid #eee;border-radius:8px;transition:background .15s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='#fff'">
+                        <input type="checkbox" name="chao_gang_cheng_popup[show_desktop]" value="1" <?php checked( '1', $opts['show_desktop'] ); ?> style="width:18px;height:18px;cursor:pointer;">
+                        <span style="font-size:24px;">💻</span>
+                        <div>
+                            <strong style="font-size:14px;">桌機版</strong>
+                            <p style="margin:2px 0 0;font-size:12px;color:#aaa;">電腦瀏覽器造訪時顯示</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <!-- ── 顯示設定 ── -->
             <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:20px 24px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.05);">
                 <h3 style="margin:0 0 14px;">顯示設定</h3>
@@ -276,6 +308,8 @@ function ckc_popup_render() {
             'show_home'     => '1',
             'show_shop'     => '1',
             'show_product'  => '1',
+            'show_mobile'   => '1',
+            'show_desktop'  => '1',
             'cookie_days'   => 1,
             'delay_seconds' => 0,
         )
@@ -289,7 +323,15 @@ function ckc_popup_render() {
     $image_url = wp_get_attachment_url( $opts['image_id'] );
     if ( ! $image_url ) return;
 
-    // 3. 判斷當前頁面是否應顯示
+    // 3. 判斷裝置是否應顯示（手機／桌機分開設定，兩個都沒勾就完全不顯示）
+    $is_mobile = wp_is_mobile();
+    if ( $is_mobile ) {
+        if ( empty( $opts['show_mobile'] ) ) return;
+    } else {
+        if ( empty( $opts['show_desktop'] ) ) return;
+    }
+
+    // 4. 判斷當前頁面是否應顯示
     $should_show = false;
     if ( ! empty( $opts['show_home'] )    && ( is_front_page() || is_home() ) ) $should_show = true;
     if ( ! empty( $opts['show_shop'] )    && ( is_shop() || is_product_taxonomy() ) )  $should_show = true;
@@ -297,7 +339,7 @@ function ckc_popup_render() {
 
     if ( ! $should_show ) return;
 
-    // 4. 準備參數
+    // 5. 準備參數
     $cookie_days   = intval( $opts['cookie_days'] );
     $delay_ms      = intval( $opts['delay_seconds'] ) * 1000;
     $link_url      = esc_url( $opts['link_url'] );
