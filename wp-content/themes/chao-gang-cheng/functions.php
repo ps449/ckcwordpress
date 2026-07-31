@@ -4207,239 +4207,11 @@ function chao_gang_cheng_mobile_shortcut_bar() {
     <?php
 }
 
-// 17. Register Homepage Customizer Settings for the Top Banner
-add_action( 'customize_register', 'chao_gang_cheng_customize_register' );
-function chao_gang_cheng_customize_register( $wp_customize ) {
-    $wp_customize->add_section( 'chao_gang_cheng_banner_section', array(
-        'title'      => '首頁頂部 Banner 設定',
-        'priority'   => 30,
-    ) );
-
-    $fields = array(
-        'ckc_banner_image' => array(
-            'label'    => 'Banner 背景圖片',
-            'type'     => 'image',
-            'default'  => get_template_directory_uri() . '/assets/images/slide-buffet.jpg',
-        ),
-        'ckc_banner_top_sub' => array(
-            'label'    => '頂部子標題 1 (如：【太陽百匯 SOLIS BUFFET】)',
-            'type'     => 'text',
-            'default'  => '【太陽百匯 SOLIS BUFFET】',
-        ),
-        'ckc_banner_sub2' => array(
-            'label'    => '頂部子標題 2 (如：華麗盛宴・盡享海陸頂級美味)',
-            'type'     => 'text',
-            'default'  => '華麗盛宴・盡享海陸頂級美味',
-        ),
-        'ckc_banner_center_slogan' => array(
-            'label'    => '中間主標語 (如：豪華龍蝦、生蠔、和牛、刺身)',
-            'type'     => 'text',
-            'default'  => '豪華龍蝦、生蠔、和牛、刺身',
-        ),
-        'ckc_banner_badge' => array(
-            'label'    => '活動標籤 (如：限定活動)',
-            'type'     => 'text',
-            'default'  => '限定活動',
-        ),
-        'ckc_banner_sub_slogan' => array(
-            'label'    => '活動副標語 (如：全新呈獻！)',
-            'type'     => 'text',
-            'default'  => '全新呈獻！',
-        ),
-        'ckc_banner_title' => array(
-            'label'    => '下殺標題 (如：太陽百匯美食饗宴・平日單人餐券限時下殺)',
-            'type'     => 'text',
-            'default'  => '太陽百匯美食饗宴・平日單人餐券限時下殺',
-        ),
-        'ckc_banner_desc' => array(
-            'label'    => '底部介紹文字',
-            'type'     => 'textarea',
-            'default'  => '台中吃到飽首選！鮮美海鮮、現切和牛、各國百匯佳餚，即刻搶購享最優折扣！',
-        ),
-        'ckc_banner_link' => array(
-            'label'    => 'Banner 連結網址',
-            'type'     => 'text',
-            'default'  => '',
-        ),
-    );
-
-    foreach ( $fields as $id => $data ) {
-        $wp_customize->add_setting( $id, array(
-            'default'   => $data['default'],
-            'transport' => 'refresh',
-            'sanitize_callback' => 'sanitize_text_field',
-        ) );
-
-        if ( $data['type'] === 'image' ) {
-            $wp_customize->add_control( new WP_Customize_Image_Control( $wp_customize, $id, array(
-                'label'    => $data['label'],
-                'section'  => 'chao_gang_cheng_banner_section',
-                'settings' => $id,
-            ) ) );
-        } elseif ( $data['type'] === 'textarea' ) {
-            $wp_customize->add_control( $id, array(
-                'label'    => $data['label'],
-                'section'  => 'chao_gang_cheng_banner_section',
-                'type'     => 'textarea',
-                'settings' => $id,
-            ) );
-        } else {
-            $wp_customize->add_control( $id, array(
-                'label'    => $data['label'],
-                'section'  => 'chao_gang_cheng_banner_section',
-                'type'     => 'text',
-                'settings' => $id,
-            ) );
-        }
-    }
-
-    // Add section for monthly promos
-    $wp_customize->add_section( 'chao_gang_cheng_promo_section', array(
-        'title'      => '首頁促銷活動設定',
-        'priority'   => 35,
-    ) );
-
-    $promos = array(
-        1 => array(
-            'text_default'  => '🔥 限時特惠｜太陽百匯平日單人餐券任選 3 張，結帳即享 95 折優惠！',
-            'color_default' => '#FFE8CC',
-            'label'         => '第一列活動',
-        ),
-        2 => array(
-            'text_default'  => '🍲 本月限定｜招牌冷凍食品＋下酒菜任選 3 件 95 折，急速冷凍配送到家！',
-            'color_default' => '#E8FFF6',
-            'label'         => '第二列活動',
-        ),
-        3 => array(
-            'text_default'  => '🍺 老饕最愛｜獨享紅燒牛肉爐＋經典老滷系列任選 2 件即享 9 折限時搶購！',
-            'color_default' => '#FFECEC',
-            'label'         => '第三列活動',
-        ),
-    );
-
-    foreach ( $promos as $num => $data ) {
-        // Text Setting
-        $wp_customize->add_setting( "ckc_promo_text_{$num}", array(
-            'default'           => $data['text_default'],
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'sanitize_text_field',
-        ) );
-        $wp_customize->add_control( "ckc_promo_text_{$num}", array(
-            'label'    => "{$data['label']} - 文字內容",
-            'section'  => 'chao_gang_cheng_promo_section',
-            'type'     => 'text',
-        ) );
-
-        // Link Setting
-        $wp_customize->add_setting( "ckc_promo_link_{$num}", array(
-            'default'           => '',
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'sanitize_text_field',
-        ) );
-        $wp_customize->add_control( "ckc_promo_link_{$num}", array(
-            'label'    => "{$data['label']} - 連結網址",
-            'section'  => 'chao_gang_cheng_promo_section',
-            'type'     => 'text',
-        ) );
-
-        // Color Setting
-        $wp_customize->add_setting( "ckc_promo_color_{$num}", array(
-            'default'           => $data['color_default'],
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'sanitize_hex_color',
-        ) );
-        $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, "ckc_promo_color_{$num}", array(
-            'label'    => "{$data['label']} - 背景顏色",
-            'section'  => 'chao_gang_cheng_promo_section',
-        ) ) );
-    }
-
-    // Add section for inter-category banners
-    $wp_customize->add_section( 'chao_gang_cheng_cat_banner_section', array(
-        'title'      => '首頁分類間 Banner 設定',
-        'priority'   => 38,
-        'description'=> '設定首頁各個商品分類區塊之間的廣告 Banner（可自由啟用或停用每個間隔的 Banner）',
-    ) );
-
-    for ( $i = 1; $i <= 5; $i++ ) {
-        // Enable Setting
-        $wp_customize->add_setting( "ckc_cat_banner_enable_{$i}", array(
-            'default'           => true,
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'absint',
-        ) );
-        $wp_customize->add_control( "ckc_cat_banner_enable_{$i}", array(
-            'label'    => "啟用第 {$i} 個分類後的 Banner",
-            'section'  => 'chao_gang_cheng_cat_banner_section',
-            'type'     => 'checkbox',
-        ) );
-
-        // Image Setting
-        $wp_customize->add_setting( "ckc_cat_banner_img_{$i}", array(
-            'default'           => '',
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'esc_url_raw',
-        ) );
-        $wp_customize->add_control( new WP_Customize_Image_Control( $wp_customize, "ckc_cat_banner_img_{$i}", array(
-            'label'    => "第 {$i} 個分類後的 Banner 圖片",
-            'section'  => 'chao_gang_cheng_cat_banner_section',
-        ) ) );
-
-        // Link Setting
-        $wp_customize->add_setting( "ckc_cat_banner_link_{$i}", array(
-            'default'           => '',
-            'transport'         => 'refresh',
-            'sanitize_callback' => 'esc_url_raw',
-        ) );
-        $wp_customize->add_control( "ckc_cat_banner_link_{$i}", array(
-            'label'    => "第 {$i} 個分類後的 Banner 連結網址",
-            'section'  => 'chao_gang_cheng_cat_banner_section',
-            'type'     => 'text',
-        ) );
-    }
-
-    // Add section for Homepage News Banner
-    $wp_customize->add_section( 'chao_gang_cheng_news_banner_section', array(
-        'title'      => '首頁新聞 Banner 設定',
-        'priority'   => 39,
-        'description'=> '設定首頁最新消息/新聞區塊上方的廣告 Banner（圖片建議尺寸：1200X300）',
-    ) );
-
-    // Enable Setting
-    $wp_customize->add_setting( 'ckc_news_banner_enable', array(
-        'default'           => true,
-        'transport'         => 'refresh',
-        'sanitize_callback' => 'absint',
-    ) );
-    $wp_customize->add_control( 'ckc_news_banner_enable', array(
-        'label'    => '啟用新聞區塊 Banner',
-        'section'  => 'chao_gang_cheng_news_banner_section',
-        'type'     => 'checkbox',
-    ) );
-
-    // Image Setting
-    $wp_customize->add_setting( 'ckc_news_banner_img', array(
-        'default'           => '',
-        'transport'         => 'refresh',
-        'sanitize_callback' => 'esc_url_raw',
-    ) );
-    $wp_customize->add_control( new WP_Customize_Image_Control( $wp_customize, 'ckc_news_banner_img', array(
-        'label'    => '新聞 Banner 圖片 (建議尺寸 1200X300)',
-        'section'  => 'chao_gang_cheng_news_banner_section',
-    ) ) );
-
-    // Link Setting
-    $wp_customize->add_setting( 'ckc_news_banner_link', array(
-        'default'           => '',
-        'transport'         => 'refresh',
-        'sanitize_callback' => 'esc_url_raw',
-    ) );
-    $wp_customize->add_control( 'ckc_news_banner_link', array(
-        'label'    => '新聞 Banner 連結網址',
-        'section'  => 'chao_gang_cheng_news_banner_section',
-        'type'     => 'text',
-    ) );
-}
+// 17. （已移除）首頁頂部 Banner／促銷活動／分類間 Banner／新聞 Banner 這四組
+// Customizer 設定面板：這些內容現在都已改由後台「首頁編輯」（首頁模塊化編輯器，
+// includes/admin/homepage-builder.php）管理，Customizer 裡的舊版設定欄位已是
+// 死路（不會再被任何前台渲染邏輯讀取），故整組移除，避免造成操作者混淆，
+// 誤以為改這裡也能調整首頁內容。
 
 
 // 17b. Remove WooCommerce taxonomy/archive description from below the controls bar
@@ -4924,6 +4696,8 @@ function chao_gang_cheng_optimize_admin_menu() {
     remove_menu_page( 'wpcom-upgrades' );     // 升級方案
     remove_menu_page( 'wpcom-upgrades-sub' ); // 升級方案子項
     remove_menu_page( 'jetpack' );            // Jetpack
+    // 4. Remove YotuWP
+    remove_menu_page( 'yotuwp' );
 }
 
 /**
@@ -4991,7 +4765,8 @@ function chao_gang_cheng_admin_menu_styling() {
                     }
                 });
             }
-            translateMonsterInsights($('body'));
+            // 只針對通知區塊進行翻譯，避免遞迴掃描整個 body 導致 WooCommerce 商品編輯頁面當機 (Maximum call stack size exceeded)
+            translateMonsterInsights($('.notice, .update-nag, .monsterinsights-notice'));
         });
     </script>
     <?php
@@ -5672,7 +5447,6 @@ function ckc_setup_website_features_menu() {
         'news'      => array( 'title' => '文章', 'slug' => 'edit.php?post_type=jetpack-portfolio', 'found' => false ),
         'themes'    => array( 'title' => '外觀', 'slug' => 'themes.php', 'found' => false ),
         'mydybox'   => array( 'title' => 'Mydybox TW', 'slug' => 'mydybox-taiwan-for-woocommerce', 'found' => false ),
-        'yotuwp'    => array( 'title' => 'YotuWP', 'slug' => 'yotuwp-settings', 'found' => false ),
         'payments'  => array( 'title' => '付款', 'slug' => 'admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM', 'found' => false ),
         'plugins'   => array( 'title' => '外掛', 'slug' => 'plugins.php', 'found' => false ),
         'tools'     => array( 'title' => '工具', 'slug' => 'tools.php', 'found' => false ),
@@ -5699,7 +5473,10 @@ function ckc_setup_website_features_menu() {
         } elseif ( stripos( $slug, 'mydybox' ) !== false || stripos( $title, 'mydybox' ) !== false ) {
             $matched_key = 'mydybox';
         } elseif ( stripos( $slug, 'yotuwp' ) !== false || stripos( $slug, 'yotu' ) !== false || stripos( $title, 'yotuwp' ) !== false ) {
-            $matched_key = 'yotuwp';
+            // YotuWP 外掛自己的頂層選單：不再移入「網站功能」子選單，直接從頂層移除即可
+            // （首頁 YouTube 影片摘要模塊已改用自家 RSS 抓取，不再依賴這個外掛的 shortcode）。
+            unset( $menu[ $pos ] );
+            continue;
         } elseif ( stripos( $slug, 'tab=checkout' ) !== false || stripos( $title, '付款' ) !== false ) {
             $matched_key = 'payments';
         } elseif ( $slug === 'plugins.php' ) {
