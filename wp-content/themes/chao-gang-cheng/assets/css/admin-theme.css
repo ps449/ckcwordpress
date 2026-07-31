@@ -68,7 +68,7 @@ body.wp-admin .wrap > h2:first-child {
 #adminmenuback,
 #adminmenuwrap,
 #adminmenu {
-	background: var(--ckc-admin-primary);
+	background: var(--ckc-admin-primary) !important;
 }
 #adminmenu a {
 	color: #d8d4cf;
@@ -80,7 +80,7 @@ body.wp-admin .wrap > h2:first-child {
 #adminmenu li.menu-top:hover,
 #adminmenu li.opensub > a.menu-top,
 #adminmenu li > a.menu-top:focus {
-	background: var(--ckc-admin-primary-light);
+	background: var(--ckc-admin-primary-light) !important;
 }
 #adminmenu li.menu-top:hover div.wp-menu-image:before,
 #adminmenu li.opensub > a.menu-top div.wp-menu-image:before {
@@ -99,7 +99,7 @@ body.wp-admin .wrap > h2:first-child {
 #adminmenu .wp-submenu,
 #adminmenu .wp-has-current-submenu .wp-submenu,
 .folded #adminmenu .wp-has-current-submenu .wp-submenu {
-	background: #171717;
+	background: #171717 !important;
 }
 #adminmenu .wp-submenu a,
 #adminmenu .wp-has-current-submenu .wp-submenu a {
