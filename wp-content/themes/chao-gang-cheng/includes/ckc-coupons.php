@@ -2421,13 +2421,16 @@ function ckc_checkout_coupon_ajax_script() {
     <script>
     jQuery(function($){
         // 行動版友善的浮出提示（非阻塞、底部置中、自動消失），取代 alert
-        function ckcToast(msg, isError){
+        // persist=true 時不會自動消失（用於「處理中」提示，等到後續呼叫 ckcToast 更新內容再消失）
+        function ckcToast(msg, isError, persist){
             var $t = $('#ckc-coupon-toast');
             if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
             $t.text(msg).css('background', isError ? '#b91c1c' : '#16a34a');
             requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
             clearTimeout(window._ckcToastTimer);
-            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 1500);
+            if (!persist) {
+                window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 1500);
+            }
         }
 
         // 套用後同步券卡片狀態（自動偵測或強制指定），
@@ -2529,6 +2532,9 @@ function ckc_checkout_coupon_ajax_script() {
 
             var originalBtnText = ($btn && $btn.length) ? $btn.html() : '';
             if ($btn && $btn.length) { ckcBtnSpinner($btn); }
+            // 立即給予提示（在結帳頁上，套用按鈕跟訂單金額可能不在同一個畫面範圍內，
+            // 手機版尤其容易讓人覺得「按下去沒反應」）。持續顯示直到套用結果出來為止。
+            ckcToast('正在核算最新金額，請稍候…', false, true);
 
             var $form = $('form.checkout');
             if ($form.length && typeof wc_checkout_params !== 'undefined') {
