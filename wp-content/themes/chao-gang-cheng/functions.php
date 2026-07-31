@@ -7838,6 +7838,10 @@ require_once get_template_directory() . '/includes/woocommerce/cart.php';
 require_once get_template_directory() . '/includes/woocommerce/checkout-ux.php';
 require_once get_template_directory() . '/includes/woocommerce/order-savings.php'; // 購物車／結帳頁「此訂單省了多少」
 
+// 首頁模塊化編輯器（後台可自行新增/刪除/排序首頁區塊）
+require_once get_template_directory() . '/includes/admin/homepage-builder.php';
+require_once get_template_directory() . '/includes/homepage-modules-render.php';
+
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
  */
