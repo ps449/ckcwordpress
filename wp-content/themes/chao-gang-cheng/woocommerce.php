@@ -19,14 +19,22 @@ get_header(); ?>
         $term_id = $queried_object->term_id;
         $banner_title = $queried_object->name;
         $banner_desc = $queried_object->description;
-        
-        // Try getting term thumbnail from WooCommerce settings
-        $thumbnail_id = get_term_meta( $term_id, 'thumbnail_id', true );
-        if ( $thumbnail_id ) {
-            $banner_image_url = wp_get_attachment_url( $thumbnail_id );
+
+        // 1. 優先使用後台「編輯分類」頁面設定的專屬 Banner 圖片
+        //    （獨立於分類縮圖之外，見 includes/admin/category-banner.php）
+        if ( function_exists( 'ckc_get_category_banner_url' ) ) {
+            $banner_image_url = ckc_get_category_banner_url( $term_id );
         }
-        
-        // Predefined fallback banners based on categories
+
+        // 2. 沒設定的話，沿用 WooCommerce 分類本身的縮圖
+        if ( ! $banner_image_url ) {
+            $thumbnail_id = get_term_meta( $term_id, 'thumbnail_id', true );
+            if ( $thumbnail_id ) {
+                $banner_image_url = wp_get_attachment_url( $thumbnail_id );
+            }
+        }
+
+        // 3. 再沒有的話，才落到少數分類寫死的預設圖／通用圖
         if ( ! $banner_image_url ) {
             $slug = $queried_object->slug;
             if ( $slug === 'tickets' ) {
@@ -47,28 +55,12 @@ get_header(); ?>
         $banner_title = get_the_title( $shop_id );
         $shop_post = get_post( $shop_id );
         $banner_desc = $shop_post ? trim( strip_tags( $shop_post->post_content ) ) : '';
-        
-        // Randomly pick an image from the existing categories
-        $banner_image_url = '';
-        $categories = get_terms( array(
-            'taxonomy'   => 'product_cat',
-            'hide_empty' => false,
-        ) );
-        $category_images = array();
-        if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) {
-            foreach ( $categories as $cat ) {
-                $thumbnail_id = get_term_meta( $cat->term_id, 'thumbnail_id', true );
-                if ( $thumbnail_id ) {
-                    $img_url = wp_get_attachment_url( $thumbnail_id );
-                    if ( $img_url ) {
-                        $category_images[] = $img_url;
-                    }
-                }
-            }
-        }
-        if ( ! empty( $category_images ) ) {
-            $banner_image_url = $category_images[ array_rand( $category_images ) ];
-        } else {
+
+        // 商店主頁 Banner 圖片：改成後台固定設定（商店頁編輯畫面的 meta box，
+        // 見 includes/admin/category-banner.php），取代原本「每次隨機抽一張
+        // 分類縮圖」的做法——同一頁每次重新整理看到不同圖，不利品牌一致性。
+        $banner_image_url = function_exists( 'ckc_get_shop_banner_url' ) ? ckc_get_shop_banner_url() : '';
+        if ( ! $banner_image_url ) {
             $banner_image_url = get_template_directory_uri() . '/assets/images/slide-line.jpg';
         }
     }
