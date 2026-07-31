@@ -718,6 +718,14 @@ function ckc_homepage_builder_render_page() {
 
 /**
  * 後台頁面樣式與 JS（拖曳排序、新增/刪除/複製模塊、repeater 子項目、圖片選擇器）
+ *
+ * 注意：CSS／JS 一律透過 wp_add_inline_style()／wp_add_inline_script() 附加在
+ * 有明確相依關係（jquery、jquery-ui-sortable、media-editor）的已註冊 handle 上，
+ * 不能直接 echo <style>/<script> 標籤——admin_enqueue_scripts 這個 hook 是在
+ * <head> 最前面（jQuery 本體都還沒載入之前）就會執行，若直接 echo 會讓這段
+ * <script> 在 jQuery 尚未定義時就先執行，導致 jQuery(...) 拋出錯誤、後面所有
+ * 事件綁定（展開/收合、拖曳排序、新增/刪除/複製模塊、repeater、圖片選擇器）
+ * 全部失效，且畫面上完全看不出任何反應（此問題已在實機測試中發現並修正）。
  */
 add_action( 'admin_enqueue_scripts', 'ckc_homepage_builder_admin_assets' );
 function ckc_homepage_builder_admin_assets( $hook ) {
@@ -726,8 +734,8 @@ function ckc_homepage_builder_admin_assets( $hook ) {
     }
     wp_enqueue_media();
     wp_enqueue_script( 'jquery-ui-sortable' );
-    ?>
-    <style>
+
+    $css = <<<'CSS'
         .ckc-hb-toolbar { margin: 16px 0; display: flex; gap: 10px; align-items: center; }
         .ckc-hb-module-list { max-width: 900px; }
         .ckc-hb-module { background: #fff; border: 1px solid #dcdcde; border-radius: 6px; margin-bottom: 10px; }
@@ -747,8 +755,13 @@ function ckc_homepage_builder_admin_assets( $hook ) {
         .ckc-hb-repeater-row-fields input[type=text], .ckc-hb-repeater-row-fields input[type=url] { flex: 1; min-width: 160px; }
         .ckc-hb-repeater-remove { color: #b32d2e; }
         .ckc-hb-placeholder { border: 2px dashed #8c8f94; background: #f0f0f1; height: 50px; border-radius: 6px; margin-bottom: 10px; }
-    </style>
-    <script>
+    CSS;
+
+    wp_register_style( 'ckc-homepage-builder-admin', false, array(), '1.0' );
+    wp_enqueue_style( 'ckc-homepage-builder-admin' );
+    wp_add_inline_style( 'ckc-homepage-builder-admin', $css );
+
+    $js = <<<'JS'
     jQuery(function($){
         var $list = $('#ckc-hb-module-list');
 
@@ -836,6 +849,9 @@ function ckc_homepage_builder_admin_assets( $hook ) {
             if (url) { $img.attr('src', url).show(); } else { $img.hide(); }
         });
     });
-    </script>
-    <?php
+    JS;
+
+    wp_register_script( 'ckc-homepage-builder-admin', false, array( 'jquery', 'jquery-ui-sortable', 'media-editor' ), '1.0', true );
+    wp_enqueue_script( 'ckc-homepage-builder-admin' );
+    wp_add_inline_script( 'ckc-homepage-builder-admin', $js );
 }
