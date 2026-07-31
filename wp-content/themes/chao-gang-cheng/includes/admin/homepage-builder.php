@@ -477,6 +477,10 @@ function ckc_save_homepage_modules_handler() {
  * ========================================================================= */
 add_action( 'admin_menu', 'ckc_homepage_builder_add_menu' );
 function ckc_homepage_builder_add_menu() {
+    // 位置 29：緊接在「網站功能」（位置 28）之後，落在後台選單「網站內容」分類區塊內
+    // （「電商營運」分類標題是由 functions.php 的 chao_gang_cheng_admin_menu_styling()
+    // 以 JS 動態插入在「出貨AI助理」〔ckc-gemini-agent，位置約 54.9〕正前方，
+    // 所以只要位置數字小於它，就會落在「網站內容」區塊）。
     add_menu_page(
         '首頁編輯',
         '首頁編輯',
@@ -484,7 +488,7 @@ function ckc_homepage_builder_add_menu() {
         'ckc-homepage-builder',
         'ckc_homepage_builder_render_page',
         'dashicons-layout',
-        58
+        29
     );
 }
 
