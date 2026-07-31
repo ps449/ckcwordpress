@@ -5,8 +5,11 @@
 
 /**
  * 21a. 後台選單 — 獨立頂層選單「彈窗管理」
- * （原本掛在「外觀 > 彈窗廣告設定」下面，比較不容易被找到，
- * 改成獨立頂層選單，位置 58：緊接在「電商營運」分類最後一項之後）
+ * 位置 30：緊接在「首頁編輯」（位置 29）之後，落在後台選單「網站內容」
+ * 分類區塊內（「電商營運」分類標題是由 functions.php 的
+ * chao_gang_cheng_admin_menu_styling() 以 JS 動態插入在「出貨AI助理」
+ * 〔ckc-gemini-agent，位置約 54.9〕正前方，位置數字小於它就會落在
+ * 「網站內容」區塊，跟「首頁編輯」選單位置的處理邏輯相同）。
  */
 add_action( 'admin_menu', 'ckc_popup_add_menu' );
 function ckc_popup_add_menu() {
@@ -17,7 +20,7 @@ function ckc_popup_add_menu() {
         'ckc-popup-settings',
         'ckc_popup_page_html',
         'dashicons-megaphone',
-        58
+        30
     );
 }
 
