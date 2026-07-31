@@ -5449,7 +5449,6 @@ function ckc_setup_website_features_menu() {
         'mydybox'   => array( 'title' => 'Mydybox TW', 'slug' => 'mydybox-taiwan-for-woocommerce', 'found' => false ),
         'payments'  => array( 'title' => '付款', 'slug' => 'admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM', 'found' => false ),
         'plugins'   => array( 'title' => '外掛', 'slug' => 'plugins.php', 'found' => false ),
-        'tools'     => array( 'title' => '工具', 'slug' => 'tools.php', 'found' => false ),
         'settings'  => array( 'title' => '設定', 'slug' => 'options-general.php', 'found' => false ),
     );
 
@@ -5482,7 +5481,9 @@ function ckc_setup_website_features_menu() {
         } elseif ( $slug === 'plugins.php' ) {
             $matched_key = 'plugins';
         } elseif ( $slug === 'tools.php' ) {
-            $matched_key = 'tools';
+            // 「工具」不再移入「網站功能」子選單，直接從頂層移除
+            unset( $menu[ $pos ] );
+            continue;
         } elseif ( $slug === 'options-general.php' ) {
             $matched_key = 'settings';
         }
