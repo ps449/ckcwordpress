@@ -507,65 +507,59 @@ function ckc_render_module_youtube_feed( $settings ) {
             </div>
 
             <?php
-            if ( shortcode_exists( 'yotuwp' ) ) {
-                echo do_shortcode( '[yotuwp type="channel" id="UCICXOKIAEFoX0ZZEkKdkbHA"]' );
-            } elseif ( shortcode_exists( 'youtube-feed' ) ) {
-                echo do_shortcode( '[youtube-feed feed="2"]' );
-            } else {
-                $yt_videos = function_exists( 'chao_gang_cheng_get_youtube_videos' ) ? chao_gang_cheng_get_youtube_videos() : array();
-                ?>
-                <div class="youtube-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;">
-                    <?php if ( ! empty( $yt_videos ) ) : ?>
-                        <?php foreach ( $yt_videos as $video ) : ?>
-                            <a href="<?php echo esc_url( $video['link'] ); ?>" target="_blank" class="youtube-item" style="position: relative; display: block; background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-decoration: none; transition: transform 0.3s ease, box-shadow 0.3s ease;">
-                                <div class="yt-thumb-wrapper" style="position: relative; aspect-ratio: 16/9; overflow: hidden; background-color: #000;">
-                                    <img src="<?php echo esc_url( $video['thumbnail'] ); ?>" alt="<?php echo esc_attr( $video['title'] ); ?>" width="480" height="270" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;">
-                                    <div class="yt-play-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; transition: background-color 0.3s ease;">
-                                        <div class="yt-play-button" style="background-color: rgba(255,0,0,0.9); width: 48px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--white); transition: transform 0.3s ease, background-color 0.3s ease;">
-                                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="padding: 15px;">
-                                    <h3 class="yt-title" style="font-size: 14px; font-weight: 600; color: var(--primary-color); line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 42px; transition: color 0.3s ease; text-align: left;"><?php echo esc_html( $video['title'] ); ?></h3>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <?php
-                        $fallback_videos = array(
-                            array( 'img' => 'slide-buffet.jpg', 'title' => '太陽百匯釜山海鮮季新上市！帶您直擊頂級生猛海鮮盛宴' ),
-                            array( 'img' => 'slide-frozen.jpg', 'title' => '國宴主廚大公開！星級極品佛跳牆的備料與慢火熬煮秘訣' ),
-                            array( 'img' => 'slide-line.jpg', 'title' => '百萬光影與巨幕環景！直擊潮港城最新概念沉浸式婚宴' ),
-                            array( 'img' => 'product-beef.jpg', 'title' => '極致濃郁！主廚揭秘招牌紅燒牛肉爐十二道中藥慢燉工序' ),
-                        );
-                        foreach ( $fallback_videos as $video ) :
-                            ?>
-                            <a href="<?php echo esc_url( $channel_url ); ?>" target="_blank" class="youtube-item" style="position: relative; display: block; background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-decoration: none; transition: transform 0.3s ease, box-shadow 0.3s ease;">
-                                <div class="yt-thumb-wrapper" style="position: relative; aspect-ratio: 16/9; overflow: hidden; background-color: #000;">
-                                    <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/' . $video['img'] ); ?>" alt="<?php echo esc_attr( $video['title'] ); ?>" width="480" height="270" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;">
-                                    <div class="yt-play-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; transition: background-color 0.3s ease;">
-                                        <div class="yt-play-button" style="background-color: rgba(255,0,0,0.9); width: 48px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--white); transition: transform 0.3s ease, background-color 0.3s ease;">
-                                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="padding: 15px;">
-                                    <h3 class="yt-title" style="font-size: 14px; font-weight: 600; color: var(--primary-color); line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 42px; transition: color 0.3s ease; text-align: left;"><?php echo esc_html( $video['title'] ); ?></h3>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-                <style>
-                    .youtube-item:hover { transform: translateY(-5px) !important; box-shadow: 0 8px 25px rgba(0,0,0,0.08) !important; }
-                    .youtube-item:hover .yt-thumb-wrapper img { transform: scale(1.05) !important; }
-                    .youtube-item:hover .yt-play-button { background-color: #ff0000 !important; transform: scale(1.1) !important; }
-                    .youtube-item:hover .yt-title { color: #ff0000 !important; }
-                </style>
-                <?php
-            }
+            // 統一使用自家 RSS 抓取＋卡片樣式，不再依賴外掛 shortcode（yotuwp／youtube-feed）
+            // 輸出——外掛版面跟這裡精心設計的縮圖／播放鍵／hover 效果不一致，故不採用。
+            $yt_videos = function_exists( 'chao_gang_cheng_get_youtube_videos' ) ? chao_gang_cheng_get_youtube_videos( $channel_url ) : array();
             ?>
+            <div class="youtube-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;">
+                <?php if ( ! empty( $yt_videos ) ) : ?>
+                    <?php foreach ( $yt_videos as $video ) : ?>
+                        <a href="<?php echo esc_url( $video['link'] ); ?>" target="_blank" class="youtube-item" style="position: relative; display: block; background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-decoration: none; transition: transform 0.3s ease, box-shadow 0.3s ease;">
+                            <div class="yt-thumb-wrapper" style="position: relative; aspect-ratio: 16/9; overflow: hidden; background-color: #000;">
+                                <img src="<?php echo esc_url( $video['thumbnail'] ); ?>" alt="<?php echo esc_attr( $video['title'] ); ?>" width="480" height="270" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;">
+                                <div class="yt-play-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; transition: background-color 0.3s ease;">
+                                    <div class="yt-play-button" style="background-color: rgba(255,0,0,0.9); width: 48px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--white); transition: transform 0.3s ease, background-color 0.3s ease;">
+                                        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="padding: 15px;">
+                                <h3 class="yt-title" style="font-size: 14px; font-weight: 600; color: var(--primary-color); line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 42px; transition: color 0.3s ease; text-align: left;"><?php echo esc_html( $video['title'] ); ?></h3>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php else : ?>
+                    <?php
+                    $fallback_videos = array(
+                        array( 'img' => 'slide-buffet.jpg', 'title' => '太陽百匯釜山海鮮季新上市！帶您直擊頂級生猛海鮮盛宴' ),
+                        array( 'img' => 'slide-frozen.jpg', 'title' => '國宴主廚大公開！星級極品佛跳牆的備料與慢火熬煮秘訣' ),
+                        array( 'img' => 'slide-line.jpg', 'title' => '百萬光影與巨幕環景！直擊潮港城最新概念沉浸式婚宴' ),
+                        array( 'img' => 'product-beef.jpg', 'title' => '極致濃郁！主廚揭秘招牌紅燒牛肉爐十二道中藥慢燉工序' ),
+                    );
+                    foreach ( $fallback_videos as $video ) :
+                        ?>
+                        <a href="<?php echo esc_url( $channel_url ); ?>" target="_blank" class="youtube-item" style="position: relative; display: block; background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-decoration: none; transition: transform 0.3s ease, box-shadow 0.3s ease;">
+                            <div class="yt-thumb-wrapper" style="position: relative; aspect-ratio: 16/9; overflow: hidden; background-color: #000;">
+                                <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/' . $video['img'] ); ?>" alt="<?php echo esc_attr( $video['title'] ); ?>" width="480" height="270" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;">
+                                <div class="yt-play-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; transition: background-color 0.3s ease;">
+                                    <div class="yt-play-button" style="background-color: rgba(255,0,0,0.9); width: 48px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--white); transition: transform 0.3s ease, background-color 0.3s ease;">
+                                        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="padding: 15px;">
+                                <h3 class="yt-title" style="font-size: 14px; font-weight: 600; color: var(--primary-color); line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 42px; transition: color 0.3s ease; text-align: left;"><?php echo esc_html( $video['title'] ); ?></h3>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <style>
+                .youtube-item:hover { transform: translateY(-5px) !important; box-shadow: 0 8px 25px rgba(0,0,0,0.08) !important; }
+                .youtube-item:hover .yt-thumb-wrapper img { transform: scale(1.05) !important; }
+                .youtube-item:hover .yt-play-button { background-color: #ff0000 !important; transform: scale(1.1) !important; }
+                .youtube-item:hover .yt-title { color: #ff0000 !important; }
+            </style>
         </div>
     </section>
     <?php

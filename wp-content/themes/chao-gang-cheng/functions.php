@@ -2940,14 +2940,90 @@ function chao_gang_cheng_related_products_args( $args ) {
 }
 
 /**
- * Fetch and cache latest YouTube videos from a specific channel using RSS feed
+ * 將後台「頻道連結」欄位（可能是 /channel/UCxxx、/user/name、/@handle、/c/Name
+ * 等各種格式）解析成 YouTube RSS feed 實際可用的參數。
+ *
+ * RSS feed（https://www.youtube.com/feeds/videos.xml）本身只接受 channel_id
+ * 或 user 兩種參數，不支援 @handle／自訂網址，所以遇到 handle／自訂網址時，
+ * 需要先抓一次頻道頁面 HTML，從裡面解析出真正的 channel ID，並用 transient
+ * 快取 7 天（頻道 ID 幾乎不會變動，沒必要每次都重新請求）。
+ *
+ * @param string $channel_url 後台「頻道連結」欄位的原始網址
+ * @return string 成功時回傳 'UCxxxxxxxx...'（channel_id）或 'user:帳號名'（舊式 user 格式）；解析失敗回傳空字串
  */
-function chao_gang_cheng_get_youtube_videos() {
-    $transient_key = 'chao_gang_cheng_youtube_feed';
+function chao_gang_cheng_resolve_youtube_channel_id( $channel_url ) {
+    $channel_url = trim( (string) $channel_url );
+    if ( '' === $channel_url ) {
+        return '';
+    }
+
+    // 1) /channel/UCxxxx 格式：ID 已經在網址裡，不需要額外請求
+    if ( preg_match( '#youtube\.com/channel/(UC[0-9A-Za-z_-]{10,})#i', $channel_url, $m ) ) {
+        return $m[1];
+    }
+
+    // 2) 舊式 /user/username 格式：RSS feed 原生支援 user 參數，直接標記回傳
+    if ( preg_match( '#youtube\.com/user/([^/?#]+)#i', $channel_url, $m ) ) {
+        return 'user:' . $m[1];
+    }
+
+    // 3) /@handle 或 /c/CustomName：抓頻道頁面 HTML 解析出真正的 channel ID
+    $cache_key = 'ckc_yt_chid_' . md5( $channel_url );
+    $cached    = get_transient( $cache_key );
+    if ( false !== $cached ) {
+        return $cached;
+    }
+
+    $response = wp_remote_get( $channel_url, array( 'timeout' => 8 ) );
+    if ( is_wp_error( $response ) ) {
+        return '';
+    }
+    $body = wp_remote_retrieve_body( $response );
+    if ( empty( $body ) ) {
+        return '';
+    }
+
+    $resolved = '';
+    if ( preg_match( '#"channelId":"(UC[0-9A-Za-z_-]{10,})"#', $body, $m ) ) {
+        $resolved = $m[1];
+    } elseif ( preg_match( '#<link rel="canonical" href="https://www\.youtube\.com/channel/(UC[0-9A-Za-z_-]{10,})"#', $body, $m ) ) {
+        $resolved = $m[1];
+    }
+
+    // 只快取「成功解析」的結果；失敗時不快取，讓下次還有機會重新嘗試
+    // （例如頻道頁面暫時打不開），避免長期卡在空結果。
+    if ( '' !== $resolved ) {
+        set_transient( $cache_key, $resolved, 7 * DAY_IN_SECONDS );
+    }
+
+    return $resolved;
+}
+
+/**
+ * Fetch and cache latest YouTube videos from a specific channel using RSS feed
+ *
+ * @param string $channel_url 頻道連結（來自首頁模塊「頻道連結」欄位）；留空則使用預設頻道
+ */
+function chao_gang_cheng_get_youtube_videos( $channel_url = '' ) {
+    if ( '' === trim( (string) $channel_url ) ) {
+        $channel_url = 'https://www.youtube.com/@ckcgroup'; // 保底預設頻道
+    }
+
+    $transient_key = 'chao_gang_cheng_youtube_feed_' . md5( $channel_url );
     $videos = get_transient( $transient_key );
-    
+
     if ( false === $videos ) {
-        $feed_url = 'https://www.youtube.com/feeds/videos.xml?channel_id=UCICXOKIAEFoX0ZZEkKdkbHA';
+        $resolved = chao_gang_cheng_resolve_youtube_channel_id( $channel_url );
+        if ( '' === $resolved ) {
+            return array(); // 解析失敗，交由呼叫端顯示保底假資料卡片
+        }
+
+        if ( 0 === strpos( $resolved, 'user:' ) ) {
+            $feed_url = 'https://www.youtube.com/feeds/videos.xml?user=' . rawurlencode( substr( $resolved, 5 ) );
+        } else {
+            $feed_url = 'https://www.youtube.com/feeds/videos.xml?channel_id=' . rawurlencode( $resolved );
+        }
+
         $response = wp_remote_get( $feed_url );
         
         if ( is_wp_error( $response ) ) {
