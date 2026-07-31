@@ -55,7 +55,7 @@
                 <!-- Centered Brand Logo -->
                 <div class="logo" style="flex: 1; display: flex; justify-content: center; text-align: center;">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: inline-block;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo-v1-05.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" style="height: 40px; width: auto; object-fit: contain;">
+                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="40" height="40" style="height: 40px; width: auto; object-fit: contain;" fetchpriority="high">
                     </a>
                 </div>
 
@@ -270,7 +270,7 @@
                 
                 <div class="mobile-logo-section">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: flex; align-items: center; text-decoration: none;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo-v1-05.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" style="height: 35px; width: auto; object-fit: contain;">
+                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="35" height="35" style="height: 35px; width: auto; object-fit: contain;" fetchpriority="high">
                     </a>
                 </div>
                 

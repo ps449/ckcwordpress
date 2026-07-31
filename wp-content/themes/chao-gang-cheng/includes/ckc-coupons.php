@@ -1215,7 +1215,7 @@ function ckc_coupon_claim_center_shortcode() {
                                 
                                 <div class="ckc-card-left">
                                     <div class="ckc-card-img-wrap">
-                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" />
+                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" width="80" height="80" loading="lazy" decoding="async" />
                                     </div>
                                     <a href="#" class="ckc-rules-trigger">使用規則</a>
                                 </div>
@@ -1275,7 +1275,7 @@ function ckc_coupon_claim_center_shortcode() {
                                 
                                 <div class="ckc-card-left">
                                     <div class="ckc-card-img-wrap">
-                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" />
+                                        <img src="<?php echo esc_url( $thumbnail ); ?>" alt="<?php echo esc_attr( $title ); ?>" width="80" height="80" loading="lazy" decoding="async" />
                                     </div>
                                     <a href="#" class="ckc-rules-trigger">使用規則</a>
                                 </div>

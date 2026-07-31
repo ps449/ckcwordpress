@@ -48,7 +48,7 @@
                 <h3>官方粉絲專頁</h3>
                 <!-- Facebook Page Plugin Iframe (hide_cover=true, show_facepile=false, small_header=true) -->
                 <div class="fb-page-wrapper">
-                    <iframe src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fckcfood%2F&tabs&width=340&height=154&small_header=false&adapt_container_width=true&hide_cover=true&show_facepile=false&appId" width="100%" height="154" style="border:none;border-radius:8px;background:white;width:100%;max-width:340px;height:154px;display:block;" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>
+                    <iframe src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fckcfood%2F&tabs&width=340&height=154&small_header=false&adapt_container_width=true&hide_cover=true&show_facepile=false&appId" width="100%" height="154" style="border:none;border-radius:8px;background:white;width:100%;max-width:340px;height:154px;display:block;" scrolling="no" frameborder="0" allowfullscreen="true" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>
                 </div>
                 <!-- Social media SVGs with circular backgrounds -->
                 <div class="footer-social-icons" style="display: flex; gap: 10px;">
