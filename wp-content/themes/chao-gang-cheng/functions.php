@@ -431,7 +431,23 @@ function chao_gang_cheng_cart_fragments( $fragments ) {
 	<span class="cart-count"><?php echo esc_html( WC()->cart->get_cart_contents_count() ); ?></span>
 	<?php
 	$fragments['span.cart-count'] = ob_get_clean();
-	
+
+	// 購物車頁的免運進度條（.cart-shipping-progress-wrapper）位置在
+	// woocommerce_before_cart，不在 <form class="woocommerce-cart-form"> 裡面，
+	// 所以 WooCommerce 內建的購物車表單 AJAX 更新（加減數量、套用優惠券）
+	// 不會自動刷新它。改用 fragment 讓它跟表單一起用 AJAX 更新，
+	// 且直接重用同一個 PHP function 渲染，跟結帳頁的免運判斷基準保證一致
+	// （不再需要另外寫一段 JS 去解析畫面上的文字金額，那個做法讀到的是
+	// 折扣前的小計，是先前「購物車顯示免運、結帳頁卻收運費」問題的根因）。
+	// 注意：這裡不判斷 is_cart()——WooCommerce 的 fragment 刷新是走
+	// wc-ajax 端點，不會建立一般頁面的 $wp_query，is_cart() 在那個情境下
+	// 一律回傳 false；但 WC()->cart 本身在任何情境都可用，且 jQuery 找不到
+	// 對應的 .cart-shipping-progress-wrapper 元素時，fragment 內容單純不會
+	// 被套用，不會有副作用，所以其他頁面一律回傳也是安全的。
+	ob_start();
+	chao_gang_cheng_cart_free_shipping_progress();
+	$fragments['.cart-shipping-progress-wrapper'] = ob_get_clean();
+
 	// Update the cart dropdown too
 	ob_start();
 	?>
@@ -1229,12 +1245,27 @@ function chao_get_free_shipping_threshold() {
     return $cached;
 }
 
+/**
+ * 全站判斷「是否達免運門檻」統一用這個金額——修正 bug：先前購物車頁多處
+ * （進度條／預估運費列／湊免運推薦區）各自呼叫 WC()->cart->get_subtotal()
+ * （折扣「前」金額）來比對門檻，但 WooCommerce 免運方式實際判斷資格時看的
+ * 是折扣「後」金額（結帳頁 chao_checkout_free_shipping_progress() 原本就是
+ * 用 get_cart_contents_total()，這個才是對的）。兩邊金額基準不一致，就會
+ * 出現購物車頁顯示「免運費」，套用優惠券後小計低於門檻，結帳頁卻被收運費
+ * 的落差（使用者實際回報過這個問題：購物車顯示免運，結帳頁多收 NT$250）。
+ *
+ * 統一改成這個 helper（=get_cart_contents_total()，已扣掉優惠券折扣、
+ * 稅／運費前），讓購物車頁的免運提示跟結帳頁的實際運費計算基準一致。
+ */
+function chao_get_free_shipping_progress_amount() {
+    return WC()->cart ? floatval( WC()->cart->get_cart_contents_total() ) : 0;
+}
+
 add_action( 'woocommerce_before_cart', 'chao_gang_cheng_cart_free_shipping_progress' );
 function chao_gang_cheng_cart_free_shipping_progress() {
     $threshold = chao_get_free_shipping_threshold();
-    // Calculate current subtotal (exclude tax/shipping/discounts if desired, default subtotal is correct)
-    $cart_subtotal = WC()->cart->get_subtotal();
-    
+    $cart_subtotal = chao_get_free_shipping_progress_amount();
+
     if ( $cart_subtotal >= $threshold ) {
         $percent = 100;
         $message = '太棒了！已符合免運條件，本筆訂單免運費！';
@@ -1243,7 +1274,7 @@ function chao_gang_cheng_cart_free_shipping_progress() {
         $percent = round( ($cart_subtotal / $threshold) * 100 );
         $message = '🚚 還差 <strong>' . wc_price( $diff ) . '</strong> 即可享冷凍宅配、超商取貨免運費！';
     }
-    
+
     ?>
     <div class="cart-shipping-progress-wrapper">
         <p class="progress-message"><?php echo $message; ?></p>

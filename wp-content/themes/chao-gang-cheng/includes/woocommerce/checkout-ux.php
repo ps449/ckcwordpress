@@ -106,7 +106,10 @@ add_action( 'woocommerce_before_checkout_form', 'chao_checkout_free_shipping_pro
 function chao_checkout_free_shipping_progress() {
     $threshold = chao_get_free_shipping_threshold();
 
-    $cart_total = floatval( WC()->cart->get_cart_contents_total() );
+    // 這裡原本就是用折扣後金額（正確），現在統一呼叫共用 helper，
+    // 確保跟購物車頁的判斷基準永遠是同一份邏輯，見
+    // functions.php: chao_get_free_shipping_progress_amount()
+    $cart_total = chao_get_free_shipping_progress_amount();
     $remaining  = $threshold - $cart_total;
 
     // 檢查是否已套用含「允許免運費」的折價券
@@ -464,7 +467,8 @@ function chao_get_estimated_shipping_rates() {
 add_action( 'woocommerce_cart_totals_before_order_total', 'chao_cart_estimated_shipping_row' );
 function chao_cart_estimated_shipping_row() {
     $threshold = chao_get_free_shipping_threshold();
-    $subtotal  = WC()->cart->get_subtotal();
+    // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
+    $subtotal  = chao_get_free_shipping_progress_amount();
 
     // 檢查目前購物車是否已套用含「允許免運費」的折價券
     $coupon_free_shipping = false;
@@ -510,7 +514,8 @@ function chao_cart_free_shipping_cross_sell() {
         return;
     }
     $threshold = chao_get_free_shipping_threshold();
-    $subtotal  = WC()->cart->get_subtotal();
+    // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
+    $subtotal  = chao_get_free_shipping_progress_amount();
     if ( $subtotal >= $threshold ) {
         return;
     }
@@ -613,7 +618,8 @@ function chao_checkout_free_shipping_cross_sell() {
         return;
     }
     $threshold = chao_get_free_shipping_threshold();
-    $subtotal  = WC()->cart->get_subtotal();
+    // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
+    $subtotal  = chao_get_free_shipping_progress_amount();
     if ( $subtotal >= $threshold ) {
         return;
     }
@@ -743,7 +749,6 @@ function chao_cart_ux_footer_assets() {
     if ( ! is_cart() ) {
         return;
     }
-    $threshold = chao_get_free_shipping_threshold();
     ?>
     <style>
     /* Continue shopping link */
@@ -796,8 +801,6 @@ function chao_cart_ux_footer_assets() {
     <?php endif; ?>
     <script>
     jQuery(function($) {
-        var chaoFreeShipThreshold = <?php echo (int) $threshold; ?>;
-
         // 1. Auto quantity recalculation: debounce, then programmatically press "update cart"
         //    (Baymard: don't require an explicit update button click)
         var chaoQtyTimer = null;
@@ -811,31 +814,13 @@ function chao_cart_ux_footer_assets() {
             }, 600);
         });
 
-        // 2. Keep the free-shipping progress bar in sync after AJAX cart updates
-        //    (the bar sits outside the form WooCommerce replaces, so refresh it client-side)
-        function chaoParseAmount(text) {
-            var digits = (text || '').replace(/[^0-9.]/g, '');
-            return digits ? parseFloat(digits) : NaN;
-        }
-        function chaoFormatNTD(num) {
-            return 'NT$' + Math.round(num).toLocaleString('en-US');
-        }
-        function chaoRefreshProgress() {
-            var $wrap = $('.cart-shipping-progress-wrapper');
-            if (!$wrap.length) { return; }
-            var subtotal = chaoParseAmount($('.cart_totals .cart-subtotal .woocommerce-Price-amount').first().text());
-            if (isNaN(subtotal)) { return; }
-            var percent, message;
-            if (subtotal >= chaoFreeShipThreshold) {
-                percent = 100;
-                message = '太棒了！已符合免運條件，本筆訂單免運費！';
-            } else {
-                percent = Math.round((subtotal / chaoFreeShipThreshold) * 100);
-                message = '🚚 還差 <strong>' + chaoFormatNTD(chaoFreeShipThreshold - subtotal) + '</strong> 即可享冷凍宅配、超商取貨免運費！';
-            }
-            $wrap.find('.progress-message').html(message);
-            $wrap.find('.progress-bar-fill').css('width', percent + '%');
-        }
+        // 2. 免運進度條（.cart-shipping-progress-wrapper）現在已經改用
+        //    woocommerce_add_to_cart_fragments 讓它跟著購物車表單一起用 AJAX
+        //    更新（見 functions.php: chao_gang_cheng_cart_fragments()），
+        //    不再需要這裡另外寫 JS 解析畫面文字金額自行重算——原本那個做法
+        //    讀到的是折扣「前」的小計，是「購物車顯示免運、結帳頁卻收運費」
+        //    問題的根因，改用 fragment 直接重用同一段 PHP 邏輯render，
+        //    保證跟結帳頁的免運判斷基準一致。
 
         // 3. Mobile sticky bar: mirror the cart total, hide when the cart becomes empty
         function chaoSyncStickyBar() {
@@ -851,7 +836,6 @@ function chao_cart_ux_footer_assets() {
 
         chaoSyncStickyBar();
         $(document.body).on('updated_cart_totals updated_wc_div wc_fragments_refreshed', function() {
-            chaoRefreshProgress();
             chaoSyncStickyBar();
         });
 
