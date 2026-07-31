@@ -522,21 +522,17 @@ function chao_cart_free_shipping_cross_sell() {
     }
 
     // Best sellers first; pick in-stock simple products whose price fits the gap (or a low-price cap)
+    // 效能：候選商品池改讀取快取（見 chao_checkout_crosssell_pool_ids），避免購物車每次
+    // AJAX 更新（加減數量、套券）都重跑一次 meta_value_num 排序查詢。
     $price_cap = max( $diff, 400 );
-    $query     = new WP_Query( array(
-        'post_type'      => 'product',
-        'post_status'    => 'publish',
-        'posts_per_page' => 20,
-        'post__not_in'   => $exclude,
-        'meta_key'       => 'total_sales',
-        'orderby'        => 'meta_value_num',
-        'order'          => 'DESC',
-        'no_found_rows'  => true,
-    ) );
+    $candidate_ids = chao_checkout_crosssell_pool_ids();
 
     $picks = array();
-    foreach ( $query->posts as $post ) {
-        $product = wc_get_product( $post->ID );
+    foreach ( $candidate_ids as $product_id ) {
+        if ( in_array( (int) $product_id, $exclude, true ) ) {
+            continue;
+        }
+        $product = wc_get_product( $product_id );
         if ( ! $product || ! $product->is_type( 'simple' ) || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
             continue;
         }
@@ -549,7 +545,6 @@ function chao_cart_free_shipping_cross_sell() {
             break;
         }
     }
-    wp_reset_postdata();
 
     if ( count( $picks ) < 2 ) {
         return;
@@ -575,6 +570,42 @@ function chao_cart_free_shipping_cross_sell() {
     <?php
 }
 
+/**
+ * 效能重構：結帳頁加購商品的「候選商品池」改用 transient 快取。
+ *
+ * 舊做法：每次結帳頁 AJAX 更新（update_checkout，例如套用優惠券、改數量、
+ * 換運送方式）都會重新執行一次 meta_key=total_sales / orderby=meta_value_num
+ * 的 WP_Query —— 這種依 postmeta 數值排序的查詢在 WooCommerce 是公認較重的
+ * 查詢方式，等於每次套券都要多付出一次不必要的重量級 DB 查詢成本。
+ *
+ * 新做法：熱銷商品 ID 池每 10 分鐘才重新查詢一次並快取；每次結帳頁更新只從
+ * 快取的 ID 池讀取，再依當下購物車內容（排除已在購物車的商品、價格上限、
+ * 庫存）做輕量篩選，不再重複打那支重查詢。
+ */
+function chao_checkout_crosssell_pool_ids() {
+    $cache_key = 'ckc_checkout_crosssell_pool_v1';
+    $ids = get_transient( $cache_key );
+    if ( false !== $ids && is_array( $ids ) ) {
+        return $ids;
+    }
+
+    $query = new WP_Query( array(
+        'post_type'      => 'product',
+        'post_status'    => 'publish',
+        'posts_per_page' => 40,
+        'meta_key'       => 'total_sales',
+        'orderby'        => 'meta_value_num',
+        'order'          => 'DESC',
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+    ) );
+    $ids = $query->posts;
+    wp_reset_postdata();
+
+    set_transient( $cache_key, $ids, 10 * MINUTE_IN_SECONDS );
+    return $ids;
+}
+
 // 32c-2. 結帳頁：未達免運門檻時顯示加購商品區（AJAX 加入，不整頁重載）
 add_action( 'woocommerce_checkout_before_order_review', 'chao_checkout_free_shipping_cross_sell', 20 );
 function chao_checkout_free_shipping_cross_sell() {
@@ -593,19 +624,14 @@ function chao_checkout_free_shipping_cross_sell() {
         $exclude[] = $cart_item['product_id'];
     }
     $price_cap = max( $diff, 400 );
-    $query = new WP_Query( array(
-        'post_type'      => 'product',
-        'post_status'    => 'publish',
-        'posts_per_page' => 20,
-        'post__not_in'   => $exclude,
-        'meta_key'       => 'total_sales',
-        'orderby'        => 'meta_value_num',
-        'order'          => 'DESC',
-        'no_found_rows'  => true,
-    ) );
+
+    $candidate_ids = chao_checkout_crosssell_pool_ids();
     $picks = array();
-    foreach ( $query->posts as $post ) {
-        $product = wc_get_product( $post->ID );
+    foreach ( $candidate_ids as $product_id ) {
+        if ( in_array( (int) $product_id, $exclude, true ) ) {
+            continue;
+        }
+        $product = wc_get_product( $product_id );
         if ( ! $product || ! $product->is_type( 'simple' ) || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
             continue;
         }
@@ -618,7 +644,6 @@ function chao_checkout_free_shipping_cross_sell() {
             break;
         }
     }
-    wp_reset_postdata();
     if ( count( $picks ) < 2 ) {
         return;
     }
