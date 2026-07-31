@@ -5604,6 +5604,32 @@ function ckc_website_features_page() {
 }
 
 /**
+ * 26h. 將「分類」（商品分類管理，原本是「商品」選單下的子項目）移至
+ * 「網站內容」分類區塊，獨立成頂層選單「分類管理」。
+ * 沿用既有的 edit-tags.php?taxonomy=product_cat&post_type=product 頁面，
+ * 不重複建立頁面邏輯，只是換一個入口並移除原本「商品」選單下的子項目。
+ */
+add_action( 'admin_menu', 'ckc_move_product_category_menu', 20 );
+function ckc_move_product_category_menu() {
+    $slug = 'edit-tags.php?taxonomy=product_cat&post_type=product';
+
+    // 位置 31：緊接在「彈窗管理」（位置 30）之後，落在「網站內容」區塊內
+    // （邏輯與 includes/admin/homepage-builder.php 的 ckc_homepage_builder_add_menu() 一致）。
+    add_menu_page(
+        '分類管理',
+        '分類管理',
+        'manage_product_terms',
+        $slug,
+        '',
+        'dashicons-category',
+        31
+    );
+
+    // 移除原本「商品」選單下的「分類」子項目，避免重複入口
+    remove_submenu_page( 'edit.php?post_type=product', $slug );
+}
+
+/**
  * 27. 出貨AI助理頁面渲染回呼
  */
 function ckc_gemini_agent_page() {
