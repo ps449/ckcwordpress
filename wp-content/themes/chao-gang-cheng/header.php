@@ -324,23 +324,43 @@
         var lastScrollY = window.scrollY || window.pageYOffset;
         var ticking = false;
         var threshold = 8; // 忽略滑鼠滾輪誤觸等極小幅度的抖動
+        // 收合／展開動畫是 0.25s，切換後短時間內（cooldown）不再重新判斷方向。
+        // 沒有這道保護的話，觸控板慣性捲動常常會在極短時間內連續出現「往下一點、
+        // 往上一點」的小幅來回抖動，導致收合／展開被連續觸發兩次，畫面出現
+        // 「文字淡出淡入疊在下方圖片上」的閃爍跳動。
+        var cooldown = 400;
+        var lastToggleAt = 0;
 
         function onScroll() {
             var currentY = window.scrollY || window.pageYOffset;
+            var now = Date.now();
 
             if (currentY <= topGuard) {
                 // 頁面頂端附近一律展開，不受方向判斷影響
-                header.classList.remove('nav-row-collapsed');
+                if (header.classList.contains('nav-row-collapsed')) {
+                    header.classList.remove('nav-row-collapsed');
+                    lastToggleAt = now;
+                }
                 lastScrollY = currentY;
                 ticking = false;
                 return;
             }
 
+            if (now - lastToggleAt < cooldown) {
+                // 剛切換過，冷卻時間內先不重新判斷，等動畫播完再說
+                ticking = false;
+                return;
+            }
+
             if (Math.abs(currentY - lastScrollY) > threshold) {
-                if (currentY > lastScrollY && currentY > expandedHeight) {
+                var shouldCollapse = currentY > lastScrollY && currentY > expandedHeight;
+                var isCollapsed = header.classList.contains('nav-row-collapsed');
+                if (shouldCollapse && !isCollapsed) {
                     header.classList.add('nav-row-collapsed'); // 往下滑：收起分類列
-                } else {
+                    lastToggleAt = now;
+                } else if (!shouldCollapse && isCollapsed) {
                     header.classList.remove('nav-row-collapsed'); // 往上滑：展開分類列
+                    lastToggleAt = now;
                 }
                 lastScrollY = currentY;
             }
