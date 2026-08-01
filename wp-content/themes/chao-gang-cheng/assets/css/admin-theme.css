@@ -12,14 +12,20 @@
 	--ckc-admin-accent: #f86f69;       /* 品牌珊瑚紅，對應前台 --accent-color */
 	--ckc-admin-accent-dark: #e2564f;
 	--ckc-admin-secondary: #7c6767;    /* 品牌駝棕色 */
-	--ckc-admin-bg: #f6f5f3;
+	--ckc-admin-bg: #faf6f1;           /* 暖紙感米白，呼應餐飲品牌的溫度（對應前台 --light-bg） */
 	--ckc-admin-card-bg: #ffffff;
-	--ckc-admin-border: #e5e2df;
+	--ckc-admin-border: #e7ded3;
 	--ckc-admin-text: #2b2b2b;
 	--ckc-admin-text-muted: #8c8577;
 	--ckc-admin-radius: 8px;
 	--ckc-admin-radius-sm: 6px;
 	--ckc-admin-shadow: 0 1px 3px rgba(28, 28, 28, 0.06), 0 1px 2px rgba(28, 28, 28, 0.04);
+}
+
+/* 系統字型堆疊：標題用較粗字重＋略緊字距做出風格，不額外載入 Web Font
+   （避免拖慢後台載入速度），中文顯示交給各系統內建的黑體／圓體。 */
+body.wp-admin {
+	font-feature-settings: "palt" 1;
 }
 
 /* ==========================================================================
@@ -35,9 +41,25 @@ body.wp-admin #wpbody-content {
 body.wp-admin .wrap h1.wp-heading-inline,
 body.wp-admin .wrap > h1,
 body.wp-admin .wrap > h2:first-child {
-	font-weight: 700;
-	letter-spacing: 0.02em;
+	font-weight: 800;
+	letter-spacing: 0.01em;
 	color: var(--ckc-admin-text);
+	padding-left: 14px;
+	position: relative;
+}
+/* 簽名細節：頁面標題前的珊瑚色短槓，取材自菜單品項的列表槓號，
+   讓每個後台頁面一眼就能辨識「這裡是可操作的內容區」。 */
+body.wp-admin .wrap h1.wp-heading-inline::before,
+body.wp-admin .wrap > h1::before,
+body.wp-admin .wrap > h2:first-child::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0.35em;
+	width: 6px;
+	height: 1em;
+	background: var(--ckc-admin-accent);
+	border-radius: 2px;
 }
 
 /* ==========================================================================
@@ -91,6 +113,22 @@ body.wp-admin .wrap > h2:first-child {
 	background: var(--ckc-admin-accent) !important;
 	color: #fff !important;
 	box-shadow: none;
+	position: relative;
+}
+/* 簽名細節：目前所在頁面的選單項目右側伸出一個小三角「訂單存根」缺角，
+   像餐飲業出單存根一樣指向右側正在操作的內容區，強化「你在這裡」的方向感。 */
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu::after,
+#adminmenu li.current a.menu-top::after {
+	content: "";
+	position: absolute;
+	right: -7px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 0;
+	height: 0;
+	border-top: 7px solid transparent;
+	border-bottom: 7px solid transparent;
+	border-left: 7px solid var(--ckc-admin-accent);
 }
 #adminmenu li.wp-has-current-submenu a.wp-has-current-submenu div.wp-menu-image:before,
 #adminmenu li.current a.menu-top div.wp-menu-image:before {
