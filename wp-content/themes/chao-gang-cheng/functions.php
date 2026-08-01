@@ -5775,6 +5775,38 @@ function ckc_product_categories_redirect_page() {
 }
 
 /**
+ * 26h-1. 修正「分類管理」點進去（轉導後）側邊選單不會自動展開「首頁」的問題。
+ *
+ * 原因跟 ckc_fix_nav_menus_admin_highlight() 是同一種情況：使用者點「分類
+ * 管理」後會被轉導到真正的 edit-tags.php?taxonomy=product_cat&post_type=product
+ * 頁面，而 WordPress 對「分類法編輯頁」的父選單判斷不是走一般子選單陣列
+ * 比對，是直接把它視為所屬文章類型（商品）選單底下的頁面，所以會反白
+ * 「商品」而不是「首頁」。同樣用 parent_file／submenu_file 過濾器強制
+ * 指定回「首頁 > 分類管理」。
+ */
+add_filter( 'parent_file', 'ckc_fix_product_categories_admin_highlight' );
+function ckc_fix_product_categories_admin_highlight( $parent_file ) {
+    if ( ckc_is_product_categories_screen() ) {
+        return 'ckc-homepage-builder';
+    }
+    return $parent_file;
+}
+add_filter( 'submenu_file', 'ckc_fix_product_categories_admin_submenu_highlight' );
+function ckc_fix_product_categories_admin_submenu_highlight( $submenu_file ) {
+    if ( ckc_is_product_categories_screen() ) {
+        return 'ckc-product-categories';
+    }
+    return $submenu_file;
+}
+function ckc_is_product_categories_screen() {
+    global $pagenow;
+    return 'edit-tags.php' === $pagenow
+        && isset( $_GET['taxonomy'], $_GET['post_type'] )
+        && 'product_cat' === $_GET['taxonomy']
+        && 'product' === $_GET['post_type'];
+}
+
+/**
  * 26i. 修正商品分類頁面「上層分類」欄位說明文字
  * WordPress 核心預設範例文字沿用影劇類比喻（影集／美劇／日劇），
  * 與本站主要銷售冷凍食品的商品分類邏輯不符，改為貼近實際業務的範例。
@@ -5844,6 +5876,37 @@ function ckc_add_nav_menu_management_page() {
         'edit_theme_options',
         'nav-menus.php'
     );
+}
+
+/**
+ * 26k-1. 修正「選單管理」點進去後，側邊選單不會自動展開「首頁」的問題。
+ *
+ * 背景：nav-menus.php 是 WordPress 核心頁面，核心本身早就在
+ * $submenu['themes.php'] 註冊過一筆同樣指向 nav-menus.php 的子選單
+ * （即原本「外觀 > 選單」）。WordPress 判斷目前頁面所屬父選單
+ * （get_admin_page_parent()）時，是依序掃描每個父選單底下的子選單陣列，
+ * 找到第一個 slug 相符的就直接回傳——核心的 themes.php 註冊時機比
+ * 我們在 admin_menu 才掛上去的「首頁」子選單更早，永遠會先比對到，
+ * 導致側邊選單一直不會展開「首頁」、也不會反白，即使我們把子選單
+ * 頁面本身正確掛在「首頁」底下也一樣。
+ * 用 parent_file／submenu_file 這兩個 WordPress 官方提供、專門處理
+ * 這種「連到共用核心頁面」情境的過濾器，強制指定回「首頁」。
+ */
+add_filter( 'parent_file', 'ckc_fix_nav_menus_admin_highlight' );
+function ckc_fix_nav_menus_admin_highlight( $parent_file ) {
+    global $pagenow;
+    if ( 'nav-menus.php' === $pagenow ) {
+        return 'ckc-homepage-builder';
+    }
+    return $parent_file;
+}
+add_filter( 'submenu_file', 'ckc_fix_nav_menus_admin_submenu_highlight' );
+function ckc_fix_nav_menus_admin_submenu_highlight( $submenu_file ) {
+    global $pagenow;
+    if ( 'nav-menus.php' === $pagenow ) {
+        return 'nav-menus.php';
+    }
+    return $submenu_file;
 }
 
 /**
