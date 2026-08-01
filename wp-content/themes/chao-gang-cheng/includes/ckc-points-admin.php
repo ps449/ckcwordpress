@@ -16,20 +16,22 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /* ============================================================
  * 1. 選單
+ *
+ * 後台選單整理：原本是獨立頂層選單，收整到「會員與行銷」頂層選單
+ * （ckc-referral-admin.php 註冊，slug ckc-referral-admin）底下，
+ * 優先權 23（緊接在分潤夥伴 20、21 與折價券管理 22 之後）。
  * ============================================================ */
-add_action( 'admin_menu', 'ckc_pts_register_menu', 62 );
+add_action( 'admin_menu', 'ckc_pts_register_menu', 23 );
 function ckc_pts_register_menu() {
-    add_menu_page( '紅利點數管理', '🪙 紅利點數', 'manage_woocommerce',
-        'ckc-points-admin', 'ckc_pts_page_overview', 'dashicons-star-filled', 57 );
-    add_submenu_page( 'ckc-points-admin', '整體總覽',   '📊 整體總覽',
+    add_submenu_page( 'ckc-referral-admin', '整體總覽',   '📊 整體總覽',
         'manage_woocommerce', 'ckc-points-admin',    'ckc_pts_page_overview' );
-    add_submenu_page( 'ckc-points-admin', '會員點數',   '👥 會員點數',
+    add_submenu_page( 'ckc-referral-admin', '會員點數',   '👥 會員點數',
         'manage_woocommerce', 'ckc-points-members',  'ckc_pts_page_members' );
-    add_submenu_page( 'ckc-points-admin', '異動紀錄',   '📋 異動紀錄',
+    add_submenu_page( 'ckc-referral-admin', '異動紀錄',   '📋 異動紀錄',
         'manage_woocommerce', 'ckc-points-log',      'ckc_pts_page_log' );
-    add_submenu_page( 'ckc-points-admin', '批量發放',   '🎁 批量發放',
+    add_submenu_page( 'ckc-referral-admin', '批量發放',   '🎁 批量發放',
         'manage_woocommerce', 'ckc-points-batch',    'ckc_pts_page_batch' );
-    add_submenu_page( 'ckc-points-admin', '發放設定',   '發放設定',
+    add_submenu_page( 'ckc-referral-admin', '發放設定',   '發放設定',
         'manage_woocommerce', 'ckc-points-settings', 'ckc_pts_page_settings' );
 }
 

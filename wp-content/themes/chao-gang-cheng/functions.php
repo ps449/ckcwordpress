@@ -4880,7 +4880,15 @@ function chao_gang_cheng_admin_menu_styling() {
                 $storeStart.before('<li class="menu-section-header">電商營運</li>');
             }
             
-            $('#menu-appearance').before('<li class="menu-section-header">系統配置</li>');
+            // 注意：原本錨點是 #menu-appearance（外觀選單），但「外觀」早就被
+            // ckc_setup_website_features_menu() 收進「網站功能」子選單，
+            // #menu-appearance 這個元素已經不存在，導致這個標題從來沒有
+            //顯示出來過。改成錨定在「使用者」（#menu-users，目前系統配置
+            // 分類下唯一還留在頂層的項目）前面。
+            var $sysConfigStart = $('#menu-users');
+            if ($sysConfigStart.length) {
+                $sysConfigStart.before('<li class="menu-section-header">系統配置</li>');
+            }
 
             // Translate MonsterInsights English admin notice to Traditional Chinese
             function translateMonsterInsights($el) {
@@ -4910,6 +4918,27 @@ function chao_gang_cheng_admin_menu_styling() {
         });
     </script>
     <?php
+}
+
+/**
+ * 修正「商店設定」（WooCommerce 原生頂層選單，slug: woocommerce）底下第一個
+ * 子選單也叫「首頁」，跟本站另一個頂層選單「首頁」（網站內容編輯，
+ * ckc-homepage-builder）撞名的問題——兩者意思完全不同（一個是 WooCommerce
+ * 自己的營運總覽儀表板，一個是編輯前台首頁內容的地方），撞名容易讓人
+ * 點錯。改名成「商店總覽」，不影響實際連結與功能，只改顯示文字。
+ */
+add_action( 'admin_menu', 'chao_gang_cheng_rename_woocommerce_home_submenu', 9999 );
+function chao_gang_cheng_rename_woocommerce_home_submenu() {
+    global $submenu;
+    if ( empty( $submenu['woocommerce'] ) || ! is_array( $submenu['woocommerce'] ) ) {
+        return;
+    }
+    foreach ( $submenu['woocommerce'] as $key => $item ) {
+        if ( isset( $item[0] ) && '首頁' === wp_strip_all_tags( $item[0] ) ) {
+            $submenu['woocommerce'][ $key ][0] = '商店總覽';
+            break;
+        }
+    }
 }
 
 /**

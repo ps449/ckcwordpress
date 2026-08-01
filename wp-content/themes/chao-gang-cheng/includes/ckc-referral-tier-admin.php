@@ -8,7 +8,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // 1. 註冊子選單
-add_action( 'admin_menu', 'ckc_reftier_register_menu', 62 );
+// 優先權 21：緊接在「分潤夥伴」（優先權 20）之後，確保收整進「會員與
+// 行銷」頂層選單後的子選單順序穩定（見 ckc-referral-admin.php 說明）。
+add_action( 'admin_menu', 'ckc_reftier_register_menu', 21 );
 function ckc_reftier_register_menu() {
     add_submenu_page(
         'ckc-referral-admin',

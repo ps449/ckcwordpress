@@ -2131,9 +2131,17 @@ function ckc_purge_all_coupon_menu_entries() {
     );
 
     // 也從 $menu 動態蒐集所有頂層選單的 slug
+    // 注意：排除 ckc-referral-admin（「會員與行銷」頂層選單，折價券管理
+    // 收整後的新掛載父選單，見 ckc-coupons.php 的 ckc_register_coupon_admin_menu()）。
+    // 這個父選單底下本來就合法掛了一個指向
+    // post-new.php?post_type=shop_coupon 的「新增折價券」子選單，不能被
+    // 下面 1c 的清除邏輯誤刪——這裡原本排除的是舊版直接掛載的頂層 slug
+    // ckc-coupon-center，收整後這筆合法連結搬到 ckc-referral-admin
+    // 底下，排除清單也要跟著改，否則自己剛註冊的「新增折價券」會被
+    // 這個掃描迴圈當成別人的殘留連結清掉。
     if ( is_array( $menu ) ) {
         foreach ( $menu as $item ) {
-            if ( isset( $item[2] ) && $item[2] !== 'ckc-coupon-center' ) {
+            if ( isset( $item[2] ) && $item[2] !== 'ckc-referral-admin' ) {
                 $known_parents[] = $item[2];
             }
         }
@@ -2175,11 +2183,6 @@ function ckc_hide_coupon_menu_css() {
         #adminmenu li:has(> a[href="edit.php?post_type=shop_coupon"]),
         #adminmenu a[href*="post_type=shop_coupon"]:not([href*="post-new"]) {
             display: none !important;
-        }
-        /* 自訂折價券管理選單改用 Dashicons 票券圖示 */
-        #adminmenu #toplevel_page_ckc-coupon-center .wp-menu-image::before {
-            content: "\f524";
-            font-family: dashicons;
         }
         <?php if ( 'shop_coupon' === $post_type ) : ?>
         /* 隱藏「一般」tab 的「折價券到期日」欄位
@@ -2928,22 +2931,15 @@ function ckc_checkout_points_panel() {
 }
 
 
-add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 25 );
+// 後台選單整理：原本是獨立頂層選單，收整到「會員與行銷」頂層選單
+// （ckc-referral-admin.php 註冊，slug ckc-referral-admin）底下，
+// 優先權 22（緊接在分潤夥伴相關的 20、21 之後）。
+// 三個子選單各自的 slug、渲染回呼都不變，只改掛載的父選單。
+add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 22 );
 function ckc_register_coupon_admin_menu() {
-    // ── 頂層選單（dashicons-tag 圖示，位置在 WooCommerce 之後）
-    add_menu_page(
-        '折價券管理',            // 頁面 <title>
-        '折價券管理',            // 選單標籤文字（Emoji 用 CSS 方式注入）
-        'manage_woocommerce',   // 需要 WooCommerce 管理權限
-        'ckc-coupon-center',    // 唯一 slug
-        'ckc_coupon_center_admin_page',
-        'dashicons-tag',        // WordPress 內建標籤圖示
-        56                      // 位置：WooCommerce(55) 之後
-    );
-
-    // ── 子選單 A：折價券列表（與頂層相同，標題用「所有折價券」區分）
+    // ── 子選單 A：折價券列表
     add_submenu_page(
-        'ckc-coupon-center',
+        'ckc-referral-admin',
         '所有折價券',
         '📋 所有折價券',
         'manage_woocommerce',
@@ -2953,7 +2949,7 @@ function ckc_register_coupon_admin_menu() {
 
     // ── 子選單 B：新增折價券（WooCommerce 新增頁）
     add_submenu_page(
-        'ckc-coupon-center',
+        'ckc-referral-admin',
         '新增折價券',
         '➕ 新增折價券',
         'manage_woocommerce',
@@ -2962,7 +2958,7 @@ function ckc_register_coupon_admin_menu() {
 
     // ── 子選單 C：前往前台領券中心（外部連結）
     add_submenu_page(
-        'ckc-coupon-center',
+        'ckc-referral-admin',
         '查看前台領券中心',
         '🔗 前台領券中心',
         'manage_woocommerce',
