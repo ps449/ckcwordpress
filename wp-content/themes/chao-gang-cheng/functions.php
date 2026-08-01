@@ -5883,42 +5883,33 @@ function ckc_add_nav_menu_management_page() {
  *
  * 背景：nav-menus.php 是 WordPress 核心頁面，核心本身早就在
  * $submenu['themes.php'] 註冊過一筆同樣指向 nav-menus.php 的子選單
- * （即原本「外觀 > 選單」）。WordPress 判斷目前頁面所屬父選單
- * （get_admin_page_parent()）時，是依序掃描每個父選單底下的子選單陣列，
- * 找到第一個 slug 相符的就直接回傳——核心的 themes.php 註冊時機比
- * 我們在 admin_menu 才掛上去的「首頁」子選單更早，永遠會先比對到，
- * 導致側邊選單一直不會展開「首頁」、也不會反白，即使我們把子選單
- * 頁面本身正確掛在「首頁」底下也一樣。
- * 用 parent_file／submenu_file 這兩個 WordPress 官方提供、專門處理
- * 這種「連到共用核心頁面」情境的過濾器，強制指定回「首頁」。
+ * （即原本「外觀 > 選單」）。
+ *
+ * 一開始用 parent_file／submenu_file 過濾器強制指定回「首頁」，但驗證
+ * 後發現沒有生效——追進 WordPress 核心 wp-admin/menu-header.php 原始碼
+ * 才發現：這兩個過濾器套用「之後」，核心緊接著會呼叫一次不帶參數的
+ * get_admin_page_parent()，這個函式會自己重新掃一遍 $submenu 陣列比對
+ * $pagenow，只要找到第一個相符的（核心自己在 themes.php 底下註冊的
+ * nav-menus.php，因為註冊時機比我們的「首頁」子選單早，一定先比對到）
+ * 就直接覆蓋回 $parent_file，把過濾器剛設好的值蓋掉。
+ *
+ * 真正的解法是 WordPress 內建、專門處理「把某個父選單整個重新導向到
+ * 別的父選單」的機制：$_wp_real_parent_file 這個全域陣列。
+ * get_admin_page_parent() 掃描比對前，會先用這個陣列把比對到的父選單
+ * slug 置換過一次——只要在 nav-menus.php 這個頁面時，把
+ * themes.php 置換成 ckc-homepage-builder，掃描比對到 themes.php 底下的
+ * nav-menus.php 時就會直接算成「首頁」底下的項目，不會再蓋掉。
+ * 只在 $pagenow 是 nav-menus.php 時才置換，不影響其他仍然使用
+ * themes.php 的頁面。
  */
-add_filter( 'parent_file', 'ckc_fix_nav_menus_admin_highlight', 999999 );
-function ckc_fix_nav_menus_admin_highlight( $parent_file ) {
+add_action( 'admin_menu', 'ckc_fix_nav_menus_admin_highlight', 1 );
+function ckc_fix_nav_menus_admin_highlight() {
     global $pagenow;
     if ( 'nav-menus.php' === $pagenow ) {
-        return 'ckc-homepage-builder';
+        $GLOBALS['_wp_real_parent_file']['themes.php'] = 'ckc-homepage-builder';
     }
-    return $parent_file;
-}
-add_filter( 'submenu_file', 'ckc_fix_nav_menus_admin_submenu_highlight', 999999 );
-function ckc_fix_nav_menus_admin_submenu_highlight( $submenu_file ) {
-    global $pagenow;
-    if ( 'nav-menus.php' === $pagenow ) {
-        return 'nav-menus.php';
-    }
-    return $submenu_file;
 }
 
-// TEMP DEBUG（驗證完會移除）：印出 nav-menus.php 頁面上 parent_file 過濾器
-// 實際跑出來的值，方便找出為什麼 sidebar 沒有展開「首頁」。
-add_action( 'admin_notices', 'ckc_temp_debug_parent_file' );
-function ckc_temp_debug_parent_file() {
-    global $pagenow, $parent_file, $submenu_file;
-    if ( 'nav-menus.php' !== $pagenow ) {
-        return;
-    }
-    echo '<div class="notice notice-info"><p>TEMP DEBUG — pagenow: <code>' . esc_html( $pagenow ) . '</code> / parent_file: <code>' . esc_html( $parent_file ) . '</code> / submenu_file: <code>' . esc_html( $submenu_file ) . '</code></p></div>';
-}
 
 /**
  * 27. 出貨AI助理頁面渲染回呼
