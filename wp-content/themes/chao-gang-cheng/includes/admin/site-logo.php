@@ -36,7 +36,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 add_action( 'admin_menu', 'ckc_site_logo_add_menu', 15 );
 function ckc_site_logo_add_menu() {
-	add_submenu_page(
+	// 注意：不能直接寫死猜測 hook suffix 字串（例如 'ckc-homepage-builder_page_ckc-site-logo'）。
+	// 父選單「首頁」的選單標題含中文，WordPress 組出來的 hook suffix 其實是
+	// 「未經處理的中文選單標題_page_ckc-site-logo」，不是父選單的英文 slug——
+	// 實測踩到這個坑：用猜測字串比對永遠對不上，導致 wp_enqueue_media() 跟
+	// 圖片選擇器 JS 完全沒載入。改用 add_submenu_page() 的回傳值（真正的
+	// hook suffix）存起來，在 ckc_site_logo_admin_assets() 精準比對。
+	$GLOBALS['ckc_site_logo_hook'] = add_submenu_page(
 		'ckc-homepage-builder',
 		'Logo 設定',
 		'Logo 設定',
@@ -142,7 +148,7 @@ function ckc_site_logo_page_html() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_site_logo_admin_assets' );
 function ckc_site_logo_admin_assets( $hook ) {
-	if ( 'ckc-homepage-builder_page_ckc-site-logo' !== $hook ) {
+	if ( empty( $GLOBALS['ckc_site_logo_hook'] ) || $GLOBALS['ckc_site_logo_hook'] !== $hook ) {
 		return;
 	}
 

@@ -11,7 +11,13 @@
  */
 add_action( 'admin_menu', 'ckc_popup_add_menu', 11 );
 function ckc_popup_add_menu() {
-    add_submenu_page(
+    // 注意：不能直接寫死猜測 hook suffix 字串。父選單「首頁」的選單標題含
+    // 中文，WordPress 組出來的 hook suffix 其實是「未經處理的中文選單
+    // 標題_page_ckc-popup-settings」，不是父選單的英文 slug——這個坑跟
+    // site-logo.php 的 ckc_site_logo_add_menu() 是同一個原因。改用
+    // add_submenu_page() 的回傳值（真正的 hook suffix）存起來，
+    // 在 ckc_popup_enqueue_admin_scripts() 精準比對。
+    $GLOBALS['ckc_popup_hook'] = add_submenu_page(
         'ckc-homepage-builder',
         '彈窗管理',
         '彈窗管理',
@@ -26,7 +32,7 @@ function ckc_popup_add_menu() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_popup_enqueue_admin_scripts' );
 function ckc_popup_enqueue_admin_scripts( $hook ) {
-    if ( $hook !== 'ckc-homepage-builder_page_ckc-popup-settings' ) return;
+    if ( empty( $GLOBALS['ckc_popup_hook'] ) || $GLOBALS['ckc_popup_hook'] !== $hook ) return;
     wp_enqueue_media();
 }
 
