@@ -4252,11 +4252,15 @@ function chao_gang_cheng_mobile_shortcut_bar() {
 // 選單（nav_menus）：後台側邊選單已新增獨立的「選單管理」入口，直接連到功能
 // 完整的 nav-menus.php 選單編輯頁面，客製化工具裡這個功能較陽春的「選單」
 // 面板已重複且多餘，故移除。
+// WooCommerce（woocommerce）：面板內的商店通知／產品目錄／商品圖片／結帳等設定，
+// 在後台「WooCommerce > 設定」都有對應且更完整的頁面可以調整，客製化工具這裡
+// 只是重複入口，故移除（不影響已設定的數值，只是隱藏這個較少人使用的入口）。
 add_action( 'customize_register', 'chao_gang_cheng_remove_legacy_customizer_panels', 999 );
 function chao_gang_cheng_remove_legacy_customizer_panels( $wp_customize ) {
     $wp_customize->remove_panel( 'widgets' );
     $wp_customize->remove_section( 'static_front_page' );
     $wp_customize->remove_panel( 'nav_menus' );
+    $wp_customize->remove_panel( 'woocommerce' );
 }
 
 
