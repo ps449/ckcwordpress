@@ -306,6 +306,41 @@
         <?php endif; ?>
     </header>
 
+    <script>
+    /* 桌機版頁首分類選單列（Row 2：所有商品／冷凍食品／下酒菜…）智慧隱藏：
+       往下滑時收起、往上滑時展開，節省閱讀內容時的垂直空間。只作用在桌機版
+       （.header-navigation-row 只存在於 .desktop-header-wrapper，手機版本來
+       就沒有這一列，768px 以下的媒體查詢會把整個 .desktop-header-wrapper
+       隱藏，不需要另外排除）。 */
+    (function () {
+        var header = document.getElementById('masthead');
+        if (!header) { return; }
+        var lastScrollY = window.scrollY || window.pageYOffset;
+        var ticking = false;
+        var threshold = 8; // 忽略滑鼠滾輪誤觸等極小幅度的抖動
+
+        function onScroll() {
+            var currentY = window.scrollY || window.pageYOffset;
+            if (Math.abs(currentY - lastScrollY) > threshold) {
+                if (currentY > lastScrollY && currentY > header.offsetHeight) {
+                    header.classList.add('nav-row-collapsed'); // 往下滑：收起分類列
+                } else {
+                    header.classList.remove('nav-row-collapsed'); // 往上滑：展開分類列
+                }
+                lastScrollY = currentY;
+            }
+            ticking = false;
+        }
+
+        window.addEventListener('scroll', function () {
+            if (!ticking) {
+                window.requestAnimationFrame(onScroll);
+                ticking = true;
+            }
+        }, { passive: true });
+    })();
+    </script>
+
     <!-- Mobile Drawer Overlay & Content -->
     <div class="mobile-menu-overlay" style="display: none;"></div>
     <div class="mobile-menu-drawer">

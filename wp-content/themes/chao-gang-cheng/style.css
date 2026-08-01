@@ -125,6 +125,22 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
 }
 
+/* 分類選單列（Row 2）往下滑收起、往上滑展開，見 header.php 的 scroll
+   監聽 script（切換 .main-header 上的 .nav-row-collapsed）。用
+   max-height + opacity 做過渡，避免直接 display:none 沒有動畫效果。 */
+.header-navigation-row {
+  overflow: hidden;
+  max-height: 80px;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease, border-color 0.3s ease;
+}
+.main-header.nav-row-collapsed .header-navigation-row {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-top-color: transparent;
+}
+
 .logo img {
   max-height: 80px;
   height: auto;
