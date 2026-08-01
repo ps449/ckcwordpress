@@ -385,7 +385,7 @@ function ckc_refp_account_section() {
         ?>
         <?php
         $hot_rate = get_option( '_ckc_ref_tier_rate_hot', '3' );
-        $normal_rate = get_option( '_ckc_ref_tier_rate_normal', '6' );
+        $normal_rate = get_option( '_ckc_ref_tier_rate_regular', '6' );
         $slow_rate = get_option( '_ckc_ref_tier_rate_slow', '12' );
         ?>
         <div style="background: #fff; border: 2px solid #7f6c60; border-radius: 10px; padding: 20px; margin-top: 20px;">
