@@ -8363,7 +8363,52 @@ add_filter( 'yotuwp_prev_text', function() { return '上一頁'; } );
 add_filter( 'woocommerce_currency_symbol', 'change_twd_currency_symbol_to_plain_text', 10, 2 );
 function change_twd_currency_symbol_to_plain_text( $currency_symbol, $currency ) {
     if ( 'TWD' === $currency ) {
-        return 'NT$'; 
+        return 'NT$';
     }
     return $currency_symbol;
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────
+ * 28. 前端全站效能優化：非必要第三方追蹤腳本延遲載入 + 條件式載入
+ * ─────────────────────────────────────────────────────────────────
+ * 背景：實測發現首頁載入偏慢（DOMContentLoaded ~4 秒），主因之一是多個
+ * 第三方追蹤／整合外掛（Facebook Conversions API、Facebook 像素信號、
+ * Google Listings & Ads 的 gtag 事件）的腳本用同步方式載入，且 WooCommerce
+ * Product Add-Ons 外掛（含 jQuery UI datepicker）不分頁面全站載入，但實際上
+ * 只有商品頁選購附加選項、購物車、結帳頁重新計算金額時才用得到。
+ * 這裡改成：(1) 純追蹤類腳本加上 defer，不阻塞首屏渲染；(2) 附加選項相關
+ * 腳本改成只在真正需要的頁面才載入。純視覺/行為不變，只改變載入時機。
+ */
+
+// 28a. 非關鍵第三方追蹤腳本加上 defer（純追蹤用途，不影響頁面其他功能，
+// 加上 defer 後會等 HTML 解析完才依序執行，不再阻塞首屏渲染）。
+add_filter( 'script_loader_tag', 'chao_gang_cheng_defer_tracking_scripts', 10, 3 );
+function chao_gang_cheng_defer_tracking_scripts( $tag, $handle, $src ) {
+    if ( is_admin() ) {
+        return $tag;
+    }
+    $defer_handles = array(
+        'facebook-capi-param-builder', // Facebook for WooCommerce：Conversions API 參數建構
+        'wc-facebook-signals',         // Facebook for WooCommerce：像素事件信號
+        'gla-gtag-events',             // Google Listings & Ads：gtag 轉換事件
+    );
+    if ( in_array( $handle, $defer_handles, true ) && false === strpos( $tag, ' defer' ) ) {
+        $tag = str_replace( ' src=', ' defer src=', $tag );
+    }
+    return $tag;
+}
+
+// 28b. WooCommerce Product Add-Ons 外掛的前端腳本（含 jQuery UI datepicker、
+// 驗證庫）改成只在商品頁／購物車／結帳頁載入，其餘頁面（首頁、商店列表、
+// 文章等）完全用不到附加選項互動，卻要多載入一整套 jQuery UI，故在這些
+// 頁面上停用，減少不必要的下載與執行時間。
+add_action( 'wp_enqueue_scripts', 'chao_gang_cheng_conditional_product_addons_assets', 100 );
+function chao_gang_cheng_conditional_product_addons_assets() {
+    if ( is_product() || is_cart() || is_checkout() ) {
+        return; // 這些頁面維持原樣，附加選項功能正常運作
+    }
+    wp_dequeue_script( 'woocommerce-addons' );
+    wp_dequeue_script( 'woocommerce-addons-validation' );
+    wp_dequeue_script( 'jquery-ui-datepicker' );
 }
