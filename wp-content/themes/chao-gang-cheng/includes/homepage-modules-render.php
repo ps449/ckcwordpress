@@ -579,7 +579,7 @@ function ckc_render_module_social_links( $settings ) {
     $ln  = isset( $settings['line_url'] ) ? $settings['line_url'] : '';
     $yt  = isset( $settings['youtube_url'] ) ? $settings['youtube_url'] : '';
     ?>
-    <section class="social-links-section" style="margin-top: 5px; margin-bottom: 5px;">
+    <section class="social-links-section" style="margin-top: 0; margin-bottom: 0;">
         <div class="container social-grid">
             <?php if ( ! empty( $fb ) ) : ?>
             <a href="<?php echo esc_url( $fb ); ?>" target="_blank" class="social-card fb-card">

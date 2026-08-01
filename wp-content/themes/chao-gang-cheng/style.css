@@ -223,7 +223,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 500px;
   overflow: hidden;
   background-color: #000;
-  margin-bottom: 5px;
+  margin-bottom: 0;
 }
 
 .slide {
@@ -423,18 +423,16 @@ h1, h2, h3, h4, h5, h6 {
 
 /* --- Product Showcase Grid --- */
 .product-showcase {
-  margin: 0 0 5px 0;
+  margin: 0;
   padding: 60px 0;
 }
 
-/* 首頁區塊間距統一：所有區塊一律用 margin-bottom: 5px 建立間距
-   （margin-top 統一留 0），相鄰區塊的 margin 會以較大值 collapse，
-   兩邊都是 5px／0px 時 collapse 結果固定是 5px，確保每個區塊之間
-   的間距整齊劃一，不會因為個別區塊各自設不同數字而忽大忽小。 */
+/* 首頁區塊間距統一：這幾個區塊之間不留額外間距（margin: 0），
+   只靠各自原本的 padding 呈現內容留白，區塊與區塊直接相接。 */
 .home-image-banner,
 .home-portfolio-section,
 .home-youtube-section {
-  margin-bottom: 5px;
+  margin-bottom: 0;
 }
 
 .section-header {
@@ -678,7 +676,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* --- Homepage New Sections --- */
 .limited-promo-banner {
-  margin-bottom: 5px;
+  margin-bottom: 0;
   overflow: hidden;
 }
 
@@ -888,7 +886,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .monthly-promo-section {
   margin-top: 0;
-  margin-bottom: 5px;
+  margin-bottom: 0;
 }
 
 .promo-list {
@@ -5107,7 +5105,7 @@ ul.products.list-view li.product a.add_to_cart_button {
    讓圖片貼齊左右螢幕邊緣（搭配 homepage-modules-render.php 移除外層
    .container 包裹，兩邊要一起改才會是真正滿版）。 */
 .category-divider-banner {
-  margin: 0 0 5px 0;
+  margin: 0;
   overflow: hidden;
   text-align: center;
 }
