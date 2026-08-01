@@ -1172,6 +1172,13 @@ h1, h2, h3, h4, h5, h6 {
   .products-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  /* 首頁各分類模組（例如「下酒菜」）商品數不固定，遇到只有 1 件商品時，
+     固定 2 欄會讓卡片右邊留一大塊空白格——稽核時在「下酒菜」模組實際
+     看到這個狀況。用 :has() 偵測「只有一個子項目」，讓孤例卡片改成
+     滿版寬度，其餘正常 2 欄不受影響。 */
+  .products-grid:has(> .product-card:only-child) {
+    grid-template-columns: 1fr;
+  }
   .footer-grid {
     grid-template-columns: 1fr;
     gap: 30px;
@@ -3558,12 +3565,19 @@ body.show-register-form .u-column1.col-1 {
     background-color: rgba(124, 103, 103, 0.05) !important;
   }
 
-  /* Buy Now button on mobile sticky bar */
+  /* Buy Now button on mobile sticky bar.
+     原本這裡是藍色（#1a56db），跟本次「手機版UIUX優化」稽核時發現的問題一致：
+     商品頁內文的「立即購買」已經統一用品牌珊瑚紅（--accent-color）當作
+     唯一的主要行動色，但這顆黏在畫面底部、購買決策當下最後看到的按鈕卻是
+     完全不在色票內的藍色——同一個動作、同一個當下，卻用了兩種顏色，
+     反而稀釋「這是最終行動按鈕」的視覺訊號。改回珊瑚紅，讓這條色彩線索
+     從商品圖、卡片、頁內按鈕到手機黏底按鈕維持一致，不新增任何顏色。 */
   html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn {
     flex: 1 1 50% !important;
     max-width: 110px !important;
     height: 40px !important;
-    background-color: #1a56db !important; /* Switch to a bright primary blue for Buy Now to distinguish it clearly */
+    background-color: var(--accent-color) !important;
+    background-image: none !important;
     color: var(--white) !important;
     border: none !important;
     border-radius: 20px !important;
@@ -3574,7 +3588,7 @@ body.show-register-form .u-column1.col-1 {
     align-items: center !important;
     justify-content: center !important;
     padding: 0 4px !important;
-    box-shadow: 0 4px 10px rgba(26, 86, 219, 0.3) !important;
+    box-shadow: 0 4px 10px rgba(248, 111, 105, 0.35) !important;
     box-sizing: border-box !important;
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
