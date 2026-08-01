@@ -582,14 +582,28 @@ function ckc_homepage_render_field( $name_prefix, $key, $field, $value ) {
             echo '<div class="ckc-hb-repeater" data-row-template-name="' . esc_attr( $name ) . '">';
             echo '<div class="ckc-hb-repeater-rows">';
             $rows = is_array( $value ) ? $value : array();
+            $row_idx = 0;
             foreach ( $rows as $row ) {
-                ckc_homepage_render_repeater_row( $name, $field['row_fields'], $row );
+                // 注意：每一列的 text/link/color 欄位必須共用「同一個」陣列索引
+                // （例如 items[0][text]、items[0][link]、items[0][color]），
+                // 才能讓 PHP 把它們解析回同一列。如果像舊版一樣三個欄位都用
+                // items[][text]／items[][link]／items[][color] 這種空中括號，
+                // PHP 會把每一次的 [] 都當成「陣列再多加一個全新的元素」，
+                // 跟欄位名稱完全無關——結果 N 列會被拆成 3N 個各自只有一個
+                // 欄位有值的破碎項目，儲存一次資料就亂掉一次（已在實機驗證
+                // 中發現此問題並修正）。
+                ckc_homepage_render_repeater_row( $name, $field['row_fields'], $row, $row_idx );
+                $row_idx++;
             }
             echo '</div>';
             echo '<button type="button" class="button ckc-hb-repeater-add">＋ 新增一筆</button>';
-            // 隱藏的空白列範本：即使目前一筆都沒有，也能靠這份範本新增新的一筆
+            // 隱藏的空白列範本：即使目前一筆都沒有，也能靠這份範本新增新的一筆。
+            // 範本裡的欄位一律加上 disabled，確保這份範本本身「絕對不會」被
+            // 表單一併送出（disabled 的欄位瀏覽器天生就不會提交）；使用者按
+            // 「＋ 新增一筆」時，JS 會複製這份範本、拿掉 disabled、並換上一個
+            // 真正唯一的列索引（__ROWIDX__）後才附加到畫面上。
             echo '<div class="ckc-hb-repeater-row-template" style="display:none;">';
-            ckc_homepage_render_repeater_row( $name, $field['row_fields'], array() );
+            ckc_homepage_render_repeater_row( $name, $field['row_fields'], array(), '__ROWIDX__', true );
             echo '</div>';
             echo '</div>';
             break;
@@ -600,19 +614,22 @@ function ckc_homepage_render_field( $name_prefix, $key, $field, $value ) {
     echo '</div>';
 }
 
-function ckc_homepage_render_repeater_row( $name, $row_fields, $row_value ) {
+function ckc_homepage_render_repeater_row( $name, $row_fields, $row_value, $row_idx, $is_template = false ) {
+    $disabled = $is_template ? ' disabled="disabled"' : '';
     echo '<div class="ckc-hb-repeater-row">';
     echo '<span class="ckc-hb-repeater-drag">☰</span>';
     echo '<div class="ckc-hb-repeater-row-fields">';
     foreach ( $row_fields as $rkey => $rfield ) {
-        $rname = $name . '[][' . $rkey . ']';
+        // 三個欄位共用同一個 $row_idx，例如 items[0][text]／items[0][link]／
+        // items[0][color]，儲存時才能正確組回同一列（見上方呼叫端註解）。
+        $rname = $name . '[' . $row_idx . '][' . $rkey . ']';
         $rval  = isset( $row_value[ $rkey ] ) ? $row_value[ $rkey ] : '';
         if ( 'color' === $rfield['type'] ) {
-            echo '<input type="color" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ? $rval : '#ffffff' ) . '" class="ckc-hb-color" title="' . esc_attr( $rfield['label'] ) . '">';
+            echo '<input type="color" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ? $rval : '#ffffff' ) . '" class="ckc-hb-color" title="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
         } elseif ( 'url' === $rfield['type'] ) {
-            echo '<input type="url" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '">';
+            echo '<input type="url" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
         } else {
-            echo '<input type="text" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '">';
+            echo '<input type="text" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
         }
     }
     echo '</div>';
@@ -834,12 +851,22 @@ function ckc_homepage_builder_admin_assets( $hook ) {
         });
 
         // repeater：新增一筆（一律從隱藏的空白列範本複製，確保「目前一筆都沒有」時也能新增）
+        // 範本裡的欄位原本是 disabled（確保範本本身絕對不會被表單提交），
+        // 複製出來要變成「真正可用的一列」時，必須：
+        // 1. 拿掉 disabled，這一列的內容才會在儲存時一併送出。
+        // 2. 把欄位名稱裡的 __ROWIDX__ 換成一個目前頁面上絕對不會撞到的
+        //    唯一索引，text／link／color 三個欄位才會共用同一個索引、
+        //    儲存時才能正確組回同一列（而不是各自變成互不相干的破碎資料）。
+        var ckcRepeaterRowSeq = 0;
         $(document).on('click', '.ckc-hb-repeater-add', function(){
             var $repeater = $(this).closest('.ckc-hb-repeater');
             var $rows = $repeater.find('.ckc-hb-repeater-rows');
             var $template = $repeater.find('.ckc-hb-repeater-row-template .ckc-hb-repeater-row').first();
             if (!$template.length) { return; }
-            var $newRow = $template.clone();
+            var uniqueIdx = 'n' + Date.now().toString(36) + (ckcRepeaterRowSeq++);
+            var html = $template.prop('outerHTML').split('__ROWIDX__').join(uniqueIdx);
+            var $newRow = $(html);
+            $newRow.find('input').prop('disabled', false);
             $rows.append($newRow);
         });
 
