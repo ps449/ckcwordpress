@@ -422,6 +422,30 @@ function chao_gang_cheng_browser_cache_headers() {
 }
 
 /**
+ * Performance Optimization 7: Dequeue unused "Custom Facebook Feed" plugin assets sitewide
+ *
+ * 稽核「反應速度」時用 Performance API 抓每頁的資源清單，發現這個外掛的
+ * cff-scripts.min.js 每一頁都在載入（被 WordPress.com 的資源合併機制跟
+ * 其他檔案包在同一個請求裡），但站上實際檢查後找不到任何地方在用這個
+ * 外掛的動態貼文牆——首頁的 Facebook 卡片跟頁尾的粉專小卡都是另外手刻
+ * 的 iframe／連結，不是這個外掛產生的。等於每個訪客都在多下載、多解析
+ * 一支完全沒有畫面產出的 JS。這裡先在前台全站停用；如果之後真的要用
+ * 這個外掛的動態貼文牆功能，把這段拿掉即可（wp_dequeue 對不存在的
+ * handle 只是安全的無操作，不會影響其他功能）。
+ */
+add_action( 'wp_enqueue_scripts', 'chao_gang_cheng_dequeue_unused_cff_assets', 99 );
+function chao_gang_cheng_dequeue_unused_cff_assets() {
+	wp_dequeue_script( 'cff-scripts' );
+	wp_deregister_script( 'cff-scripts' );
+	wp_dequeue_style( 'cff-style' );
+	wp_deregister_style( 'cff-style' );
+	wp_dequeue_style( 'cff-styles' );
+	wp_deregister_style( 'cff-styles' );
+	wp_dequeue_style( 'cff-fontawesome' );
+	wp_deregister_style( 'cff-fontawesome' );
+}
+
+/**
  * Update WooCommerce Cart Fragment via AJAX
  */
 add_filter( 'woocommerce_add_to_cart_fragments', 'chao_gang_cheng_cart_fragments' );
