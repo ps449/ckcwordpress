@@ -19,13 +19,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 1. 註冊 240×80 的圖片尺寸，上傳的 Logo 圖片會自動裁切出這個尺寸，
- *    避免管理員上傳過大的原圖時前台還要下載、縮放整張大圖。
+ * 1.（已移除）原本這裡註冊了 ckc-site-logo 這個 240×80 裁切尺寸，但
+ * WordPress 的裁切尺寸只在上傳當下依「當時」註冊的數字產生一次，之後
+ * 改動尺寸不會自動幫已上傳過的圖重新裁切——實測踩到這個坑：把尺寸從
+ * 80×80 改成 240×80 後，先前上傳、套用過的 Logo 仍沿用舊的 80×80
+ * 裁切檔，被圖片 CDN 依 <img> 上寫的 240×80 硬拉伸，畫面整個放大模糊。
+ * 改成一律使用原始圖檔（見下面 ckc_get_site_logo_url()），前台
+ * width/height + object-fit:contain 自己負責等比縮放，不再需要、也
+ * 不再註冊這個容易過期的裁切尺寸。
  */
-add_action( 'after_setup_theme', 'ckc_register_site_logo_image_size' );
-function ckc_register_site_logo_image_size() {
-	add_image_size( 'ckc-site-logo', 240, 80, true );
-}
 
 /**
  * 2. 後台選單：移到「網站內容」分類區塊，緊接在「快捷列設定」（位置 33）
@@ -62,13 +64,22 @@ function ckc_site_logo_register_settings() {
 /**
  * 4. 取得目前應該使用的 Logo 網址（給 header.php 呼叫）。
  *
- * @param string $size 圖片尺寸，預設用裁切好的 240×80 版本。
+ * 注意：這裡刻意回傳「原始圖檔」（wp_get_attachment_url），不透過
+ * wp_get_attachment_image_url() 取 ckc-site-logo 這個裁切尺寸。原因：
+ * WordPress 的裁切尺寸只在「上傳當下」依照當時註冊的尺寸產生一次，
+ * 之後改了 add_image_size() 的數字並不會自動幫已經上傳過的圖重新裁切。
+ * 實測發現：先前把 ckc-site-logo 從 80×80 改成 240×80 後，某張在改動
+ * 之前就上傳、套用過的 Logo 仍然沿用舊的 80×80 裁切檔，被 WordPress.com
+ * 的圖片 CDN 依 <img> 上寫的 240×80 硬拉伸／裁切，畫面整個放大模糊、
+ * 字被裁掉一角。改回吃原始圖檔，讓前台 <img> 的 width/height +
+ * object-fit:contain 自己負責等比縮放，就不會再受裁切尺寸是否過期影響。
+ *
  * @return string
  */
-function ckc_get_site_logo_url( $size = 'ckc-site-logo' ) {
+function ckc_get_site_logo_url() {
 	$logo_id = absint( get_option( 'chao_gang_cheng_site_logo_id', 0 ) );
 	if ( $logo_id ) {
-		$url = wp_get_attachment_image_url( $logo_id, $size );
+		$url = wp_get_attachment_url( $logo_id );
 		if ( $url ) {
 			return $url;
 		}
@@ -85,7 +96,7 @@ function ckc_site_logo_page_html() {
 		return;
 	}
 	$logo_id  = absint( get_option( 'chao_gang_cheng_site_logo_id', 0 ) );
-	$logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'ckc-site-logo' ) : '';
+	$logo_url = $logo_id ? wp_get_attachment_url( $logo_id ) : '';
 	$is_custom = $logo_id && $logo_url;
 	$preview_url = $is_custom ? $logo_url : ( get_template_directory_uri() . '/assets/images/logo.png' );
 	?>
