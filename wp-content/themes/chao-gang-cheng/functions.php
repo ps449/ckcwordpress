@@ -5611,22 +5611,89 @@ function ckc_website_features_page() {
  */
 add_action( 'admin_menu', 'ckc_move_product_category_menu', 20 );
 function ckc_move_product_category_menu() {
-    $slug = 'edit-tags.php?taxonomy=product_cat&post_type=product';
+    $real_slug = 'edit-tags.php?taxonomy=product_cat&post_type=product';
 
-    // 位置 31：緊接在「彈窗管理」（位置 30）之後，落在「網站內容」區塊內
-    // （邏輯與 includes/admin/homepage-builder.php 的 ckc_homepage_builder_add_menu() 一致）。
+    // 注意：一開始直接用 add_menu_page() 的 $menu_slug 帶查詢字串
+    // （edit-tags.php?taxonomy=product_cat&post_type=product）指向既有頁面，
+    // 但實測發現選單項目完全沒有出現（WordPress 核心 get_plugin_page_hookname()
+    // 內部會用 preg_replace('!\.php!','', $menu_slug) 處理 hookname，容易與查詢字串
+    // 版本的 slug 互相干擾）。改採本檔案「網站功能」（ckc-website-features）已驗證
+    // 可行的做法：建立一個全新的獨立 slug 當作頂層選單，點擊時用回呼函式
+    // wp_safe_redirect() 轉導到真正的分類頁面，行為與 ckc_website_features_page()
+    // 一致。
+
+    // 位置 31：緊接在「彈窗管理」（位置 30）之後，落在「網站內容」區塊內。
     add_menu_page(
         '分類管理',
         '分類管理',
         'manage_product_terms',
-        $slug,
-        '',
+        'ckc-product-categories',
+        'ckc_product_categories_redirect_page',
         'dashicons-category',
         31
     );
 
     // 移除原本「商品」選單下的「分類」子項目，避免重複入口
-    remove_submenu_page( 'edit.php?post_type=product', $slug );
+    remove_submenu_page( 'edit.php?post_type=product', $real_slug );
+}
+
+/**
+ * 「分類管理」頂層選單點擊時的自動轉導回呼，導向真正的分類編輯頁面。
+ */
+function ckc_product_categories_redirect_page() {
+    wp_safe_redirect( admin_url( 'edit-tags.php?taxonomy=product_cat&post_type=product' ) );
+    exit;
+}
+
+/**
+ * 26i. 修正商品分類頁面「上層分類」欄位說明文字
+ * WordPress 核心預設範例文字沿用影劇類比喻（影集／美劇／日劇），
+ * 與本站主要銷售冷凍食品的商品分類邏輯不符，改為貼近實際業務的範例。
+ */
+add_filter( 'register_taxonomy_args', 'ckc_customize_product_cat_labels', 10, 2 );
+function ckc_customize_product_cat_labels( $args, $taxonomy ) {
+    if ( 'product_cat' !== $taxonomy ) {
+        return $args;
+    }
+    if ( ! isset( $args['labels'] ) || ! is_array( $args['labels'] ) ) {
+        $args['labels'] = array();
+    }
+    $args['labels']['parent_field_description'] = '指派上層分類以建立階層架構。舉例來說，這個網站可以有個「食品」分類，而其下還有「冷凍食品」及「常溫食品」等子分類。';
+    return $args;
+}
+
+/**
+ * 26j. 翻譯商品分類頁面「Google 商品分類」欄位相關文字（Facebook for WooCommerce 外掛）
+ *
+ * 這個欄位（含說明文字、提示、彈窗、下拉選單佔位文字）都是透過標準 WordPress
+ * __() 函式並帶有 'facebook-for-woocommerce' text domain 輸出，可直接用 gettext
+ * 過濾器攔截翻譯。注意：Google 官方商品分類樹本身（如「Apparel & Accessories」
+ * 等上千筆分類名稱）是外掛內建的原始 PHP 陣列資料，並非透過 __() 輸出，
+ * 不在這個過濾器的處理範圍內。
+ */
+add_filter( 'gettext', 'ckc_translate_facebook_google_category_strings', 20, 3 );
+function ckc_translate_facebook_google_category_strings( $translated, $original, $domain ) {
+    if ( 'facebook-for-woocommerce' !== $domain ) {
+        return $translated;
+    }
+    static $map = null;
+    if ( null === $map ) {
+        $map = array(
+            'To optimize ad performance, we recommend providing these additional product attributes in WooCommerce. Updates made here will be overwritten with attributes provided in WooCommerce.' => '為了優化廣告成效，建議在 WooCommerce 中提供這些額外的商品屬性。此處所做的修改，將會被 WooCommerce 中設定的屬性覆蓋。',
+            'Default Google product category' => '預設 Google 商品分類',
+            'Choose a default Google product category for products in this category. Products need at least two category levels defined for tax to be correctly applied.' => '為此分類下的商品選擇預設的 Google 商品分類。商品至少需要指定兩層分類，稅金才能正確套用。',
+            'Category Specific Attributes' => '分類專屬屬性',
+            'Select default values for enhanced attributes within this category' => '為此分類選擇加強屬性的預設值',
+            'Show more attributes' => '顯示更多屬性',
+            'Products and categories that inherit this global setting (i.e. they do not have a specific Google product category set) will use the new default immediately. Are you sure you want to proceed?' => '繼承此全域設定的商品與分類（也就是尚未個別設定 Google 商品分類者），將會立即套用新的預設值。確定要繼續嗎？',
+            'Cancel' => '取消',
+            'Update default Google product category' => '更新預設 Google 商品分類',
+            'Search main categories...' => '搜尋主要分類...',
+            'Choose a main category first' => '請先選擇主要分類',
+            'Choose a category' => '選擇分類',
+        );
+    }
+    return isset( $map[ $original ] ) ? $map[ $original ] : $translated;
 }
 
 /**
