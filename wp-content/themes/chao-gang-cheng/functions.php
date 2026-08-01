@@ -5784,14 +5784,14 @@ function ckc_product_categories_redirect_page() {
  * 「商品」而不是「首頁」。同樣用 parent_file／submenu_file 過濾器強制
  * 指定回「首頁 > 分類管理」。
  */
-add_filter( 'parent_file', 'ckc_fix_product_categories_admin_highlight' );
+add_filter( 'parent_file', 'ckc_fix_product_categories_admin_highlight', 999999 );
 function ckc_fix_product_categories_admin_highlight( $parent_file ) {
     if ( ckc_is_product_categories_screen() ) {
         return 'ckc-homepage-builder';
     }
     return $parent_file;
 }
-add_filter( 'submenu_file', 'ckc_fix_product_categories_admin_submenu_highlight' );
+add_filter( 'submenu_file', 'ckc_fix_product_categories_admin_submenu_highlight', 999999 );
 function ckc_fix_product_categories_admin_submenu_highlight( $submenu_file ) {
     if ( ckc_is_product_categories_screen() ) {
         return 'ckc-product-categories';
@@ -5892,7 +5892,7 @@ function ckc_add_nav_menu_management_page() {
  * 用 parent_file／submenu_file 這兩個 WordPress 官方提供、專門處理
  * 這種「連到共用核心頁面」情境的過濾器，強制指定回「首頁」。
  */
-add_filter( 'parent_file', 'ckc_fix_nav_menus_admin_highlight' );
+add_filter( 'parent_file', 'ckc_fix_nav_menus_admin_highlight', 999999 );
 function ckc_fix_nav_menus_admin_highlight( $parent_file ) {
     global $pagenow;
     if ( 'nav-menus.php' === $pagenow ) {
@@ -5900,7 +5900,7 @@ function ckc_fix_nav_menus_admin_highlight( $parent_file ) {
     }
     return $parent_file;
 }
-add_filter( 'submenu_file', 'ckc_fix_nav_menus_admin_submenu_highlight' );
+add_filter( 'submenu_file', 'ckc_fix_nav_menus_admin_submenu_highlight', 999999 );
 function ckc_fix_nav_menus_admin_submenu_highlight( $submenu_file ) {
     global $pagenow;
     if ( 'nav-menus.php' === $pagenow ) {

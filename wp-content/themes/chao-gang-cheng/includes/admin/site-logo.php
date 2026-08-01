@@ -18,18 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// TEMP DEBUG（驗證完會移除）：印出 admin_enqueue_scripts 收到的 $hook、
-// $_GET['page']，確認 ckc_site_logo_admin_assets() 有沒有跑到、判斷式
-// 有沒有通過。
-add_action( 'admin_notices', 'ckc_temp_debug_site_logo_notice' );
-function ckc_temp_debug_site_logo_notice() {
-	if ( empty( $_GET['page'] ) || 'ckc-site-logo' !== $_GET['page'] ) {
-		return;
-	}
-	$d = isset( $GLOBALS['ckc_temp_debug_site_logo'] ) ? $GLOBALS['ckc_temp_debug_site_logo'] : null;
-	echo '<div class="notice notice-info"><p>TEMP DEBUG — $_GET[page] 現在: <code>' . esc_html( $_GET['page'] ) . '</code> / admin_enqueue_scripts 收到的 hook: <code>' . esc_html( $d ? $d['hook'] : 'N/A（尚未執行到 admin_notices 前 admin_enqueue_scripts 還沒跑?）' ) . '</code> / 當時看到的 get_page: <code>' . esc_html( $d ? (string) $d['get_page'] : 'N/A' ) . '</code> / ran_past_check: <code>' . ( $d && $d['ran_past_check'] ? 'true' : 'false' ) . '</code></p></div>';
-}
-
 /**
  * 1.（已移除）原本這裡註冊了 ckc-site-logo 這個 240×80 裁切尺寸，但
  * WordPress 的裁切尺寸只在上傳當下依「當時」註冊的數字產生一次，之後
@@ -152,27 +140,18 @@ function ckc_site_logo_page_html() {
 /**
  * 6. 後台圖片選擇器 JS（wp.media），只在這個設定頁載入。
  *
- * 注意：不要用 $hook（hook suffix）比對。這個 hook suffix 是拿父選單
- * 「首頁」的選單標題（中文）去跑 sanitize_title() 組出來的，實測發現
- * 這個環境把它編碼成 urlencode 過的 %e9%a6%96%e9%a0%81_page_ckc-site-logo
- * 這種形式——即使拿 add_submenu_page() 的回傳值存起來比對，理論上應該
- * 要是同一個值，實測卻還是比對不上（不確定是不是這個平台在 hook
- * suffix 產生時機上有其他特殊處理）。改成直接比對網址上的
- * $_GET['page']，不透過 hook suffix 這條容易受中文選單標題影響的
- * 路徑，最直接也最不受影響。
+ * 注意：不要用 $hook（hook suffix）比對。父選單「首頁」的選單標題含
+ * 中文，這個環境把它組出來的 hook suffix 編碼成類似
+ * %e9%a6%96%e9%a0%81_page_ckc-site-logo 這種 urlencode 過的形式，直接
+ * 拿字面值寫死比對很容易出錯。改成直接比對網址上的 $_GET['page']，
+ * 不透過 hook suffix 這條容易受中文選單標題影響的路徑，最直接也最
+ * 不受影響。
  */
 add_action( 'admin_enqueue_scripts', 'ckc_site_logo_admin_assets' );
 function ckc_site_logo_admin_assets( $hook ) {
-	// TEMP DEBUG（驗證完會移除）
-	$GLOBALS['ckc_temp_debug_site_logo'] = array(
-		'hook'       => $hook,
-		'get_page'   => isset( $_GET['page'] ) ? $_GET['page'] : null,
-		'ran_past_check' => false,
-	);
 	if ( empty( $_GET['page'] ) || 'ckc-site-logo' !== $_GET['page'] ) {
 		return;
 	}
-	$GLOBALS['ckc_temp_debug_site_logo']['ran_past_check'] = true;
 
 	wp_enqueue_media();
 
