@@ -2272,13 +2272,20 @@ h1, h2, h3, h4, h5, h6 {
   box-sizing: border-box !important;
 }
 
-.product-action-buttons .add-to-cart-btn {
+/* 商品頁「加入購物車」實際 class 是 WooCommerce 原生的
+   single_add_to_cart_button，並非 .add-to-cart-btn（那個 class 只有商店
+   格線卡片在用）——原本這裡沒對到，商品頁的「加入購物車」等於沒套用次要
+   按鈕的外框樣式，跟「立即購買」長得一模一樣（都是通用規則的實心駝色），
+   分不出主／次動作。補上正確的 class，讓它退回外框次要樣式。 */
+.product-action-buttons .add-to-cart-btn,
+.product-action-buttons button.single_add_to_cart_button {
   background-color: transparent !important;
   color: var(--secondary-color) !important;
   border: 1.5px solid var(--secondary-color) !important;
 }
 
-.product-action-buttons .add-to-cart-btn:hover {
+.product-action-buttons .add-to-cart-btn:hover,
+.product-action-buttons button.single_add_to_cart_button:hover {
   background-color: var(--secondary-color) !important;
   color: var(--white) !important;
 }
@@ -2287,13 +2294,17 @@ h1, h2, h3, h4, h5, h6 {
    是駝色、只有滑鼠移過去才變珊瑚紅——桌機使用者很多時候看到按鈕當下就
    已經做出判斷，看不到 hover 效果。改成預設就是珊瑚紅，讓「這是最終
    行動按鈕」的視覺語言從商品頁開始就一致。 */
-.product-action-buttons .buy-now-btn {
+/* 選擇器刻意加上 button 元素型態（而非只有兩個 class），
+   specificity 才追得上 .woocommerce-page button.button 這條全站通用規則
+   （同樣有 !important，class 數量相同時單看選擇器出現順序，容易被更晚出現
+   的其他規則悄悄蓋掉——實測發現真的被蓋掉，故加強 specificity 而非只靠順序）。 */
+.product-action-buttons button.buy-now-btn {
   background-color: var(--accent-color) !important;
   color: var(--white) !important;
   border: none !important;
 }
 
-.product-action-buttons .buy-now-btn:hover {
+.product-action-buttons button.buy-now-btn:hover {
   background-color: var(--primary-color) !important;
   box-shadow: 0 4px 12px rgba(18, 18, 18, 0.15) !important;
 }
