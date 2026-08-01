@@ -5188,15 +5188,24 @@ function ckc_remove_appearance_submenus() {
     remove_submenu_page( 'themes.php', 'edit.php?post_type=wp_block' );
 }
 
+/**
+ * 20a-1. 「快捷列設定」原本掛在「外觀」選單底下，移至「網站內容」分類區塊，
+ * 跟「分類管理」（位置 31）、「選單管理」（位置 32）放在一起，方便管理
+ * 前台右側浮動按鈕（LINE／電話／回到頂端）的設定入口。
+ * 沿用既有的 slug 與渲染回呼，只是改用 add_menu_page() 讓它變成頂層選單。
+ */
 add_action( 'admin_menu', 'ckc_floating_btns_add_menu' );
 
 function ckc_floating_btns_add_menu() {
-    add_theme_page(
+    // 位置 33：緊接在「選單管理」（位置 32）之後，落在「網站內容」區塊內。
+    add_menu_page(
         '快捷列設定',        // 頁面標題
         '快捷列設定',        // 選單標籤
         'manage_options',    // 權限：管理員
         'ckc-floating-btns', // 選單 slug
-        'ckc_floating_btns_page_html' // 渲染回呼
+        'ckc_floating_btns_page_html', // 渲染回呼
+        'dashicons-admin-links',
+        33
     );
 }
 
