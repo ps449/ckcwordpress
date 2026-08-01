@@ -1404,6 +1404,65 @@ function chao_gang_cheng_save_extra_register_fields( $customer_id ) {
 }
 
 /**
+ * 會員登入：除了 WordPress 原生就支援的「使用者名稱」與「電子郵件」，
+ * 再加上「行動電話」也能登入。
+ *
+ * 註冊時 billing_phone 已強制要求為 09 開頭的 10 碼數字（見上面的
+ * chao_gang_cheng_validate_extra_register_fields 驗證邏輯），所以每個
+ * 會員都一定有這筆資料可以比對。
+ *
+ * 掛在 authenticate 的 priority 15，搶在 WordPress 核心處理使用者名稱／
+ * 電子郵件登入的 wp_authenticate_username_password（priority 20）之前跑。
+ * 只有在輸入內容「看起來像手機號碼」時才介入：找到對應會員後，直接把
+ * 輸入換成該會員真正的使用者名稱，再原封不動交給 WordPress 原生的
+ * wp_authenticate_username_password 去驗證密碼——密碼驗證邏輯完全沒有
+ * 自己重寫，只有「用什麼字串去比對帳號」這一步被替換掉，安全性跟原本
+ * 帳密登入一致。如果輸入的不是手機號碼格式，就直接放行給後面的原生
+ * 流程處理，不影響原本使用者名稱／電子郵件登入的行為。
+ */
+add_filter( 'authenticate', 'chao_gang_cheng_authenticate_by_phone', 15, 3 );
+function chao_gang_cheng_authenticate_by_phone( $user, $username, $password ) {
+    // 已經有其他驗證流程解析出結果的話就不重複處理
+    if ( $user instanceof WP_User || empty( $username ) ) {
+        return $user;
+    }
+
+    $digits = preg_replace( '/[^0-9]/', '', $username );
+    if ( ! preg_match( '/^09\d{8}$/', $digits ) ) {
+        return $user;
+    }
+
+    $matched_users = get_users( array(
+        'meta_key'   => 'billing_phone',
+        'meta_value' => $digits,
+        'number'     => 1,
+        'fields'     => 'all',
+    ) );
+
+    if ( empty( $matched_users ) ) {
+        return $user;
+    }
+
+    return wp_authenticate_username_password( null, $matched_users[0]->user_login, $password );
+}
+
+/**
+ * 把登入表單上「使用者名稱或電子郵件地址」的欄位標籤，改成也提到手機號碼，
+ * 跟上面新增的手機號碼登入功能對應起來（欄位本身有 CSS 讓標籤視覺上隱藏，
+ * 只顯示 placeholder，但畫面閱讀器仍會讀到這個標籤文字，所以兩處都要改）。
+ */
+add_filter( 'gettext', 'chao_gang_cheng_translate_login_label', 10, 3 );
+function chao_gang_cheng_translate_login_label( $translated, $original, $domain ) {
+    if ( 'woocommerce' !== $domain ) {
+        return $translated;
+    }
+    if ( 'Username or email address' === $original || '使用者名稱或電子郵件地址' === $translated ) {
+        return '使用者名稱、電子郵件或手機號碼';
+    }
+    return $translated;
+}
+
+/**
  * Reduce WooCommerce Password Strength Requirements and Disable Front-end Meter
  * Allows users to register/checkout with simpler passwords while keeping a minimum length of 6 characters for security.
  */
@@ -2482,7 +2541,7 @@ function chao_gang_cheng_account_page_script() {
         <script>
             jQuery(document).ready(function($) {
                 // Add placeholders to login fields
-                $('#username').attr('placeholder', '請輸入您的使用者名稱或電子郵件');
+                $('#username').attr('placeholder', '請輸入使用者名稱、電子郵件或手機號碼');
                 $('#password').attr('placeholder', '請輸入您的密碼');
                 // Add placeholders to register fields if present
                 $('#reg_email').attr('placeholder', '請輸入您的電子郵件地址');
