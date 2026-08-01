@@ -315,14 +315,29 @@
     (function () {
         var header = document.getElementById('masthead');
         if (!header) { return; }
+        // 收合觸發的捲動門檻用「展開狀態下」量到的固定高度，只在腳本啟動時量一次。
+        // 不能像舊版一樣每次都即時讀 header.offsetHeight：收合後 header 會變矮，
+        // 讀到的高度也跟著變小，門檻就會一直變動，滑到頂端附近時很容易觸發
+        // 「收起→展開→收起」連續閃爍、畫面跳動的問題。
+        var expandedHeight = header.offsetHeight;
+        var topGuard = 20; // 捲動距離小於這個值時，強制維持展開，避免頁面頂端附近閃爍
         var lastScrollY = window.scrollY || window.pageYOffset;
         var ticking = false;
         var threshold = 8; // 忽略滑鼠滾輪誤觸等極小幅度的抖動
 
         function onScroll() {
             var currentY = window.scrollY || window.pageYOffset;
+
+            if (currentY <= topGuard) {
+                // 頁面頂端附近一律展開，不受方向判斷影響
+                header.classList.remove('nav-row-collapsed');
+                lastScrollY = currentY;
+                ticking = false;
+                return;
+            }
+
             if (Math.abs(currentY - lastScrollY) > threshold) {
-                if (currentY > lastScrollY && currentY > header.offsetHeight) {
+                if (currentY > lastScrollY && currentY > expandedHeight) {
                     header.classList.add('nav-row-collapsed'); // 往下滑：收起分類列
                 } else {
                     header.classList.remove('nav-row-collapsed'); // 往上滑：展開分類列
