@@ -18,6 +18,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// TEMP DEBUG（驗證完會移除）：印出 admin_enqueue_scripts 收到的 $hook、
+// $_GET['page']，確認 ckc_site_logo_admin_assets() 有沒有跑到、判斷式
+// 有沒有通過。
+add_action( 'admin_notices', 'ckc_temp_debug_site_logo_notice' );
+function ckc_temp_debug_site_logo_notice() {
+	if ( empty( $_GET['page'] ) || 'ckc-site-logo' !== $_GET['page'] ) {
+		return;
+	}
+	$d = isset( $GLOBALS['ckc_temp_debug_site_logo'] ) ? $GLOBALS['ckc_temp_debug_site_logo'] : null;
+	echo '<div class="notice notice-info"><p>TEMP DEBUG — $_GET[page] 現在: <code>' . esc_html( $_GET['page'] ) . '</code> / admin_enqueue_scripts 收到的 hook: <code>' . esc_html( $d ? $d['hook'] : 'N/A（尚未執行到 admin_notices 前 admin_enqueue_scripts 還沒跑?）' ) . '</code> / 當時看到的 get_page: <code>' . esc_html( $d ? (string) $d['get_page'] : 'N/A' ) . '</code> / ran_past_check: <code>' . ( $d && $d['ran_past_check'] ? 'true' : 'false' ) . '</code></p></div>';
+}
+
 /**
  * 1.（已移除）原本這裡註冊了 ckc-site-logo 這個 240×80 裁切尺寸，但
  * WordPress 的裁切尺寸只在上傳當下依「當時」註冊的數字產生一次，之後
@@ -151,9 +163,16 @@ function ckc_site_logo_page_html() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_site_logo_admin_assets' );
 function ckc_site_logo_admin_assets( $hook ) {
+	// TEMP DEBUG（驗證完會移除）
+	$GLOBALS['ckc_temp_debug_site_logo'] = array(
+		'hook'       => $hook,
+		'get_page'   => isset( $_GET['page'] ) ? $_GET['page'] : null,
+		'ran_past_check' => false,
+	);
 	if ( empty( $_GET['page'] ) || 'ckc-site-logo' !== $_GET['page'] ) {
 		return;
 	}
+	$GLOBALS['ckc_temp_debug_site_logo']['ran_past_check'] = true;
 
 	wp_enqueue_media();
 
