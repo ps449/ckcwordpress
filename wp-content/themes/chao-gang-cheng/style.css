@@ -422,7 +422,19 @@ h1, h2, h3, h4, h5, h6 {
 
 /* --- Product Showcase Grid --- */
 .product-showcase {
+  margin: 40px 0;
   padding: 60px 0;
+}
+
+/* 首頁區塊間距統一：以下這幾個區塊原本完全沒有 margin（只有內距
+   padding），padding 不會跟相鄰區塊產生任何視覺留白，兩個區塊會直接
+   黏在一起（.home-image-banner 改滿版之後這個問題更明顯）。統一補上
+   margin-bottom: 40px，跟 .category-divider-banner／.product-showcase
+   已經在用的 40px 間距節奏一致。 */
+.home-image-banner,
+.home-portfolio-section,
+.home-youtube-section {
+  margin-bottom: 40px;
 }
 
 .section-header {
