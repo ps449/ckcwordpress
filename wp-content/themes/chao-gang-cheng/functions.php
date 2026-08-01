@@ -4249,10 +4249,14 @@ function chao_gang_cheng_mobile_shortcut_bar() {
 // 首頁設定（static_front_page）：WordPress 樣板優先權規則下，只要佈景主題有
 // front-page.php（本站就有），首頁一律使用該樣板，「您的首頁顯示」這個切換
 // 完全不會影響實際顯示內容，留著只會讓操作者誤以為改這裡有用，故移除。
+// 選單（nav_menus）：後台側邊選單已新增獨立的「選單管理」入口，直接連到功能
+// 完整的 nav-menus.php 選單編輯頁面，客製化工具裡這個功能較陽春的「選單」
+// 面板已重複且多餘，故移除。
 add_action( 'customize_register', 'chao_gang_cheng_remove_legacy_customizer_panels', 999 );
 function chao_gang_cheng_remove_legacy_customizer_panels( $wp_customize ) {
     $wp_customize->remove_panel( 'widgets' );
     $wp_customize->remove_section( 'static_front_page' );
+    $wp_customize->remove_panel( 'nav_menus' );
 }
 
 
