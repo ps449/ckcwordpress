@@ -8067,6 +8067,7 @@ require_once get_template_directory() . '/includes/woocommerce/checkout.php';
 
 // Load custom LINE Login module
 require_once get_template_directory() . '/includes/line-login.php';
+require_once get_template_directory() . '/includes/line-order-notify.php'; // LINE 訂單成功通知（推播到 LINE 群組）
 require_once get_template_directory() . '/includes/ckc-referral.php'; // 分潤系統（推薦好友，第一階段點數軌）
 require_once get_template_directory() . '/includes/ckc-referral-partner.php'; // 分潤系統（第二階段夥伴現金軌）
 require_once get_template_directory() . '/includes/ckc-referral-admin.php'; // 分潤系統（後台夥伴管理頁）
