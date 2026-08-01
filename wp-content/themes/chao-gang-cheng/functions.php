@@ -8070,6 +8070,7 @@ require_once get_template_directory() . '/includes/line-login.php';
 require_once get_template_directory() . '/includes/ckc-referral.php'; // 分潤系統（推薦好友，第一階段點數軌）
 require_once get_template_directory() . '/includes/ckc-referral-partner.php'; // 分潤系統（第二階段夥伴現金軌）
 require_once get_template_directory() . '/includes/ckc-referral-admin.php'; // 分潤系統（後台夥伴管理頁）
+require_once get_template_directory() . '/includes/ckc-referral-tier-admin.php'; // 分潤系統（商品階梯式分潤分類設定）
 require_once get_template_directory() . '/includes/ckc-coupons.php'; // 折扣券（領券中心＋專屬優惠券頁）
 require_once get_template_directory() . '/includes/ckc-points-admin.php'; // 紅利點數後台管理系統
 
