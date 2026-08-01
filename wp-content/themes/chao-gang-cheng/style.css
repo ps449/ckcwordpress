@@ -895,7 +895,7 @@ h1, h2, h3, h4, h5, h6 {
   list-style: none;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 15px;
+  gap: 20px;
 }
 
 .promo-item {
