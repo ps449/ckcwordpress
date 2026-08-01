@@ -5714,6 +5714,29 @@ function ckc_translate_facebook_google_category_strings( $translated, $original,
 }
 
 /**
+ * 26k. 新增「選單管理」頂層選單，移至「網站內容」分類區塊。
+ *
+ * 背景：WordPress 原生的導覽選單管理頁面（nav-menus.php）預設是「外觀」選單
+ * 底下的子項目；但本站的「外觀」已被 ckc_setup_website_features_menu() 收合成
+ * 「網站功能」下的單一連結（只指向 themes.php，不含子選單），導致 nav-menus.php
+ * 完全沒有側邊選單入口可以點進去（雖然直接輸入網址仍能存取）。
+ * 這裡沿用既有頁面本身，不重建邏輯，只是在側邊選單新增一個直接入口。
+ */
+add_action( 'admin_menu', 'ckc_add_nav_menu_management_page' );
+function ckc_add_nav_menu_management_page() {
+    // 位置 32：緊接在「分類管理」（位置 31）之後，落在「網站內容」區塊內。
+    add_menu_page(
+        '選單管理',
+        '選單管理',
+        'edit_theme_options',
+        'nav-menus.php',
+        '',
+        'dashicons-menu',
+        32
+    );
+}
+
+/**
  * 27. 出貨AI助理頁面渲染回呼
  */
 function ckc_gemini_agent_page() {
