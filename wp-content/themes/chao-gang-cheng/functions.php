@@ -5901,8 +5901,17 @@ function ckc_add_nav_menu_management_page() {
  * nav-menus.php 時就會直接算成「首頁」底下的項目，不會再蓋掉。
  * 只在 $pagenow 是 nav-menus.php 時才置換，不影響其他仍然使用
  * themes.php 的頁面。
+ *
+ * 注意：優先權要設得非常晚（99999），不能設早。踩過一次坑——
+ * add_submenu_page() 內部「也」會查這個 $_wp_real_parent_file 陣列來
+ * 置換 parent slug，如果太早設定，會連帶把 WordPress 核心其他晚一點
+ * 才用 add_submenu_page('themes.php', ...) 註冊的子選單（例如「佈景
+ * 主題展示區」「字型」「佈景主題檔案編輯器」）一起吃進「首頁」底下，
+ * 讓側邊選單多出一堆不相干的項目。設在 admin_menu 的最後（99999）
+ * 執行，讓所有註冊都完成後才置換，這樣只會影響 get_admin_page_parent()
+ * 在畫面渲染階段的查詢，不會影響任何選單的註冊結果。
  */
-add_action( 'admin_menu', 'ckc_fix_nav_menus_admin_highlight', 1 );
+add_action( 'admin_menu', 'ckc_fix_nav_menus_admin_highlight', 99999 );
 function ckc_fix_nav_menus_admin_highlight() {
     global $pagenow;
     if ( 'nav-menus.php' === $pagenow ) {
