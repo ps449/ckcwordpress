@@ -36,13 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 add_action( 'admin_menu', 'ckc_site_logo_add_menu', 15 );
 function ckc_site_logo_add_menu() {
-	// 注意：不能直接寫死猜測 hook suffix 字串（例如 'ckc-homepage-builder_page_ckc-site-logo'）。
-	// 父選單「首頁」的選單標題含中文，WordPress 組出來的 hook suffix 其實是
-	// 「未經處理的中文選單標題_page_ckc-site-logo」，不是父選單的英文 slug——
-	// 實測踩到這個坑：用猜測字串比對永遠對不上，導致 wp_enqueue_media() 跟
-	// 圖片選擇器 JS 完全沒載入。改用 add_submenu_page() 的回傳值（真正的
-	// hook suffix）存起來，在 ckc_site_logo_admin_assets() 精準比對。
-	$GLOBALS['ckc_site_logo_hook'] = add_submenu_page(
+	add_submenu_page(
 		'ckc-homepage-builder',
 		'Logo 設定',
 		'Logo 設定',
@@ -145,10 +139,19 @@ function ckc_site_logo_page_html() {
 
 /**
  * 6. 後台圖片選擇器 JS（wp.media），只在這個設定頁載入。
+ *
+ * 注意：不要用 $hook（hook suffix）比對。這個 hook suffix 是拿父選單
+ * 「首頁」的選單標題（中文）去跑 sanitize_title() 組出來的，實測發現
+ * 這個環境把它編碼成 urlencode 過的 %e9%a6%96%e9%a0%81_page_ckc-site-logo
+ * 這種形式——即使拿 add_submenu_page() 的回傳值存起來比對，理論上應該
+ * 要是同一個值，實測卻還是比對不上（不確定是不是這個平台在 hook
+ * suffix 產生時機上有其他特殊處理）。改成直接比對網址上的
+ * $_GET['page']，不透過 hook suffix 這條容易受中文選單標題影響的
+ * 路徑，最直接也最不受影響。
  */
 add_action( 'admin_enqueue_scripts', 'ckc_site_logo_admin_assets' );
 function ckc_site_logo_admin_assets( $hook ) {
-	if ( empty( $GLOBALS['ckc_site_logo_hook'] ) || $GLOBALS['ckc_site_logo_hook'] !== $hook ) {
+	if ( empty( $_GET['page'] ) || 'ckc-site-logo' !== $_GET['page'] ) {
 		return;
 	}
 

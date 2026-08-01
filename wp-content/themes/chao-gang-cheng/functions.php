@@ -5909,6 +5909,17 @@ function ckc_fix_nav_menus_admin_submenu_highlight( $submenu_file ) {
     return $submenu_file;
 }
 
+// TEMP DEBUG（驗證完會移除）：印出 nav-menus.php 頁面上 parent_file 過濾器
+// 實際跑出來的值，方便找出為什麼 sidebar 沒有展開「首頁」。
+add_action( 'admin_notices', 'ckc_temp_debug_parent_file' );
+function ckc_temp_debug_parent_file() {
+    global $pagenow, $parent_file, $submenu_file;
+    if ( 'nav-menus.php' !== $pagenow ) {
+        return;
+    }
+    echo '<div class="notice notice-info"><p>TEMP DEBUG — pagenow: <code>' . esc_html( $pagenow ) . '</code> / parent_file: <code>' . esc_html( $parent_file ) . '</code> / submenu_file: <code>' . esc_html( $submenu_file ) . '</code></p></div>';
+}
+
 /**
  * 27. 出貨AI助理頁面渲染回呼
  */

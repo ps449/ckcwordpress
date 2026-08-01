@@ -11,13 +11,7 @@
  */
 add_action( 'admin_menu', 'ckc_popup_add_menu', 11 );
 function ckc_popup_add_menu() {
-    // 注意：不能直接寫死猜測 hook suffix 字串。父選單「首頁」的選單標題含
-    // 中文，WordPress 組出來的 hook suffix 其實是「未經處理的中文選單
-    // 標題_page_ckc-popup-settings」，不是父選單的英文 slug——這個坑跟
-    // site-logo.php 的 ckc_site_logo_add_menu() 是同一個原因。改用
-    // add_submenu_page() 的回傳值（真正的 hook suffix）存起來，
-    // 在 ckc_popup_enqueue_admin_scripts() 精準比對。
-    $GLOBALS['ckc_popup_hook'] = add_submenu_page(
+    add_submenu_page(
         'ckc-homepage-builder',
         '彈窗管理',
         '彈窗管理',
@@ -29,10 +23,16 @@ function ckc_popup_add_menu() {
 
 /**
  * 21b. 在後台頁面載入媒體庫腳本
+ *
+ * 注意：不要用 $hook（hook suffix）比對。這個 hook suffix 是拿父選單
+ * 「首頁」的選單標題（中文）去跑 sanitize_title() 組出來的，實測發現
+ * 就算改用 add_submenu_page() 的回傳值存起來比對，理論上該是同一個值，
+ * 實測卻還是比對不上。改成直接比對網址上的 $_GET['page']，不透過 hook
+ * suffix 這條容易受中文選單標題影響的路徑，最直接也最不受影響。
  */
 add_action( 'admin_enqueue_scripts', 'ckc_popup_enqueue_admin_scripts' );
 function ckc_popup_enqueue_admin_scripts( $hook ) {
-    if ( empty( $GLOBALS['ckc_popup_hook'] ) || $GLOBALS['ckc_popup_hook'] !== $hook ) return;
+    if ( empty( $_GET['page'] ) || 'ckc-popup-settings' !== $_GET['page'] ) return;
     wp_enqueue_media();
 }
 
