@@ -287,17 +287,19 @@ function ckc_render_module_category_showcase( $settings ) {
     $banner_img = isset( $settings['divider_banner_image'] ) ? $settings['divider_banner_image'] : '';
     if ( ! empty( $banner_img ) ) {
         $banner_link = isset( $settings['divider_banner_link'] ) ? $settings['divider_banner_link'] : '';
+        // 注意：這裡故意不包 <div class="container">（那個 class 帶
+        // max-width，會把圖片限制在版面寬度內）。外層 #content.site-content
+        // 本身沒有 max-width 限制，讓這個 <section> 直接滿版，圖片才能真正
+        // 貼齊左右螢幕邊緣（網頁全橫幅），不是像其他區塊一樣置中、兩側留白。
         ?>
         <section class="category-divider-banner">
-            <div class="container">
-                <?php if ( ! empty( $banner_link ) ) : ?>
-                    <a href="<?php echo esc_url( $banner_link ); ?>" class="category-divider-banner-link">
-                <?php endif; ?>
-                <img class="cat-divider-banner-img" src="<?php echo esc_url( $banner_img ); ?>" alt="分類 Banner" width="1200" height="669" loading="lazy" decoding="async">
-                <?php if ( ! empty( $banner_link ) ) : ?>
-                    </a>
-                <?php endif; ?>
-            </div>
+            <?php if ( ! empty( $banner_link ) ) : ?>
+                <a href="<?php echo esc_url( $banner_link ); ?>" class="category-divider-banner-link">
+            <?php endif; ?>
+            <img class="cat-divider-banner-img" src="<?php echo esc_url( $banner_img ); ?>" alt="分類 Banner" width="1200" height="669" loading="lazy" decoding="async">
+            <?php if ( ! empty( $banner_link ) ) : ?>
+                </a>
+            <?php endif; ?>
         </section>
         <?php
     }
@@ -391,17 +393,20 @@ function ckc_render_module_image_banner( $settings ) {
     }
     $link     = isset( $settings['link'] ) ? $settings['link'] : '';
     $alt_text = isset( $settings['alt_text'] ) ? $settings['alt_text'] : '活動 Banner';
+    // 注意：這裡故意不包 <div class="container">（那個 class 帶 max-width，
+    // 會把圖片限制在版面寬度內）。外層 #content.site-content 本身沒有
+    // max-width 限制，讓這個 <section> 直接滿版，圖片才能真正貼齊左右
+    // 螢幕邊緣（網頁全橫幅），不是像其他區塊一樣置中、兩側留白。滿版圖片
+    // 邊緣本來就會貼齊螢幕，圓角拿掉才符合「全橫幅」的視覺效果。
     ?>
     <section class="home-image-banner" style="padding: 0 0 20px 0;">
-        <div class="container" style="text-align:center;">
-            <?php if ( ! empty( $link ) ) : ?>
-                <a href="<?php echo esc_url( $link ); ?>" style="display:block; width:100%;">
-            <?php endif; ?>
-            <img src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( $alt_text ); ?>" width="1200" height="300" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:8px;">
-            <?php if ( ! empty( $link ) ) : ?>
-                </a>
-            <?php endif; ?>
-        </div>
+        <?php if ( ! empty( $link ) ) : ?>
+            <a href="<?php echo esc_url( $link ); ?>" style="display:block; width:100%;">
+        <?php endif; ?>
+        <img src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( $alt_text ); ?>" width="1200" height="300" loading="lazy" decoding="async" style="width:100%; height:auto; display:block;">
+        <?php if ( ! empty( $link ) ) : ?>
+            </a>
+        <?php endif; ?>
     </section>
     <?php
 }

@@ -5091,12 +5091,11 @@ ul.products.list-view li.product a.add_to_cart_button {
   gap: 10px;
 }
 
-/* Category Divider Banner Styling */
+/* Category Divider Banner Styling — 網頁全橫幅：故意不設 max-width，
+   讓圖片貼齊左右螢幕邊緣（搭配 homepage-modules-render.php 移除外層
+   .container 包裹，兩邊要一起改才會是真正滿版）。 */
 .category-divider-banner {
   margin: 40px 0;
-}
-
-.category-divider-banner .container {
   overflow: hidden;
   text-align: center;
 }
@@ -5109,19 +5108,13 @@ ul.products.list-view li.product a.add_to_cart_button {
 .cat-divider-banner-img {
   display: block;
   width: 100%;
-  max-width: 1200px;
   height: auto;
-  margin: 0 auto;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   object-fit: cover;
-  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  transition: filter 0.2s ease;
 }
 
 .category-divider-banner-link:hover .cat-divider-banner-img {
-  transform: translateY(-2px);
   filter: brightness(0.95);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 /* Homepage News Banner Styling */
@@ -5156,9 +5149,6 @@ ul.products.list-view li.product a.add_to_cart_button {
 @media (max-width: 768px) {
   .category-divider-banner {
     margin: 25px 0;
-  }
-  .cat-divider-banner-img {
-    border-radius: 6px;
   }
   .home-news-banner {
     margin-bottom: 25px;
@@ -5321,10 +5311,6 @@ ul.products.list-view li.product a.add_to_cart_button {
   /* --- Category Divider Banners: consistent aspect ratio --- */
   .category-divider-banner {
     margin: 30px 0;
-  }
-
-  .cat-divider-banner-img {
-    border-radius: 10px;
   }
 
   /* --- Social Links: 2-column comfortable grid --- */
