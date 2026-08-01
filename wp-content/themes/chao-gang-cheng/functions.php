@@ -3868,15 +3868,22 @@ function chao_gang_cheng_sticky_product_bar() {
                 opacity: 0.95 !important;
                 background-color: #7c6767 !important;
             }
+            /* 立即購買（黏底列）：這裡原本也設成跟「加入購物車」一樣的
+               taupe（#7c6767），跟頁面內文已經統一成珊瑚紅的立即購買按鈕
+               不一致——而且因為這段 <style> 是掛在 wp_footer、輸出順序在
+               style.min.css 之後，實際上一直蓋掉 style.css 裡對這顆按鈕
+               的顏色設定，才是這顆按鈕手機版一直看起來不對的真正原因。
+               改成 var(--accent-color)，和本次其他修正保持同一套色票。 */
             html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn {
-                background-color: #7c6767 !important;
+                background-color: var(--accent-color) !important;
+                background-image: none !important;
                 color: #ffffff !important;
                 border: none !important;
-                box-shadow: 0 2px 6px rgba(124, 103, 103, 0.2) !important;
+                box-shadow: 0 2px 6px rgba(248, 111, 105, 0.3) !important;
             }
             html body.single-product #mydybox-taiwan-for-woocommerce-sticky-cart .mydybox-taiwan-for-woocommerce-sticky-btn:hover {
                 opacity: 0.95 !important;
-                background-color: #7c6767 !important;
+                background-color: var(--accent-color) !important;
             }
         }
         /* Desktop Sticky Bottom Action Bar Custom Styles */
