@@ -5637,8 +5637,21 @@ function ckc_move_product_category_menu() {
         31
     );
 
-    // 移除原本「商品」選單下的「分類」子項目，避免重複入口
-    remove_submenu_page( 'edit.php?post_type=product', $real_slug );
+    // 移除原本「商品」選單下的「分類」子項目，避免重複入口。
+    // 注意：改用直接操作 $submenu 全域變數＋模糊比對（stripos 找含有
+    // taxonomy=product_cat 字樣的項目）取代 remove_submenu_page() 精確字串比對，
+    // 因為實測發現 remove_submenu_page( 'edit.php?post_type=product', $real_slug )
+    // 即使 slug 逐字元比對完全相符，仍然移除不掉（懷疑是子選單陣列裡的字串在
+    // 這個環境中帶有肉眼不可見的差異，例如編碼或多餘的隱藏字元），改用模糊比對
+    // 更保險，也更不受這類差異影響。
+    global $submenu;
+    if ( isset( $submenu['edit.php?post_type=product'] ) && is_array( $submenu['edit.php?post_type=product'] ) ) {
+        foreach ( $submenu['edit.php?post_type=product'] as $i => $item ) {
+            if ( isset( $item[2] ) && false !== stripos( $item[2], 'taxonomy=product_cat' ) ) {
+                unset( $submenu['edit.php?post_type=product'][ $i ] );
+            }
+        }
+    }
 }
 
 /**
