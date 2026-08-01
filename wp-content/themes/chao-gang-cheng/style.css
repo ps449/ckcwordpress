@@ -2283,15 +2283,36 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--white) !important;
 }
 
+/* 「立即購買」是購買路徑上真正決定成交的按鈕，原本預設跟其他按鈕一樣
+   是駝色、只有滑鼠移過去才變珊瑚紅——桌機使用者很多時候看到按鈕當下就
+   已經做出判斷，看不到 hover 效果。改成預設就是珊瑚紅，讓「這是最終
+   行動按鈕」的視覺語言從商品頁開始就一致。 */
 .product-action-buttons .buy-now-btn {
-  background-color: var(--secondary-color) !important;
+  background-color: var(--accent-color) !important;
   color: var(--white) !important;
   border: none !important;
 }
 
 .product-action-buttons .buy-now-btn:hover {
+  background-color: var(--primary-color) !important;
+  box-shadow: 0 4px 12px rgba(18, 18, 18, 0.15) !important;
+}
+
+/* 購買路徑上的另外兩個關鍵按鈕——購物車「前往結帳」、結帳頁「送出訂單」——
+   同樣改為預設珊瑚紅，跟「立即購買」呼應，讓整個購買流程的「主要行動」
+   顏色語言前後一致，不是走到後面又變回一般按鈕的駝色。 */
+.woocommerce a.checkout-button.button.alt,
+.woocommerce-page a.checkout-button.button.alt,
+.woocommerce #place_order,
+.woocommerce-page #place_order {
   background-color: var(--accent-color) !important;
-  box-shadow: 0 4px 12px rgba(248, 111, 105, 0.2) !important;
+}
+
+.woocommerce a.checkout-button.button.alt:hover,
+.woocommerce-page a.checkout-button.button.alt:hover,
+.woocommerce #place_order:hover,
+.woocommerce-page #place_order:hover {
+  background-color: var(--primary-color) !important;
 }
 
 /* --- Wrapped Quantity Selector Styles --- */
@@ -4226,8 +4247,11 @@ body.mobile-menu-active {
   .woocommerce-page ul.products.columns-3,
   .woocommerce-page ul.products.columns-4 {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 14px !important;
+    /* auto-fill（而非固定 repeat(3,1fr)）：商品數量不足一整排時，
+       欄位不會被拉伸成大片空白色塊，未使用的格線同層背景色即可，
+       視覺上就像自然靠左排列。分類頁商品數量偏少時尤其明顯改善。 */
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+    gap: 20px !important;
     float: none !important;
     padding: 0 !important;
     margin: 0 0 20px !important;
@@ -4268,6 +4292,52 @@ body.mobile-menu-active {
     margin: 0 !important;
     clear: none !important;
     box-sizing: border-box !important;
+    /* 桌面版商品分類／商店頁補上跟手機版、首頁模塊一致的卡片框——
+       之前桌面版完全沒有邊框／陰影／圓角，商品是「裸」貼在頁面背景上。 */
+    background-color: var(--white) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    overflow: hidden !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03) !important;
+    transition: var(--transition) !important;
+    padding-bottom: 15px !important;
+  }
+
+  .archive .woocommerce ul.products li.product:hover,
+  .archive .woocommerce-page ul.products li.product:hover,
+  .woocommerce-page.archive ul.products li.product:hover,
+  .shop-main-content ul.products li.product:hover,
+  .woocommerce ul.products.columns-2 li.product:hover,
+  .woocommerce ul.products.columns-3 li.product:hover,
+  .woocommerce ul.products.columns-4 li.product:hover,
+  .woocommerce-page ul.products.columns-2 li.product:hover,
+  .woocommerce-page ul.products.columns-3 li.product:hover,
+  .woocommerce-page ul.products.columns-4 li.product:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .shop-main-content ul.products li.product img,
+  .woocommerce ul.products.columns-2 li.product img,
+  .woocommerce ul.products.columns-3 li.product img,
+  .woocommerce ul.products.columns-4 li.product img {
+    aspect-ratio: 1 / 1 !important;
+    object-fit: cover !important;
+    width: 100% !important;
+  }
+
+  .shop-main-content ul.products li.product .woocommerce-loop-product__title,
+  .woocommerce ul.products.columns-2 li.product .woocommerce-loop-product__title,
+  .woocommerce ul.products.columns-3 li.product .woocommerce-loop-product__title,
+  .woocommerce ul.products.columns-4 li.product .woocommerce-loop-product__title {
+    padding: 0 15px !important;
+  }
+
+  .shop-main-content ul.products li.product .price,
+  .woocommerce ul.products.columns-2 li.product .price,
+  .woocommerce ul.products.columns-3 li.product .price,
+  .woocommerce ul.products.columns-4 li.product .price {
+    padding: 0 15px !important;
   }
 }
 
