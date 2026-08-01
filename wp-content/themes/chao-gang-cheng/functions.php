@@ -5609,7 +5609,11 @@ function ckc_website_features_page() {
  * 沿用既有的 edit-tags.php?taxonomy=product_cat&post_type=product 頁面，
  * 不重複建立頁面邏輯，只是換一個入口並移除原本「商品」選單下的子項目。
  */
-add_action( 'admin_menu', 'ckc_move_product_category_menu', 20 );
+// 注意：優先權提高到 99999（比大部分外掛都晚），避免其他外掛／WooCommerce
+// 在較晚的 admin_menu 優先權才重新註冊「分類」子選單，導致 remove_submenu_page()
+// 移除後又被加回來（實測發現用預設優先權 20 時，新增頂層選單會成功，
+// 但移除「商品」選單下的「分類」子項目卻不會生效，懷疑就是這個時序問題）。
+add_action( 'admin_menu', 'ckc_move_product_category_menu', 99999 );
 function ckc_move_product_category_menu() {
     $real_slug = 'edit-tags.php?taxonomy=product_cat&post_type=product';
 
