@@ -45,9 +45,12 @@ function chao_line_notify_log( $message ) {
  * 1. 後台設定頁
  * ------------------------------------------------------------------ */
 
+// 掛在「網站功能」（ckc-website-features，見 functions.php 第 26 段）底下，
+// 直接跟頁面／媒體／設定等項目同一層顯示，不用再從「設定」裡面找。
 add_action( 'admin_menu', 'chao_line_notify_add_admin_menu' );
 function chao_line_notify_add_admin_menu() {
-    add_options_page(
+    add_submenu_page(
+        'ckc-website-features',
         'LINE 訂單通知設定',
         'LINE 訂單通知設定',
         'manage_options',
