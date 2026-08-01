@@ -2417,6 +2417,27 @@ function ckc_checkout_coupon_ajax_script() {
         border-radius: 4px;
         animation: ckc-price-highlight 0.6s ease-out;
     }
+    /* 套用優惠券時，WooCommerce 原生的 update_checkout 會把整個結帳表單
+       蓋上一層 blockUI 遮罩＋轉圈圈動畫，但那個動畫本身沒有任何文字。
+       只在 body 有 ckc-applying-coupon 這個 class（套券進行中）時，於
+       轉圈圈下方補一行文字說明，其餘場合（例如切換配送方式）觸發的
+       blockUI 不受影響。 */
+    body.ckc-applying-coupon .blockUI.blockOverlay::after {
+        content: '套用優惠券中，請稍候…';
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, 36px);
+        background: rgba(18, 18, 18, 0.85);
+        color: #fff;
+        padding: 8px 18px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+        z-index: 2147483000;
+        pointer-events: none;
+    }
     </style>
     <script>
     jQuery(function($){
@@ -2546,6 +2567,11 @@ function ckc_checkout_coupon_ajax_script() {
                 $field.val(code);
                 window._ckcApplyPending = { code: code, $btn: $btn, original: originalBtnText };
                 ckcScrollLockOn();
+                // WooCommerce 原生的 update_checkout 會用 blockUI 把整個結帳表單
+                // 蓋上一層半透明遮罩＋轉圈圈動畫，但那個動畫本身完全沒有文字說明。
+                // 手機版畫面小，使用者很容易看到畫面整個「糊掉」卻不知道發生什麼事，
+                // 加上這個 class 讓 CSS 在轉圈圈旁邊補一行文字提示。
+                $('body').addClass('ckc-applying-coupon');
                 $(document.body).trigger('update_checkout');
                 // 保險絲：逾時未收到 updated_checkout 就還原按鈕
                 clearTimeout(window._ckcApplyTimer);
@@ -2556,6 +2582,7 @@ function ckc_checkout_coupon_ajax_script() {
                         $('form.checkout').find('input[name="ckc_apply_coupon_now"]').val('');
                         ckcBtnRestore(p.$btn, p.original);
                         ckcScrollLockOff();
+                        $('body').removeClass('ckc-applying-coupon');
                         ckcToast('連線逾時，請再試一次。', true);
                     }
                 }, 15000);
@@ -2598,6 +2625,7 @@ function ckc_checkout_coupon_ajax_script() {
             window._ckcApplyPending = null;
             clearTimeout(window._ckcApplyTimer);
             $('form.checkout').find('input[name="ckc_apply_coupon_now"]').val('');
+            $('body').removeClass('ckc-applying-coupon');
 
             // 判斷是否套用成功：優先用後端回傳的 fragments 清單，其次檢查訂單摘要 DOM
             var codeLower = (p.code || '').toString().toLowerCase();
