@@ -2278,14 +2278,16 @@ h1, h2, h3, h4, h5, h6 {
    按鈕的外框樣式，跟「立即購買」長得一模一樣（都是通用規則的實心駝色），
    分不出主／次動作。補上正確的 class，讓它退回外框次要樣式。 */
 .product-action-buttons .add-to-cart-btn,
-.product-action-buttons button.single_add_to_cart_button {
+.product-action-buttons button.single_add_to_cart_button,
+.woocommerce .product-action-buttons button.single_add_to_cart_button.alt {
   background-color: transparent !important;
   color: var(--secondary-color) !important;
   border: 1.5px solid var(--secondary-color) !important;
 }
 
 .product-action-buttons .add-to-cart-btn:hover,
-.product-action-buttons button.single_add_to_cart_button:hover {
+.product-action-buttons button.single_add_to_cart_button:hover,
+.woocommerce .product-action-buttons button.single_add_to_cart_button.alt:hover {
   background-color: var(--secondary-color) !important;
   color: var(--white) !important;
 }
@@ -2297,14 +2299,21 @@ h1, h2, h3, h4, h5, h6 {
 /* 選擇器刻意加上 button 元素型態（而非只有兩個 class），
    specificity 才追得上 .woocommerce-page button.button 這條全站通用規則
    （同樣有 !important，class 數量相同時單看選擇器出現順序，容易被更晚出現
-   的其他規則悄悄蓋掉——實測發現真的被蓋掉，故加強 specificity 而非只靠順序）。 */
-.product-action-buttons button.buy-now-btn {
+   的其他規則悄悄蓋掉——實測發現真的被蓋掉，故加強 specificity 而非只靠順序）。
+   實測後發現商品頁真正在競爭的是另一條 .woocommerce button.button.alt
+   （specificity 0,0,3,1，跟原本的修正打成平手，一樣有 !important，又再度
+   被蓋掉）。因為兩次都栽在「打平後靠順序」這招不可靠，這次直接把 .alt
+   與 .woocommerce 祖先都疊上去，讓 specificity 明確更高（0,0,4,1），
+   不再依賴來源順序決勝負。 */
+.product-action-buttons button.buy-now-btn,
+.woocommerce .product-action-buttons button.buy-now-btn.alt {
   background-color: var(--accent-color) !important;
   color: var(--white) !important;
   border: none !important;
 }
 
-.product-action-buttons button.buy-now-btn:hover {
+.product-action-buttons button.buy-now-btn:hover,
+.woocommerce .product-action-buttons button.buy-now-btn.alt:hover {
   background-color: var(--primary-color) !important;
   box-shadow: 0 4px 12px rgba(18, 18, 18, 0.15) !important;
 }
