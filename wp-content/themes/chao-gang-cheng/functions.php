@@ -7984,6 +7984,9 @@ require_once get_template_directory() . '/includes/admin/category-banner.php';
 // 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
 require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
 
+// 網站 Logo 後台替換功能（「網站內容」分類區塊，顯示尺寸統一 80×80）
+require_once get_template_directory() . '/includes/admin/site-logo.php';
+
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
  */

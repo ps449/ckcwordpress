@@ -55,7 +55,7 @@
                 <!-- Centered Brand Logo -->
                 <div class="logo" style="flex: 1; display: flex; justify-content: center; text-align: center;">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: inline-block;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="40" height="40" style="height: 40px; width: auto; object-fit: contain;" fetchpriority="high">
+                        <img src="<?php echo esc_url( ckc_get_site_logo_url() ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="80" height="80" style="height: 80px; width: 80px; object-fit: contain;" fetchpriority="high">
                     </a>
                 </div>
 
@@ -270,7 +270,10 @@
                 
                 <div class="mobile-logo-section">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: flex; align-items: center; text-decoration: none;">
-                        <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="35" height="35" style="height: 35px; width: auto; object-fit: contain;" fetchpriority="high">
+                        <?php /* 手機版頁首固定高度 60px（見 style.css .mobile-header-container），
+                                 放不下 80×80，維持較小的顯示尺寸，但改用同一份可替換的 Logo 來源，
+                                 後台換 Logo 時桌機／手機版會一起套用。 */ ?>
+                        <img src="<?php echo esc_url( ckc_get_site_logo_url() ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="35" height="35" style="height: 35px; width: auto; object-fit: contain;" fetchpriority="high">
                     </a>
                 </div>
                 
