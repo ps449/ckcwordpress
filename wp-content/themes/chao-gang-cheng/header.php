@@ -55,7 +55,7 @@
                 <!-- Centered Brand Logo -->
                 <div class="logo" style="flex: 1; display: flex; justify-content: center; text-align: center;">
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display: inline-block;">
-                        <img src="<?php echo esc_url( ckc_get_site_logo_url() ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="80" height="80" style="height: 80px; width: 80px; object-fit: contain;" fetchpriority="high">
+                        <img src="<?php echo esc_url( ckc_get_site_logo_url() ); ?>" alt="<?php bloginfo( 'name' ); ?>" width="240" height="80" style="height: 80px; width: 240px; object-fit: contain;" fetchpriority="high">
                     </a>
                 </div>
 

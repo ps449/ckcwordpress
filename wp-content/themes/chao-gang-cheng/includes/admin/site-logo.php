@@ -7,8 +7,8 @@
  * 部署，一般管理員無法自行處理。
  *
  * 這裡新增一個「網站內容」分類底下的設定頁，讓管理員可以直接在後台用
- * WordPress 媒體庫上傳／選擇圖片來替換 Logo，顯示尺寸統一為 80×80
- * （正方形），沒有另外上傳時維持原本內建的 logo.png，不影響尚未設定過
+ * WordPress 媒體庫上傳／選擇圖片來替換 Logo，顯示尺寸統一為 240×80
+ * （橫式），沒有另外上傳時維持原本內建的 logo.png，不影響尚未設定過
  * 的情況。
  *
  * @package Chao_Gang_Cheng
@@ -19,12 +19,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 1. 註冊 80×80 的圖片尺寸，上傳的 Logo 圖片會自動裁切出這個尺寸，
+ * 1. 註冊 240×80 的圖片尺寸，上傳的 Logo 圖片會自動裁切出這個尺寸，
  *    避免管理員上傳過大的原圖時前台還要下載、縮放整張大圖。
  */
 add_action( 'after_setup_theme', 'ckc_register_site_logo_image_size' );
 function ckc_register_site_logo_image_size() {
-	add_image_size( 'ckc-site-logo', 80, 80, true );
+	add_image_size( 'ckc-site-logo', 240, 80, true );
 }
 
 /**
@@ -62,7 +62,7 @@ function ckc_site_logo_register_settings() {
 /**
  * 4. 取得目前應該使用的 Logo 網址（給 header.php 呼叫）。
  *
- * @param string $size 圖片尺寸，預設用裁切好的 80×80 版本。
+ * @param string $size 圖片尺寸，預設用裁切好的 240×80 版本。
  * @return string
  */
 function ckc_get_site_logo_url( $size = 'ckc-site-logo' ) {
@@ -94,9 +94,9 @@ function ckc_site_logo_page_html() {
 		<hr class="wp-header-end">
 
 		<p style="max-width:640px;color:#555;">
-			替換前台頁首（桌機版）的品牌 Logo。顯示尺寸統一為 80×80 正方形，
-			建議上傳正方形圖片（PNG，建議帶透明背景），系統會自動裁切成
-			80×80 顯示，不需要自己先裁好。留空則使用系統預設 Logo。
+			替換前台頁首（桌機版）的品牌 Logo。顯示尺寸統一為 240×80（橫式），
+			建議上傳長寬比接近 3:1 的橫式圖片（PNG，建議帶透明背景），系統會
+			自動裁切成 240×80 顯示，不需要自己先裁好。留空則使用系統預設 Logo。
 		</p>
 
 		<form method="post" action="options.php" style="max-width:640px;margin-top:20px;">
@@ -106,8 +106,8 @@ function ckc_site_logo_page_html() {
 
 			<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:24px;">
 				<div class="ckc-site-logo-preview-wrap" style="margin-bottom:16px;display:flex;align-items:center;gap:16px;">
-					<div style="width:80px;height:80px;border:1px solid #e2e2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#faf6f1;overflow:hidden;flex-shrink:0;">
-						<img class="ckc-site-logo-preview" src="<?php echo esc_url( $preview_url ); ?>" alt="Logo 預覽" style="max-width:80px;max-height:80px;object-fit:contain;">
+					<div style="width:240px;height:80px;border:1px solid #e2e2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#faf6f1;overflow:hidden;flex-shrink:0;">
+						<img class="ckc-site-logo-preview" src="<?php echo esc_url( $preview_url ); ?>" alt="Logo 預覽" style="max-width:240px;max-height:80px;object-fit:contain;">
 					</div>
 					<p style="margin:0;color:#888;font-size:13px;">
 						<?php echo $is_custom ? '目前使用自訂 Logo' : '目前使用系統預設 Logo'; ?>
