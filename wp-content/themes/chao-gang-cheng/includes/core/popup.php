@@ -4,23 +4,20 @@
 // =============================================================================
 
 /**
- * 21a. 後台選單 — 獨立頂層選單「彈窗管理」
- * 位置 30：緊接在「首頁編輯」（位置 29）之後，落在後台選單「網站內容」
- * 分類區塊內（「電商營運」分類標題是由 functions.php 的
- * chao_gang_cheng_admin_menu_styling() 以 JS 動態插入在「出貨AI助理」
- * 〔ckc-gemini-agent，位置約 54.9〕正前方，位置數字小於它就會落在
- * 「網站內容」區塊，跟「首頁編輯」選單位置的處理邏輯相同）。
+ * 21a. 後台選單 —「首頁」頂層選單底下的子選單「彈窗管理」
+ * 原本是獨立頂層選單（位置 30），現在收整到 ckc-homepage-builder.php
+ * 註冊的「首頁」頂層選單底下，用 admin_menu 優先權 11（緊接在首頁編輯
+ * 的預設優先權 10 之後）確保在子選單列表中排第 2 順位。
  */
-add_action( 'admin_menu', 'ckc_popup_add_menu' );
+add_action( 'admin_menu', 'ckc_popup_add_menu', 11 );
 function ckc_popup_add_menu() {
-    add_menu_page(
+    add_submenu_page(
+        'ckc-homepage-builder',
         '彈窗管理',
         '彈窗管理',
         'manage_options',
         'ckc-popup-settings',
-        'ckc_popup_page_html',
-        'dashicons-megaphone',
-        30
+        'ckc_popup_page_html'
     );
 }
 
@@ -29,7 +26,7 @@ function ckc_popup_add_menu() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_popup_enqueue_admin_scripts' );
 function ckc_popup_enqueue_admin_scripts( $hook ) {
-    if ( $hook !== 'toplevel_page_ckc-popup-settings' ) return;
+    if ( $hook !== 'ckc-homepage-builder_page_ckc-popup-settings' ) return;
     wp_enqueue_media();
 }
 

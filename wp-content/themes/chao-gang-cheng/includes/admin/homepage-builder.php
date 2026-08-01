@@ -475,20 +475,40 @@ function ckc_save_homepage_modules_handler() {
 /* =========================================================================
  * 3. 後台選單頁面
  * ========================================================================= */
-add_action( 'admin_menu', 'ckc_homepage_builder_add_menu' );
+add_action( 'admin_menu', 'ckc_homepage_builder_add_menu', 10 );
 function ckc_homepage_builder_add_menu() {
     // 位置 29：緊接在「網站功能」（位置 28）之後，落在後台選單「網站內容」分類區塊內
     // （「電商營運」分類標題是由 functions.php 的 chao_gang_cheng_admin_menu_styling()
     // 以 JS 動態插入在「出貨AI助理」〔ckc-gemini-agent，位置約 54.9〕正前方，
     // 所以只要位置數字小於它，就會落在「網站內容」區塊）。
+    //
+    // 這裡是頂層選單「首頁」，把原本各自獨立佔一排的 6 個首頁相關設定
+    // （首頁編輯、彈窗管理、分類管理、選單管理、快捷列設定、Logo 設定）
+    // 收整成它底下的子選單，側邊欄從佔 6 排縮成 1 排，點開才展開 6 個項目。
+    // 其餘 5 個子選單分別在各自檔案（popup.php、site-logo.php、
+    // functions.php 內的快捷列設定／分類管理／選單管理區塊）用遞增的
+    // admin_menu 優先權（11～15）依序註冊，確保子選單顯示順序穩定、
+    // 不受各檔案載入先後順序影響。
     add_menu_page(
-        '首頁編輯',
-        '首頁編輯',
+        '首頁',
+        '首頁',
         'manage_options',
         'ckc-homepage-builder',
         'ckc_homepage_builder_render_page',
         'dashicons-layout',
         29
+    );
+
+    // slug 與頂層選單相同時，WordPress 預設會自動產生一個跟頂層選單同名
+    // （這裡會是「首頁」）的第一個子選單項目；這裡明確呼叫 add_submenu_page()
+    // 覆寫它的顯示文字，改成「首頁編輯」，跟其他 5 個子選單並列時語意才清楚。
+    add_submenu_page(
+        'ckc-homepage-builder',
+        '首頁編輯',
+        '首頁編輯',
+        'manage_options',
+        'ckc-homepage-builder',
+        'ckc_homepage_builder_render_page'
     );
 }
 

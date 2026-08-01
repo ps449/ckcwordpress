@@ -5248,23 +5248,23 @@ function ckc_remove_appearance_submenus() {
 }
 
 /**
- * 20a-1. 「快捷列設定」原本掛在「外觀」選單底下，移至「網站內容」分類區塊，
- * 跟「分類管理」（位置 31）、「選單管理」（位置 32）放在一起，方便管理
- * 前台右側浮動按鈕（LINE／電話／回到頂端）的設定入口。
- * 沿用既有的 slug 與渲染回呼，只是改用 add_menu_page() 讓它變成頂層選單。
+ * 20a-1. 「快捷列設定」原本掛在「外觀」選單底下，後來一度移到「網站內容」
+ * 分類區塊成為獨立頂層選單，現在收整到「首頁」頂層選單（homepage-builder.php
+ * 註冊的 ckc-homepage-builder）底下的子選單，跟其他 5 個首頁相關設定並列，
+ * 方便管理前台右側浮動按鈕（LINE／電話／回到頂端）的設定入口。
+ * 沿用既有的 slug 與渲染回呼，用 admin_menu 優先權 14 確保排在子選單
+ * 列表倒數第 2 位。
  */
-add_action( 'admin_menu', 'ckc_floating_btns_add_menu' );
+add_action( 'admin_menu', 'ckc_floating_btns_add_menu', 14 );
 
 function ckc_floating_btns_add_menu() {
-    // 位置 33：緊接在「選單管理」（位置 32）之後，落在「網站內容」區塊內。
-    add_menu_page(
+    add_submenu_page(
+        'ckc-homepage-builder', // 父選單 slug（「首頁」）
         '快捷列設定',        // 頁面標題
         '快捷列設定',        // 選單標籤
         'manage_options',    // 權限：管理員
         'ckc-floating-btns', // 選單 slug
-        'ckc_floating_btns_page_html', // 渲染回呼
-        'dashicons-admin-links',
-        33
+        'ckc_floating_btns_page_html' // 渲染回呼
     );
 }
 
@@ -5712,39 +5712,44 @@ function ckc_website_features_page() {
 
 /**
  * 26h. 將「分類」（商品分類管理，原本是「商品」選單下的子項目）移至
- * 「網站內容」分類區塊，獨立成頂層選單「分類管理」。
+ * 「首頁」頂層選單（ckc-homepage-builder）底下的子選單「分類管理」。
  * 沿用既有的 edit-tags.php?taxonomy=product_cat&post_type=product 頁面，
  * 不重複建立頁面邏輯，只是換一個入口並移除原本「商品」選單下的子項目。
+ *
+ * 註冊（新增子選單）跟移除舊入口拆成兩個各自獨立的 admin_menu 回呼：
+ * - 新增子選單用優先權 12，跟其他首頁相關子選單一樣走「小數字先執行」
+ *   的順序控制，確保子選單列表順序穩定。
+ * - 移除「商品」選單下的「分類」子項目則維持原本的優先權 99999（比大部分
+ *   外掛都晚），避免其他外掛／WooCommerce 在較晚的 admin_menu 優先權才
+ *   重新註冊「分類」子選單，導致移除後又被加回來（實測發現用較早的優先
+ *   權時，新增選單會成功，但移除「商品」選單下的「分類」子項目卻不會
+ *   生效，懷疑就是這個時序問題）——這兩件事的時序需求互相衝突，所以
+ *   分成兩個函式各自用最適合的優先權。
  */
-// 注意：優先權提高到 99999（比大部分外掛都晚），避免其他外掛／WooCommerce
-// 在較晚的 admin_menu 優先權才重新註冊「分類」子選單，導致 remove_submenu_page()
-// 移除後又被加回來（實測發現用預設優先權 20 時，新增頂層選單會成功，
-// 但移除「商品」選單下的「分類」子項目卻不會生效，懷疑就是這個時序問題）。
-add_action( 'admin_menu', 'ckc_move_product_category_menu', 99999 );
-function ckc_move_product_category_menu() {
-    $real_slug = 'edit-tags.php?taxonomy=product_cat&post_type=product';
-
+add_action( 'admin_menu', 'ckc_add_product_category_submenu', 12 );
+function ckc_add_product_category_submenu() {
     // 注意：一開始直接用 add_menu_page() 的 $menu_slug 帶查詢字串
     // （edit-tags.php?taxonomy=product_cat&post_type=product）指向既有頁面，
     // 但實測發現選單項目完全沒有出現（WordPress 核心 get_plugin_page_hookname()
     // 內部會用 preg_replace('!\.php!','', $menu_slug) 處理 hookname，容易與查詢字串
     // 版本的 slug 互相干擾）。改採本檔案「網站功能」（ckc-website-features）已驗證
-    // 可行的做法：建立一個全新的獨立 slug 當作頂層選單，點擊時用回呼函式
+    // 可行的做法：建立一個全新的獨立 slug 當作子選單，點擊時用回呼函式
     // wp_safe_redirect() 轉導到真正的分類頁面，行為與 ckc_website_features_page()
     // 一致。
-
-    // 位置 31：緊接在「彈窗管理」（位置 30）之後，落在「網站內容」區塊內。
-    add_menu_page(
+    add_submenu_page(
+        'ckc-homepage-builder',
         '分類管理',
         '分類管理',
         'manage_product_terms',
         'ckc-product-categories',
-        'ckc_product_categories_redirect_page',
-        'dashicons-category',
-        31
+        'ckc_product_categories_redirect_page'
     );
+}
 
-    // 移除原本「商品」選單下的「分類」子項目，避免重複入口。
+add_action( 'admin_menu', 'ckc_remove_product_category_from_products_menu', 99999 );
+function ckc_remove_product_category_from_products_menu() {
+    // 移除原本「商品」選單下的「分類」子項目，避免與上面新增的
+    // 「首頁 > 分類管理」重複入口。
     // 注意：改用直接操作 $submenu 全域變數＋模糊比對（stripos 找含有
     // taxonomy=product_cat 字樣的項目）取代 remove_submenu_page() 精確字串比對，
     // 因為實測發現 remove_submenu_page( 'edit.php?post_type=product', $real_slug )
@@ -5821,25 +5826,23 @@ function ckc_translate_facebook_google_category_strings( $translated, $original,
 }
 
 /**
- * 26k. 新增「選單管理」頂層選單，移至「網站內容」分類區塊。
+ * 26k. 新增「選單管理」子選單，收整到「首頁」頂層選單（ckc-homepage-builder）底下。
  *
  * 背景：WordPress 原生的導覽選單管理頁面（nav-menus.php）預設是「外觀」選單
  * 底下的子項目；但本站的「外觀」已被 ckc_setup_website_features_menu() 收合成
  * 「網站功能」下的單一連結（只指向 themes.php，不含子選單），導致 nav-menus.php
  * 完全沒有側邊選單入口可以點進去（雖然直接輸入網址仍能存取）。
  * 這裡沿用既有頁面本身，不重建邏輯，只是在側邊選單新增一個直接入口。
+ * 用 admin_menu 優先權 13 確保排在子選單列表第 4 順位。
  */
-add_action( 'admin_menu', 'ckc_add_nav_menu_management_page' );
+add_action( 'admin_menu', 'ckc_add_nav_menu_management_page', 13 );
 function ckc_add_nav_menu_management_page() {
-    // 位置 32：緊接在「分類管理」（位置 31）之後，落在「網站內容」區塊內。
-    add_menu_page(
+    add_submenu_page(
+        'ckc-homepage-builder',
         '選單管理',
         '選單管理',
         'edit_theme_options',
-        'nav-menus.php',
-        '',
-        'dashicons-menu',
-        32
+        'nav-menus.php'
     );
 }
 
@@ -7984,7 +7987,7 @@ require_once get_template_directory() . '/includes/admin/category-banner.php';
 // 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
 require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
 
-// 網站 Logo 後台替換功能（「網站內容」分類區塊，顯示尺寸統一 80×80）
+// 網站 Logo 後台替換功能（「首頁」子選單，顯示尺寸統一 240×80）
 require_once get_template_directory() . '/includes/admin/site-logo.php';
 
 /**

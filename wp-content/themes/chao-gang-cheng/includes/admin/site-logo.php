@@ -6,10 +6,10 @@
  * 佈景主題內建的 /assets/images/logo.png，要換 Logo 必須改程式碼、重新
  * 部署，一般管理員無法自行處理。
  *
- * 這裡新增一個「網站內容」分類底下的設定頁，讓管理員可以直接在後台用
- * WordPress 媒體庫上傳／選擇圖片來替換 Logo，顯示尺寸統一為 240×80
- * （橫式），沒有另外上傳時維持原本內建的 logo.png，不影響尚未設定過
- * 的情況。
+ * 這裡新增一個「網站內容」分類底下、「首頁」頂層選單裡的子選單設定頁，
+ * 讓管理員可以直接在後台用 WordPress 媒體庫上傳／選擇圖片來替換 Logo，
+ * 顯示尺寸統一為 240×80（橫式），沒有另外上傳時維持原本內建的
+ * logo.png，不影響尚未設定過的情況。
  *
  * @package Chao_Gang_Cheng
  */
@@ -30,19 +30,19 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 /**
- * 2. 後台選單：移到「網站內容」分類區塊，緊接在「快捷列設定」（位置 33）
- *    之後，位置 34。
+ * 2. 後台選單：收整到「首頁」頂層選單（ckc-homepage-builder，見
+ *    homepage-builder.php）底下的子選單，用 admin_menu 優先權 15
+ *    確保排在子選單列表最後一位（跟其他 5 個首頁相關設定並列）。
  */
-add_action( 'admin_menu', 'ckc_site_logo_add_menu' );
+add_action( 'admin_menu', 'ckc_site_logo_add_menu', 15 );
 function ckc_site_logo_add_menu() {
-	add_menu_page(
+	add_submenu_page(
+		'ckc-homepage-builder',
 		'Logo 設定',
 		'Logo 設定',
 		'manage_options',
 		'ckc-site-logo',
-		'ckc_site_logo_page_html',
-		'dashicons-format-image',
-		34
+		'ckc_site_logo_page_html'
 	);
 }
 
@@ -142,7 +142,7 @@ function ckc_site_logo_page_html() {
  */
 add_action( 'admin_enqueue_scripts', 'ckc_site_logo_admin_assets' );
 function ckc_site_logo_admin_assets( $hook ) {
-	if ( 'toplevel_page_ckc-site-logo' !== $hook ) {
+	if ( 'ckc-homepage-builder_page_ckc-site-logo' !== $hook ) {
 		return;
 	}
 
