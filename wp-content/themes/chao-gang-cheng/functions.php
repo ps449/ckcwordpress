@@ -1341,6 +1341,15 @@ function chao_gang_cheng_convert_cart_checkout_pages() {
 
 /**
  * Force Enable WooCommerce Registration on My Account Page with User Password Choice
+ *
+ * 修正：woocommerce_registration_generate_username 原本被強制設為 'yes'，導致
+ * WooCommerce 完全不會顯示原生的「使用者名稱」欄位，帳號登入用的 user_login
+ * 永遠是系統從 Email 自動產生的一串英文字（例：test@gmail.com -> test）。
+ * 曾經誤把下面的 billing_first_name（收件人姓名）欄位標籤改成「使用者名稱」，
+ * 但那個欄位其實跟登入帳號無關，造成標籤跟實際功能對不上。
+ * 現在改成 'no'，讓 WooCommerce 原生的使用者名稱欄位（name="username"）出現在
+ * 註冊表單上，顧客輸入的文字就會是真正的登入帳號（WooCommerce 核心已內建
+ * 空值、格式、重複帳號等驗證，不需要另外寫）。
  */
 add_action( 'admin_init', 'chao_gang_cheng_enforce_registration_settings' );
 add_action( 'init', 'chao_gang_cheng_enforce_registration_settings' );
@@ -1348,8 +1357,8 @@ function chao_gang_cheng_enforce_registration_settings() {
     if ( get_option( 'woocommerce_enable_myaccount_registration' ) !== 'yes' ) {
         update_option( 'woocommerce_enable_myaccount_registration', 'yes' );
     }
-    if ( get_option( 'woocommerce_registration_generate_username' ) !== 'yes' ) {
-        update_option( 'woocommerce_registration_generate_username', 'yes' );
+    if ( get_option( 'woocommerce_registration_generate_username' ) !== 'no' ) {
+        update_option( 'woocommerce_registration_generate_username', 'no' );
     }
     if ( get_option( 'woocommerce_registration_generate_password' ) !== 'no' ) {
         update_option( 'woocommerce_registration_generate_password', 'no' );
@@ -1363,8 +1372,8 @@ add_action( 'woocommerce_register_form', 'chao_gang_cheng_extra_register_fields'
 function chao_gang_cheng_extra_register_fields() {
     ?>
     <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
-        <label for="reg_billing_first_name">使用者名稱 <span class="required">*</span></label>
-        <input type="text" class="input-text" name="billing_first_name" id="reg_billing_first_name" value="<?php if ( ! empty( $_POST['billing_first_name'] ) ) echo esc_attr( $_POST['billing_first_name'] ); ?>" placeholder="請輸入使用者名稱" />
+        <label for="reg_billing_first_name">姓名 <span class="required">*</span></label>
+        <input type="text" class="input-text" name="billing_first_name" id="reg_billing_first_name" value="<?php if ( ! empty( $_POST['billing_first_name'] ) ) echo esc_attr( $_POST['billing_first_name'] ); ?>" placeholder="請輸入您的真實姓名" />
     </p>
     <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
         <label for="reg_billing_phone">行動電話 (手機) <span class="required">*</span></label>
@@ -1379,7 +1388,7 @@ function chao_gang_cheng_extra_register_fields() {
 add_filter( 'woocommerce_registration_errors', 'chao_gang_cheng_validate_extra_register_fields', 10, 3 );
 function chao_gang_cheng_validate_extra_register_fields( $validation_errors, $username, $email ) {
     if ( isset( $_POST['billing_first_name'] ) && empty( $_POST['billing_first_name'] ) ) {
-        $validation_errors->add( 'billing_first_name_error', '<strong>錯誤</strong>：請輸入使用者名稱！' );
+        $validation_errors->add( 'billing_first_name_error', '<strong>錯誤</strong>：請輸入姓名！' );
     }
     if ( isset( $_POST['billing_phone'] ) && empty( $_POST['billing_phone'] ) ) {
         $validation_errors->add( 'billing_phone_error', '<strong>錯誤</strong>：請輸入行動電話！' );
@@ -2545,8 +2554,9 @@ function chao_gang_cheng_account_page_script() {
                 $('#password').attr('placeholder', '請輸入您的密碼');
                 // Add placeholders to register fields if present
                 $('#reg_email').attr('placeholder', '請輸入您的電子郵件地址');
+                $('#reg_username').attr('placeholder', '請設定您的使用者名稱（可用於登入）');
                 $('#reg_password').attr('placeholder', '請設定您的密碼');
-                $('#reg_billing_first_name').attr('placeholder', '請輸入使用者名稱');
+                $('#reg_billing_first_name').attr('placeholder', '請輸入您的真實姓名');
                 $('#reg_billing_phone').attr('placeholder', '請輸入行動電話，例：0912345678');
                 // Update form titles
                 $('#customer_login .u-column1 h2').text('會員登入');
