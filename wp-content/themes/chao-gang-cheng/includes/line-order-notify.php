@@ -47,7 +47,14 @@ function chao_line_notify_log( $message ) {
 
 // 掛在「網站功能」（ckc-website-features，見 functions.php 第 26 段）底下，
 // 直接跟頁面／媒體／設定等項目同一層顯示，不用再從「設定」裡面找。
-add_action( 'admin_menu', 'chao_line_notify_add_admin_menu' );
+// 注意：優先權一定要比 ckc_setup_website_features_menu()（99999）晚，
+// 因為那個函式才是真正呼叫 add_menu_page() 建立 ckc-website-features
+// 這個父選單的地方。如果用預設優先權（10），add_submenu_page() 執行時
+// 父選單根本還不存在，WordPress 內部的 $admin_page_hooks 對照表也還沒有
+// ckc-website-features 這個項目，算出來的 hookname 會是錯的，實測會導致
+// 這個子選單頁面點進去顯示「目前的登入身分沒有存取這個頁面的權限」，
+// 即使目前登入帳號其實有 manage_options 權限也一樣。
+add_action( 'admin_menu', 'chao_line_notify_add_admin_menu', 100000 );
 function chao_line_notify_add_admin_menu() {
     add_submenu_page(
         'ckc-website-features',
