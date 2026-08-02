@@ -953,34 +953,71 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 pauseTemporarily(2500);
             }
 
+            // 手勢方向鎖：手指按下時先不急著判斷是拖曳影片列還是要捲動頁面，
+            // 等移動超過門檻後再比較水平／垂直位移哪個比較大——明顯偏水平
+            // 才當作拖曳（這時才 setPointerCapture、preventDefault，接手
+            // 位移），偏垂直就直接放行，讓瀏覽器原生捲動頁面，完全不去動
+            // offset。少了這道方向判斷，使用者只是正常往下滑頁面（手指難免
+            // 有些微水平晃動）也會被誤判成在拖曳，連帶擋掉原生捲動、把
+            // 影片列硬拉到不該在的位置，畫面就會看起來跑版、留白。
+            var pointerActive = false;
+            var axisLocked = null; // null｜'x'｜'y'
+            var dragStartY = 0;
+
             function onPointerDown(e) {
                 // 箭頭按鈕自己有點擊邏輯（nudge），不需要也走一次拖曳判斷。
                 if (e.target.closest && e.target.closest('.instagram-showcase-arrow')) { return; }
                 if (e.pointerType === 'mouse' && e.button !== 0) { return; }
                 if (!e.isPrimary) { return; }
-                dragging = true;
+                pointerActive = true;
+                axisLocked = null;
+                dragging = false;
                 dragMoved = false;
                 dragStartX = e.clientX;
+                dragStartY = e.clientY;
                 dragStartOffset = offset;
                 paused = true;
-                try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 忽略不支援的環境 */ }
-                wrap.classList.add('instagram-showcase-dragging');
             }
 
             function onPointerMove(e) {
-                if (!dragging) { return; }
-                var delta = dragStartX - e.clientX;
-                if (!dragMoved && Math.abs(delta) < DRAG_THRESHOLD) { return; }
+                if (!pointerActive) { return; }
+                if (axisLocked === 'y') { return; }
+
+                var deltaX = dragStartX - e.clientX;
+                var deltaY = dragStartY - e.clientY;
+
+                if (axisLocked === null) {
+                    if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) { return; }
+                    if (Math.abs(deltaX) <= Math.abs(deltaY)) {
+                        // 判定為垂直捲動意圖，整段手勢都不再介入。
+                        axisLocked = 'y';
+                        return;
+                    }
+                    axisLocked = 'x';
+                    dragging = true;
+                    try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 忽略不支援的環境 */ }
+                    wrap.classList.add('instagram-showcase-dragging');
+                }
+
                 dragMoved = true;
                 if (e.cancelable) { e.preventDefault(); }
-                offset = wrapOffset(dragStartOffset + delta);
+                offset = wrapOffset(dragStartOffset + deltaX);
                 applyTransform();
             }
 
             function endDrag(e) {
-                if (!dragging) { return; }
+                if (!pointerActive) { return; }
+                pointerActive = false;
+                var wasDragging = dragging;
                 dragging = false;
+                axisLocked = null;
                 wrap.classList.remove('instagram-showcase-dragging');
+                if (!wasDragging) {
+                    // 整段手勢從頭到尾都被判定為垂直捲動（或還沒移動超過門檻
+                    // 就放開），沒有動用過 offset，維持原本較短的暫停時間即可。
+                    pauseTemporarily(2500);
+                    return;
+                }
                 if (dragMoved) {
                     snapToNearest();
                     // 確實拖曳過，給更長的閱讀時間再恢復自動捲動。
