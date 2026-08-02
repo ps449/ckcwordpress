@@ -4706,7 +4706,7 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
                 // Adjust shipping cost to 350 for outlying islands
                 $rates[$rate_key]->cost = 350;
                 $rates[$rate_key]->label = '單一費率 (離島)';
-                
+
                 if ( wc_tax_enabled() && 'taxable' === $rates[$rate_key]->tax_status ) {
                     $taxes = WC_Tax::calc_shipping_tax( 350, WC_Tax::get_shipping_tax_rates() );
                     $rates[$rate_key]->taxes = $taxes;
@@ -4714,14 +4714,45 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
                     $rates[$rate_key]->taxes = array();
                 }
             }
-            
+
             if ( 'free_shipping' === $rate->method_id ) {
                 // Disable/Remove free shipping for outlying islands
                 unset( $rates[$rate_key] );
             }
         }
     }
-    
+
+    // 22b. 當已達免運資格時（滿額或套用免運優惠券），7-11 冷凍取貨(先付款)
+    // 一併免運，修正 bug：官網文案「冷凍宅配、超商取貨免運費」原本只有
+    // 「宅配」有效——WooCommerce 原生 free_shipping 方式達門檻時只會讓
+    // 自己出現在 $rates 且 cost 為 0，但它在前端只對應「宅配」卡片，跟它
+    // 平行、各自獨立的 Wooecpay_Logistic_CVS_711（超商取貨）運費完全不受
+    // 影響，導致達免運門檻後選 7-11 取貨仍被收 NT$250。
+    //
+    // 這裡不重新判斷一次門檻金額，而是直接看「free_shipping 這個方式此刻
+    // 是否已經出現在 $rates 裡」——因為那正是 WooCommerce 對「是否達免運
+    // 資格」的唯一權威判斷（同時涵蓋滿額與套用免運優惠券兩種情況），避免
+    // 站內出現第二套門檻邏輯，兩邊金額基準又不一致（先前就出現過購物車
+    // 頁／結帳頁門檻判斷基準不一致的 bug，見 chao_get_free_shipping_progress_amount()
+    // 的說明）。離島已在上面被 unset 掉 free_shipping，所以離島訂單不會
+    // 誤觸發這裡。
+    $has_free_shipping = false;
+    foreach ( $rates as $rate ) {
+        if ( 'free_shipping' === $rate->method_id ) {
+            $has_free_shipping = true;
+            break;
+        }
+    }
+
+    if ( $has_free_shipping ) {
+        foreach ( $rates as $rate_key => $rate ) {
+            if ( false !== strpos( $rate->method_id, 'Wooecpay_Logistic_CVS' ) ) {
+                $rates[$rate_key]->cost = 0;
+                $rates[$rate_key]->taxes = array();
+            }
+        }
+    }
+
     return $rates;
 }
 

@@ -547,14 +547,19 @@ function chao_checkout_custom_js_css() {
             // Sync CVS displayed cost from the actual WooCommerce shipping_method radio label
             var $cvsRadio = $('input[name^="shipping_method"][value^="Wooecpay_Logistic_CVS_711"]');
             if ($cvsRadio.length) {
+                var fullLabel = $cvsRadio.closest('li').find('label').text().trim();
                 // WooCommerce renders cost in the <label> adjacent to the radio, inside a .woocommerce-Price-amount span
                 var $cvsLabel = $cvsRadio.closest('li').find('.woocommerce-Price-amount');
                 var cvsCostText = $cvsLabel.length ? $cvsLabel.text().trim() : '';
                 if (cvsCostText) {
                     $('#chao-cvs-rate-price').text(cvsCostText);
+                } else if (/free|免費/i.test(fullLabel)) {
+                    // 已達免運資格（滿額或套用免運優惠券）時，WooCommerce 不會輸出金額，
+                    // 只會在方式名稱後面加註「(Free)／（免費）」，此時沒有 .woocommerce-Price-amount
+                    // 可讀，改直接顯示「免運」，避免卡片停留在舊的 NT$280 不更新。
+                    $('#chao-cvs-rate-price').text('免運');
                 } else {
                     // Fallback: read full label text and strip the method name prefix
-                    var fullLabel = $cvsRadio.closest('li').find('label').text().trim();
                     // label typically looks like: "7-11 超商冷凍取貨：NT$280.00"
                     var colonIdx = fullLabel.lastIndexOf('：');
                     if (colonIdx === -1) colonIdx = fullLabel.lastIndexOf(':');
