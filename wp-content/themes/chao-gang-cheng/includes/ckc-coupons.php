@@ -1378,7 +1378,7 @@ function ckc_coupon_claim_center_shortcode() {
         box-sizing: border-box;
     }
 
-    /* ── 港口售票亭頭部：暗底＋潮金紋理 ── */
+    /* ── 港口售票亭頭部：淺牛皮紙＋潮金紋理 ── */
     .ckc-claim-header {
         display: flex;
         justify-content: space-between;
@@ -1388,24 +1388,24 @@ function ckc_coupon_claim_center_shortcode() {
         margin: 0 0 20px;
         padding: 22px 22px 20px;
         background:
-            repeating-linear-gradient(118deg, rgba(201,151,74,0.07) 0 16px, transparent 16px 34px),
-            linear-gradient(135deg, var(--ckc-ink) 0%, var(--ckc-ink-soft) 100%);
+            repeating-linear-gradient(118deg, rgba(201,151,74,0.12) 0 16px, transparent 16px 34px),
+            linear-gradient(135deg, var(--ckc-card) 0%, var(--ckc-parchment) 100%);
         border-bottom: 3px solid var(--ckc-gold);
     }
     .ckc-claim-title {
         font-size: 21px;
         font-weight: 700;
-        color: var(--ckc-gold-soft);
+        color: var(--ckc-ink);
         letter-spacing: 0.02em;
         margin: 0;
         font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
     .ckc-claim-nav-buttons {
         display: flex;
-        background: rgba(255,255,255,0.08);
+        background: var(--ckc-card);
         padding: 4px;
         border-radius: 30px;
-        border: 1px solid rgba(227,197,134,0.25);
+        border: 1px solid var(--ckc-rope-soft);
     }
     .ckc-nav-btn {
         background: none !important;
@@ -1413,7 +1413,7 @@ function ckc_coupon_claim_center_shortcode() {
         padding: 8px 20px !important;
         font-size: 14px !important;
         font-weight: 600 !important;
-        color: var(--ckc-gold-soft) !important;
+        color: var(--ckc-muted) !important;
         cursor: pointer !important;
         border-radius: 20px !important;
         transition: all 0.25s ease !important;
@@ -1511,9 +1511,9 @@ function ckc_coupon_claim_center_shortcode() {
         box-shadow: none !important;
     }
     .ckc-cat-tab.active {
-        background: var(--ckc-ink) !important;
-        border-color: var(--ckc-ink) !important;
-        color: var(--ckc-gold-soft) !important;
+        background: var(--ckc-gold) !important;
+        border-color: var(--ckc-gold) !important;
+        color: var(--ckc-ink) !important;
     }
 
     .ckc-coupon-cards-grid {
@@ -1689,12 +1689,14 @@ function ckc_coupon_claim_center_shortcode() {
         box-shadow: none !important;
     }
     .ckc-apply-action-btn {
-        background: var(--ckc-ink) !important;
-        color: var(--ckc-gold-soft) !important;
-        box-shadow: 0 2px 6px rgba(26,20,15,0.2) !important;
+        background: var(--ckc-card) !important;
+        color: var(--ckc-ink) !important;
+        border: 1.5px solid var(--ckc-gold) !important;
+        box-shadow: none !important;
     }
     .ckc-apply-action-btn:hover {
-        background: var(--ckc-ink-soft) !important;
+        background: var(--ckc-gold) !important;
+        color: var(--ckc-ink) !important;
     }
     .ckc-claim-action-btn:not(.claimed):not(.sold-out):hover {
         background: #e85850 !important;
@@ -1740,7 +1742,7 @@ function ckc_coupon_claim_center_shortcode() {
         display: flex;
         align-items: center;
         padding: 16px;
-        background: var(--ckc-ink, #1a140f);
+        background: var(--ckc-card, #fffaf1);
         border-bottom: 3px solid var(--ckc-gold, #c9974a);
     }
     .ckc-modal-close-btn {
@@ -1758,12 +1760,12 @@ function ckc_coupon_claim_center_shortcode() {
     .ckc-modal-close-btn svg {
         width: 24px;
         height: 24px;
-        fill: var(--ckc-gold-soft, #e3c586);
+        fill: var(--ckc-ink, #1a140f);
     }
     .ckc-modal-header-title {
         font-size: 16px;
         font-weight: 700;
-        color: var(--ckc-gold-soft, #e3c586);
+        color: var(--ckc-ink, #1a140f);
         flex: 1;
         text-align: center;
         margin-right: 32px;
@@ -1878,15 +1880,15 @@ function ckc_coupon_claim_center_shortcode() {
         bottom: 40px;
         left: 50%;
         transform: translateX(-50%) translateY(100px);
-        background: var(--ckc-ink, #1a140f);
-        color: var(--ckc-gold-soft, #e3c586);
+        background: var(--ckc-card, #fffaf1);
+        color: var(--ckc-ink, #1a140f);
         padding: 12px 28px;
         border-radius: 30px;
         font-size: 14px;
         font-weight: 500;
         z-index: 100000;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        border: 1px solid rgba(227,197,134,0.3);
+        box-shadow: 0 5px 20px rgba(26,20,15,0.18);
+        border: 1.5px solid var(--ckc-gold, #c9974a);
         opacity: 0;
         pointer-events: none;
         transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
