@@ -1363,8 +1363,8 @@ add_action( 'woocommerce_register_form', 'chao_gang_cheng_extra_register_fields'
 function chao_gang_cheng_extra_register_fields() {
     ?>
     <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
-        <label for="reg_billing_first_name">姓名 <span class="required">*</span></label>
-        <input type="text" class="input-text" name="billing_first_name" id="reg_billing_first_name" value="<?php if ( ! empty( $_POST['billing_first_name'] ) ) echo esc_attr( $_POST['billing_first_name'] ); ?>" placeholder="請輸入您的真實姓名" />
+        <label for="reg_billing_first_name">使用者名稱 <span class="required">*</span></label>
+        <input type="text" class="input-text" name="billing_first_name" id="reg_billing_first_name" value="<?php if ( ! empty( $_POST['billing_first_name'] ) ) echo esc_attr( $_POST['billing_first_name'] ); ?>" placeholder="請輸入使用者名稱" />
     </p>
     <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
         <label for="reg_billing_phone">行動電話 (手機) <span class="required">*</span></label>
@@ -1379,7 +1379,7 @@ function chao_gang_cheng_extra_register_fields() {
 add_filter( 'woocommerce_registration_errors', 'chao_gang_cheng_validate_extra_register_fields', 10, 3 );
 function chao_gang_cheng_validate_extra_register_fields( $validation_errors, $username, $email ) {
     if ( isset( $_POST['billing_first_name'] ) && empty( $_POST['billing_first_name'] ) ) {
-        $validation_errors->add( 'billing_first_name_error', '<strong>錯誤</strong>：請輸入姓名！' );
+        $validation_errors->add( 'billing_first_name_error', '<strong>錯誤</strong>：請輸入使用者名稱！' );
     }
     if ( isset( $_POST['billing_phone'] ) && empty( $_POST['billing_phone'] ) ) {
         $validation_errors->add( 'billing_phone_error', '<strong>錯誤</strong>：請輸入行動電話！' );
@@ -2546,7 +2546,7 @@ function chao_gang_cheng_account_page_script() {
                 // Add placeholders to register fields if present
                 $('#reg_email').attr('placeholder', '請輸入您的電子郵件地址');
                 $('#reg_password').attr('placeholder', '請設定您的密碼');
-                $('#reg_billing_first_name').attr('placeholder', '請輸入您的真實姓名');
+                $('#reg_billing_first_name').attr('placeholder', '請輸入使用者名稱');
                 $('#reg_billing_phone').attr('placeholder', '請輸入行動電話，例：0912345678');
                 // Update form titles
                 $('#customer_login .u-column1 h2').text('會員登入');
