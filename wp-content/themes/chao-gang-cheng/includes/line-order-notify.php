@@ -70,6 +70,12 @@ function chao_line_notify_settings_page() {
         update_option( 'chao_line_notify_channel_access_token', sanitize_text_field( wp_unslash( $_POST['channel_access_token'] ) ) );
         update_option( 'chao_line_notify_channel_secret', sanitize_text_field( wp_unslash( $_POST['channel_secret'] ) ) );
         update_option( 'chao_line_notify_group_id', sanitize_text_field( wp_unslash( $_POST['group_id'] ) ) );
+
+        $valid_statuses    = array_keys( chao_line_notify_get_all_statuses() );
+        $posted_statuses   = isset( $_POST['notify_statuses'] ) && is_array( $_POST['notify_statuses'] ) ? wp_unslash( $_POST['notify_statuses'] ) : array();
+        $selected_statuses = array_values( array_intersect( $valid_statuses, array_map( 'sanitize_text_field', $posted_statuses ) ) );
+        update_option( 'chao_line_notify_statuses', $selected_statuses );
+
         echo '<div class="updated"><p><strong>設定已儲存。</strong></p></div>';
     }
 
@@ -109,10 +115,15 @@ function chao_line_notify_settings_page() {
     $group_id             = get_option( 'chao_line_notify_group_id', '' );
     $detected_group_id    = get_option( 'chao_line_notify_last_seen_group_id', '' );
     $webhook_url          = rest_url( 'chao/v1/line-webhook' );
+    $all_statuses         = chao_line_notify_get_all_statuses();
+    $selected_statuses    = get_option( 'chao_line_notify_statuses', chao_line_notify_get_default_statuses() );
+    if ( ! is_array( $selected_statuses ) ) {
+        $selected_statuses = chao_line_notify_get_default_statuses();
+    }
     ?>
     <div class="wrap">
         <h1>LINE 訂單通知設定</h1>
-        <p>當訂單第一次轉入「處理中」或「已完成」狀態時，自動發送 LINE 通知到指定群組。</p>
+        <p>訂單第一次轉入下方勾選的狀態節點時，自動發送 LINE 通知到指定群組（同一張訂單、同一個節點只會通知一次）。</p>
         <form method="post" action="">
             <?php wp_nonce_field( 'chao_line_notify_settings', 'chao_line_notify_nonce' ); ?>
             <table class="form-table" role="presentation">
@@ -123,6 +134,19 @@ function chao_line_notify_settings_page() {
                             <label>
                                 <input type="checkbox" name="enabled" value="1" <?php checked( $enabled, '1' ); ?>> 啟用
                             </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">通知節點</th>
+                        <td>
+                            <?php foreach ( $all_statuses as $status_slug => $status_label ) : ?>
+                                <?php $presentation = chao_line_notify_get_status_presentation( $status_slug ); ?>
+                                <label style="display:inline-block; min-width: 220px; margin: 4px 0;">
+                                    <input type="checkbox" name="notify_statuses[]" value="<?php echo esc_attr( $status_slug ); ?>" <?php checked( in_array( $status_slug, $selected_statuses, true ) ); ?>>
+                                    <?php echo esc_html( $presentation['emoji'] ); ?> <?php echo esc_html( $status_label ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                            <p class="description">勾選訂單進入哪些狀態時要發送通知；每個節點各自獨立判斷，同一張訂單經過多個有勾選的節點會分別各發送一次。</p>
                         </td>
                     </tr>
                     <tr>
@@ -329,7 +353,7 @@ function chao_line_notify_handle_webhook( WP_REST_Request $request ) {
         if ( $group_id !== $saved_group_id && ! empty( $event['replyToken'] ) ) {
             chao_line_notify_send_reply(
                 $event['replyToken'],
-                "🔧 本群組 ID：\n{$group_id}\n\n請將此 ID 貼到後台「設定 → LINE 訂單通知設定」頁面的收件群組 ID 欄位，即可開始接收訂單通知。"
+                "🔧 本群組 ID：\n{$group_id}\n\n請將此 ID 貼到後台「網站功能 → LINE 訂單通知設定」頁面的收件群組 ID 欄位，即可開始接收訂單通知。"
             );
         }
     }
@@ -338,7 +362,46 @@ function chao_line_notify_handle_webhook( WP_REST_Request $request ) {
 }
 
 /* ------------------------------------------------------------------ *
- * 4. 訂單狀態變化 → 發送通知
+ * 4. 通知節點定義（可勾選的狀態、對應表情符號／標題、預設勾選項目）
+ * ------------------------------------------------------------------ */
+
+// 保留舊版行為當預設值：既有安裝在還沒去設定頁調整之前，維持只通知
+// 處理中／已完成，不會因為這次更新突然對所有狀態發通知。
+function chao_line_notify_get_default_statuses() {
+    return array( 'processing', 'completed' );
+}
+
+// 讀取 WooCommerce 目前登記的訂單狀態，去掉 'wc-' 前綴方便跟
+// woocommerce_order_status_changed 傳進來的 $new_status（不含前綴）比對。
+function chao_line_notify_get_all_statuses() {
+    $statuses = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
+    $result = array();
+    foreach ( $statuses as $key => $label ) {
+        $slug = ( 0 === strpos( $key, 'wc-' ) ) ? substr( $key, 3 ) : $key;
+        $result[ $slug ] = $label;
+    }
+    return $result;
+}
+
+// 各節點對應的表情符號／訊息標題，讓不同狀態的通知一眼就能分辨。
+function chao_line_notify_get_status_presentation( $status ) {
+    $map = array(
+        'pending'    => array( 'emoji' => '🛒', 'title' => '新訂單建立（待付款）' ),
+        'processing' => array( 'emoji' => '🔔', 'title' => '新訂單通知' ),
+        'on-hold'    => array( 'emoji' => '⏸️', 'title' => '訂單保留中' ),
+        'completed'  => array( 'emoji' => '✅', 'title' => '訂單已完成' ),
+        'cancelled'  => array( 'emoji' => '❌', 'title' => '訂單已取消' ),
+        'refunded'   => array( 'emoji' => '💰', 'title' => '訂單已退款' ),
+        'failed'     => array( 'emoji' => '⚠️', 'title' => '付款失敗' ),
+    );
+    if ( isset( $map[ $status ] ) ) {
+        return $map[ $status ];
+    }
+    return array( 'emoji' => '🔔', 'title' => '訂單狀態更新' );
+}
+
+/* ------------------------------------------------------------------ *
+ * 5. 訂單狀態變化 → 發送通知
  * ------------------------------------------------------------------ */
 
 add_action( 'woocommerce_order_status_changed', 'chao_line_notify_on_order_status_changed', 10, 4 );
@@ -347,14 +410,8 @@ function chao_line_notify_on_order_status_changed( $order_id, $old_status, $new_
         return;
     }
 
-    $paid_statuses = array( 'processing', 'completed' );
-
-    // 只在「第一次」轉入處理中／已完成狀態時通知，避免同一張單被通知多次
-    // （例如 processing → completed 又觸發一次）。
-    if ( ! in_array( $new_status, $paid_statuses, true ) ) {
-        return;
-    }
-    if ( in_array( $old_status, $paid_statuses, true ) ) {
+    $selected_statuses = get_option( 'chao_line_notify_statuses', chao_line_notify_get_default_statuses() );
+    if ( ! is_array( $selected_statuses ) || ! in_array( $new_status, $selected_statuses, true ) ) {
         return;
     }
 
@@ -365,43 +422,60 @@ function chao_line_notify_on_order_status_changed( $order_id, $old_status, $new_
         return;
     }
 
-    chao_line_notify_send_order_notification( $order );
+    chao_line_notify_send_order_notification( $order, $new_status );
 }
 
-function chao_line_notify_send_order_notification( $order ) {
-    if ( 'yes' === $order->get_meta( '_chao_line_notify_sent' ) ) {
-        chao_line_notify_log( '訂單 #' . $order->get_order_number() . ' 先前已發送過通知，略過。' );
+// 每張訂單、每個節點各自獨立記錄是否已發送過（_chao_line_notify_sent_statuses
+// 存已發送節點的陣列），同一張單經過多個有勾選的節點會各自通知一次，但同一個
+// 節點不會因為狀態被改來改去而重複通知。
+function chao_line_notify_send_order_notification( $order, $status = null ) {
+    if ( null === $status ) {
+        $status = $order->get_status();
+    }
+
+    $sent_statuses = $order->get_meta( '_chao_line_notify_sent_statuses' );
+    if ( ! is_array( $sent_statuses ) ) {
+        $sent_statuses = array();
+    }
+    if ( in_array( $status, $sent_statuses, true ) ) {
+        chao_line_notify_log( '訂單 #' . $order->get_order_number() . "「{$status}」節點先前已發送過通知，略過。" );
         return;
     }
 
     $group_id = get_option( 'chao_line_notify_group_id', '' );
-    $message  = chao_line_notify_build_order_message( $order );
+    $message  = chao_line_notify_build_order_message( $order, $status );
     $sent     = chao_line_notify_send_push( $group_id, $message );
 
-    // 不論成功或失敗都標記已處理，避免同一張單反覆自動重試發送；
+    // 不論成功或失敗都標記該節點已處理，避免反覆自動重試發送；
     // 若真的發送失敗，可在訂單編輯頁用「重新發送 LINE 通知」手動補發。
-    $order->update_meta_data( '_chao_line_notify_sent', 'yes' );
+    $sent_statuses[] = $status;
+    $order->update_meta_data( '_chao_line_notify_sent_statuses', $sent_statuses );
     $order->save();
 
     if ( $sent ) {
-        chao_line_notify_log( '訂單 #' . $order->get_order_number() . ' 通知已發送。' );
+        chao_line_notify_log( '訂單 #' . $order->get_order_number() . "「{$status}」節點通知已發送。" );
     } else {
-        chao_line_notify_log( '訂單 #' . $order->get_order_number() . ' 通知發送失敗。' );
+        chao_line_notify_log( '訂單 #' . $order->get_order_number() . "「{$status}」節點通知發送失敗。" );
     }
 }
 
-function chao_line_notify_build_order_message( $order ) {
-    $order_number   = $order->get_order_number();
-    $customer_name  = trim( $order->get_formatted_billing_full_name() );
-    $phone          = $order->get_billing_phone();
-    $total          = $order->get_formatted_order_total();
-    $payment_method = $order->get_payment_method_title();
-    $shipping_method = $order->get_shipping_method();
-    $status_label   = wc_get_order_status_name( $order->get_status() );
-    $edit_url       = $order->get_edit_order_url();
+function chao_line_notify_build_order_message( $order, $status = null ) {
+    if ( null === $status ) {
+        $status = $order->get_status();
+    }
+    $presentation = chao_line_notify_get_status_presentation( $status );
+
+    $order_number     = $order->get_order_number();
+    $customer_name    = trim( $order->get_formatted_billing_full_name() );
+    $phone            = $order->get_billing_phone();
+    $total            = $order->get_formatted_order_total();
+    $payment_method   = $order->get_payment_method_title();
+    $shipping_method  = $order->get_shipping_method();
+    $status_label     = wc_get_order_status_name( $status );
+    $edit_url         = $order->get_edit_order_url();
 
     $lines   = array();
-    $lines[] = '🔔 潮港城電商購物 - 新訂單通知';
+    $lines[] = $presentation['emoji'] . ' 潮港城電商購物 - ' . $presentation['title'];
     $lines[] = '訂單編號：#' . $order_number;
     if ( ! empty( $customer_name ) || ! empty( $phone ) ) {
         $lines[] = '客戶姓名：' . ( $customer_name ? $customer_name : '—' ) . '　電話：' . ( $phone ? $phone : '—' );
@@ -420,19 +494,24 @@ function chao_line_notify_build_order_message( $order ) {
 }
 
 /* ------------------------------------------------------------------ *
- * 5. 訂單編輯頁：手動重新發送
+ * 6. 訂單編輯頁：手動重新發送
  * ------------------------------------------------------------------ */
 
 add_filter( 'woocommerce_order_actions', 'chao_line_notify_add_order_action' );
 function chao_line_notify_add_order_action( $actions ) {
-    $actions['chao_line_notify_resend'] = '重新發送 LINE 通知';
+    $actions['chao_line_notify_resend'] = '重新發送 LINE 通知（目前狀態）';
     return $actions;
 }
 
 add_action( 'woocommerce_order_action_chao_line_notify_resend', 'chao_line_notify_handle_resend_action' );
 function chao_line_notify_handle_resend_action( $order ) {
-    // 手動重新發送不受「已發送過」限制，直接重發一次。
-    $order->delete_meta_data( '_chao_line_notify_sent' );
-    $order->save();
-    chao_line_notify_send_order_notification( $order );
+    // 手動重新發送只解除「目前狀態」這個節點的已發送記錄，不影響其他節點的記錄。
+    $status        = $order->get_status();
+    $sent_statuses = $order->get_meta( '_chao_line_notify_sent_statuses' );
+    if ( is_array( $sent_statuses ) && in_array( $status, $sent_statuses, true ) ) {
+        $sent_statuses = array_values( array_diff( $sent_statuses, array( $status ) ) );
+        $order->update_meta_data( '_chao_line_notify_sent_statuses', $sent_statuses );
+        $order->save();
+    }
+    chao_line_notify_send_order_notification( $order, $status );
 }
