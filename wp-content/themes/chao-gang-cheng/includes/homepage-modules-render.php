@@ -706,8 +706,20 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 if (!scaleEl) { return; }
                 item.__ckcObserved = true;
                 var ro = new ResizeObserver(function () {
-                    var scale = wrap.__ckcIgScale || 1;
-                    item.style.height = (scaleEl.offsetHeight * scale) + 'px';
+                    // 重要：Instagram 內嵌元件在真正把貼文內容載入完成前，
+                    // 量到的高度會是 0（或極小的暫時值）。如果這時候就把
+                    // item 的高度鎖定成 0，加上 overflow: hidden，會讓這個
+                    // 元素在視覺上完全塌陷——而 Instagram 官方腳本本身會依
+                    // 元素是否「有實際可視範圍」來決定要不要繼續處理／載入
+                    // 內容，塌陷成 0 高度反而會讓它卡住、永遠載入不出來。
+                    // 所以只有量到「看起來像真的內容」（> 20px）才套用縮放
+                    // 後的高度；在那之前維持瀏覽器原生的 auto 高度，讓
+                    // Instagram 的元件有機會正常完成載入。
+                    var rawHeight = scaleEl.offsetHeight;
+                    if (rawHeight > 20) {
+                        var scale = wrap.__ckcIgScale || 1;
+                        item.style.height = (rawHeight * scale) + 'px';
+                    }
                 });
                 ro.observe(scaleEl);
             });
