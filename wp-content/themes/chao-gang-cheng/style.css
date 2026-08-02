@@ -494,6 +494,13 @@ h1, h2, h3, h4, h5, h6 {
   transform-origin: top left;
 }
 
+/* Facebook 的 Video Plugin 用官方的 data-width 屬性自己控制寬度（不像
+   Instagram 元件需要用 transform: scale() 縮放），所以外層包裝不需要
+   固定 326px、也不需要縮放 transform，讓元件自己撐滿容器寬度即可。 */
+.instagram-showcase-fb-embed {
+  width: 100%;
+}
+
 /* Reels 縮圖卡片（因為 Instagram 官方內嵌元件目前無法穩定顯示 Reels，
    改成縮圖 + 點擊後開新分頁到 Instagram 播放）。寬度由 JS 統一計算，
    高度用 9:16 直式比例自動撐開，不需要另外用 JS 同步高度。 */

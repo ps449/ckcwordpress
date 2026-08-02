@@ -571,32 +571,46 @@ function ckc_render_module_youtube_feed( $settings ) {
 }
 
 /* -------------------------------------------------------------------------
- * 8. Instagram 精選影片（電腦版一屏 4 則／手機版一屏 2 則，勻速自動向右
- *    捲動並無縫循環回開頭；Instagram 官方內嵌元件，站內直接播放）
+ * 8. 精選影片（Instagram／Facebook，電腦版一屏 4 則／手機版一屏 2 則，
+ *    勻速自動向右捲動並無縫循環回開頭；官方內嵌元件，站內直接播放）
  * ---------------------------------------------------------------------- */
 function ckc_render_module_instagram_showcase( $settings ) {
     $heading    = isset( $settings['heading'] ) ? $settings['heading'] : '';
     $subheading = isset( $settings['subheading'] ) ? $settings['subheading'] : '';
     $items      = isset( $settings['items'] ) && is_array( $settings['items'] ) ? $settings['items'] : array();
 
-    // 整理清單：只保留看起來像 Instagram 網址的項目，並判斷是 Reel 還是
-    // 一般貼文——因為 Instagram 官方內嵌元件目前對 Reels 有已知的顯示問題
-    // （連 Instagram 自己的 Reel 都會嵌成空白，經實測確認跟版權音樂無關，
-    // 是 Reels 這個內容類型本身的內嵌管線有問題），一般貼文則完全正常。
-    // 所以：一般貼文＝站內直接播放；Reels＝改成縮圖卡片，點擊開新分頁到
-    // Instagram 播放（縮圖需要後台手動上傳，因為沒有官方 API 可以抓）。
+    // 整理清單：判斷平台（Instagram／Facebook）跟是否為 Reel。
+    // - Instagram 一般貼文（/p/）：官方內嵌元件站內直接播放，完全正常。
+    // - Instagram Reels（/reel/、/reels/）：官方內嵌元件目前有已知的顯示
+    //   問題（連 Instagram 自己的 Reel 都會嵌成空白，經實測確認跟版權
+    //   音樂無關，是 Reels 這個內容類型本身的內嵌管線有問題），所以改成
+    //   縮圖卡片，點擊開新分頁到 Instagram 播放（縮圖需要後台手動上傳，
+    //   因為沒有官方 API 可以抓）。
+    // - Facebook 貼文／Reel：用 Facebook 官方 Video Plugin（fb-video），
+    //   經實測 Reels 也能正常站內播放，不需要縮圖 fallback。
     $entries = array();
     foreach ( $items as $item ) {
         $url = isset( $item['url'] ) ? trim( $item['url'] ) : '';
-        if ( ! $url || false === strpos( $url, 'instagram.com' ) ) {
+        if ( ! $url ) {
             continue;
         }
-        $is_reel = (bool) preg_match( '#instagram\.com/reels?/#i', $url );
-        $entries[] = array(
-            'url'       => $url,
-            'is_reel'   => $is_reel,
-            'thumbnail' => $is_reel && isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
-        );
+        if ( false !== strpos( $url, 'instagram.com' ) ) {
+            $is_reel = (bool) preg_match( '#instagram\.com/reels?/#i', $url );
+            $entries[] = array(
+                'platform'  => 'instagram',
+                'url'       => $url,
+                'is_reel'   => $is_reel,
+                'thumbnail' => $is_reel && isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
+            );
+        } elseif ( false !== strpos( $url, 'facebook.com' ) || false !== strpos( $url, 'fb.watch' ) ) {
+            $entries[] = array(
+                'platform'  => 'facebook',
+                'url'       => $url,
+                'is_reel'   => false,
+                'thumbnail' => '',
+            );
+        }
+        // 其他網址（貼錯或不支援的平台）直接忽略，避免輸出無效的內嵌元件。
     }
 
     if ( empty( $entries ) ) {
@@ -628,7 +642,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
                     for ( $pass = 0; $pass < 2; $pass++ ) :
                         foreach ( $entries as $entry ) :
                             $hidden_attr = $pass > 0 ? ' aria-hidden="true"' : '';
-                            if ( $entry['is_reel'] ) :
+                            if ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) :
                                 ?>
                                 <div class="instagram-showcase-item instagram-showcase-item-reel"<?php echo $hidden_attr; ?>>
                                     <a class="instagram-showcase-reel-link" href="<?php echo esc_url( $entry['url'] ); ?>" target="_blank" rel="noopener noreferrer">
@@ -637,6 +651,14 @@ function ckc_render_module_instagram_showcase( $settings ) {
                                         </span>
                                         <span class="instagram-showcase-reel-caption">到 Instagram 觀看 Reel</span>
                                     </a>
+                                </div>
+                                <?php
+                            elseif ( 'facebook' === $entry['platform'] ) :
+                                ?>
+                                <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
+                                    <div class="instagram-showcase-embed-scale instagram-showcase-fb-embed">
+                                        <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true"></div>
+                                    </div>
                                 </div>
                                 <?php
                             else :
@@ -681,6 +703,30 @@ function ckc_render_module_instagram_showcase( $settings ) {
             document.body.appendChild(script);
         }
 
+        // Facebook 官方 Video Plugin：跟 Instagram 內嵌元件不同套系統，需要
+        // 另外載入 Facebook JavaScript SDK（xfbml=1）。經實測，Facebook 的
+        // Reels 用這個官方元件可以正常站內播放，沒有 Instagram Reels 那個
+        // 顯示問題。
+        var fbLoaded = false;
+        function loadFacebookEmbed() {
+            if (fbLoaded) {
+                if (window.FB && window.FB.XFBML) { window.FB.XFBML.parse(); }
+                return;
+            }
+            fbLoaded = true;
+            if (!document.getElementById('fb-root')) {
+                var fbRoot = document.createElement('div');
+                fbRoot.id = 'fb-root';
+                document.body.appendChild(fbRoot);
+            }
+            var script = document.createElement('script');
+            script.async = true;
+            script.defer = true;
+            script.crossOrigin = 'anonymous';
+            script.src = 'https://connect.facebook.net/zh_TW/sdk.js#xfbml=1&version=v19.0';
+            document.body.appendChild(script);
+        }
+
         var MOBILE_QUERY = '(max-width: 768px)';
 
         // 電腦版一屏顯示 4 則、手機版一屏顯示 2 則：因為 Instagram 官方內嵌
@@ -703,11 +749,31 @@ function ckc_render_module_instagram_showcase( $settings ) {
             var scale = Math.min(footprint / 326, 1);
             var actualFootprint = 326 * scale;
 
+            // Facebook 的 Video Plugin 官方最小寬度是 220px，太窄會被元件
+            // 自己擋掉／跑版，所以 fb-video 的寬度要另外夾在 220px 以上
+            // （比對其他卡片的 footprint 可能會稍微寬一點，屬於可接受的
+            // 小誤差）。
+            var fbNeedsReparse = false;
+
             items.forEach(function (item) {
                 item.style.width = actualFootprint + 'px';
                 var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
-                if (scaleEl) { scaleEl.style.transform = 'scale(' + scale + ')'; }
+                if (!scaleEl) { return; }
+                var fbVideo = scaleEl.querySelector('.fb-video');
+                if (fbVideo) {
+                    var fbWidth = Math.max(220, Math.round(actualFootprint));
+                    if (fbVideo.getAttribute('data-width') !== String(fbWidth)) {
+                        fbVideo.setAttribute('data-width', fbWidth);
+                        fbNeedsReparse = true;
+                    }
+                } else {
+                    scaleEl.style.transform = 'scale(' + scale + ')';
+                }
             });
+
+            if (fbNeedsReparse && window.FB && window.FB.XFBML) {
+                window.FB.XFBML.parse();
+            }
 
             wrap.__ckcIgScale = scale;
             wrap.__ckcIgFootprint = actualFootprint;
@@ -847,18 +913,23 @@ function ckc_render_module_instagram_showcase( $settings ) {
             var sections = document.querySelectorAll('.instagram-showcase-section');
             if (!sections.length) { return; }
 
+            function loadNeededEmbeds(section) {
+                if (section.querySelector('.instagram-media')) { loadInstagramEmbed(); }
+                if (section.querySelector('.fb-video')) { loadFacebookEmbed(); }
+            }
+
             if ('IntersectionObserver' in window) {
                 var observer = new IntersectionObserver(function (entries) {
                     entries.forEach(function (entry) {
                         if (entry.isIntersecting) {
-                            loadInstagramEmbed();
+                            loadNeededEmbeds(entry.target);
                             observer.unobserve(entry.target);
                         }
                     });
                 }, { rootMargin: '300px' });
                 sections.forEach(function (s) { observer.observe(s); });
             } else {
-                loadInstagramEmbed();
+                sections.forEach(loadNeededEmbeds);
             }
         });
     })();
