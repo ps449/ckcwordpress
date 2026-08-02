@@ -447,8 +447,86 @@ h1, h2, h3, h4, h5, h6 {
    只靠各自原本的 padding 呈現內容留白，區塊與區塊直接相接。 */
 .home-image-banner,
 .home-portfolio-section,
-.home-youtube-section {
+.home-youtube-section,
+.instagram-showcase-section {
   margin-bottom: 0;
+}
+
+/* --- Instagram 精選影片（橫向可滑動輪播） --- */
+.instagram-showcase-section {
+  margin: 0;
+  padding: 60px 0;
+  background-color: var(--white);
+}
+
+.instagram-showcase-wrap {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 60px;
+}
+
+.instagram-showcase-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.instagram-showcase-track::-webkit-scrollbar {
+  display: none;
+}
+
+.instagram-showcase-item {
+  flex: 0 0 auto;
+  width: 326px;
+  max-width: 85vw;
+  scroll-snap-align: start;
+}
+
+.instagram-showcase-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: var(--white);
+  color: var(--primary-color);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.instagram-showcase-arrow:hover {
+  background-color: var(--accent-color);
+  color: var(--white);
+}
+
+.instagram-showcase-prev {
+  left: 0;
+}
+
+.instagram-showcase-next {
+  right: 0;
+}
+
+@media (max-width: 768px) {
+  .instagram-showcase-wrap {
+    padding: 0 15px;
+  }
+  .instagram-showcase-arrow {
+    display: none;
+  }
 }
 
 .section-header {

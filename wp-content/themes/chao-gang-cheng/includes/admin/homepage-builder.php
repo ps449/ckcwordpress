@@ -131,6 +131,23 @@ function ckc_homepage_module_registry() {
             ),
         ),
 
+        'instagram_showcase' => array(
+            'label'       => 'Instagram 精選影片',
+            'description' => '橫向可滑動的 Instagram 貼文／Reels 輪播，直接用 Instagram 官方內嵌元件顯示，影片會在頁面內直接播放（不會跳出到 Instagram），可以放任何公開帳號的貼文網址。網址取得方式：到該則 Instagram 貼文或 Reel，點選「⋯」→「複製連結」。',
+            'fields'      => array(
+                'heading'    => array( 'label' => '標題（可留空）', 'type' => 'text', 'default' => '' ),
+                'subheading' => array( 'label' => '副標題（可留空）', 'type' => 'text', 'default' => '' ),
+                'items'      => array(
+                    'label'      => '影片清單',
+                    'type'       => 'repeater',
+                    'row_fields' => array(
+                        'url' => array( 'label' => 'Instagram 貼文／Reel 網址', 'type' => 'url', 'default' => '' ),
+                    ),
+                    'default' => array(),
+                ),
+            ),
+        ),
+
         'social_links' => array(
             'label'       => '社群連結卡片',
             'description' => 'Facebook / Instagram / LINE / YouTube 四張社群連結卡片。',
@@ -692,6 +709,9 @@ function ckc_homepage_module_summary( $module ) {
             return isset( $s['alt_text'] ) ? $s['alt_text'] : '';
         case 'youtube_feed':
             return isset( $s['heading'] ) ? $s['heading'] : '';
+        case 'instagram_showcase':
+            $count = isset( $s['items'] ) && is_array( $s['items'] ) ? count( array_filter( $s['items'], function( $row ) { return ! empty( $row['url'] ); } ) ) : 0;
+            return $count . ' 則影片' . ( isset( $s['heading'] ) && $s['heading'] ? '｜' . $s['heading'] : '' );
         case 'html_block':
             return isset( $s['content'] ) ? wp_strip_all_tags( mb_strimwidth( $s['content'], 0, 30, '…' ) ) : '';
         default:

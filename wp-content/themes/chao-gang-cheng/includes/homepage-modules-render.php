@@ -571,7 +571,120 @@ function ckc_render_module_youtube_feed( $settings ) {
 }
 
 /* -------------------------------------------------------------------------
- * 8. 社群連結卡片
+ * 8. Instagram 精選影片（橫向可滑動輪播，Instagram 官方內嵌元件，站內直接播放）
+ * ---------------------------------------------------------------------- */
+function ckc_render_module_instagram_showcase( $settings ) {
+    $heading    = isset( $settings['heading'] ) ? $settings['heading'] : '';
+    $subheading = isset( $settings['subheading'] ) ? $settings['subheading'] : '';
+    $items      = isset( $settings['items'] ) && is_array( $settings['items'] ) ? $settings['items'] : array();
+
+    // 只保留看起來像 Instagram 網址的項目，避免貼錯網址時輸出無效的內嵌元件。
+    $urls = array();
+    foreach ( $items as $item ) {
+        $url = isset( $item['url'] ) ? trim( $item['url'] ) : '';
+        if ( $url && false !== strpos( $url, 'instagram.com' ) ) {
+            $urls[] = $url;
+        }
+    }
+
+    if ( empty( $urls ) ) {
+        return; // 尚未設定任何貼文網址時，這個區塊不輸出，避免首頁出現空區塊。
+    }
+    ?>
+    <section class="instagram-showcase-section">
+        <div class="container">
+            <?php if ( $heading || $subheading ) : ?>
+                <div class="section-header" style="text-align: center; margin-bottom: 30px;">
+                    <?php if ( $heading ) : ?>
+                        <h2 style="font-size: 24px; font-weight: 700; color: var(--primary-color); margin: 0 0 5px 0;"><?php echo esc_html( $heading ); ?></h2>
+                    <?php endif; ?>
+                    <?php if ( $subheading ) : ?>
+                        <p style="font-size: 14px; color: var(--text-muted); margin: 0;"><?php echo esc_html( $subheading ); ?></p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="instagram-showcase-wrap">
+            <button type="button" class="instagram-showcase-arrow instagram-showcase-prev" aria-label="上一則">&lt;</button>
+            <div class="instagram-showcase-track">
+                <?php foreach ( $urls as $url ) : ?>
+                    <div class="instagram-showcase-item">
+                        <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $url ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <button type="button" class="instagram-showcase-arrow instagram-showcase-next" aria-label="下一則">&gt;</button>
+        </div>
+    </section>
+    <?php
+    // Instagram 官方內嵌元件（embed.js）比較重，用 IntersectionObserver 延遲到
+    // 使用者實際捲到這個區塊附近才載入，不影響首頁一開始的載入速度；就算頁面上
+    // 有多個 Instagram 精選影片模塊，這段載入腳本也只會輸出一次（static 旗標）。
+    static $script_printed = false;
+    if ( $script_printed ) {
+        return;
+    }
+    $script_printed = true;
+    ?>
+    <script>
+    (function () {
+        var embedLoaded = false;
+        function loadInstagramEmbed() {
+            if (embedLoaded) {
+                if (window.instgrm && window.instgrm.Embeds) { window.instgrm.Embeds.process(); }
+                return;
+            }
+            embedLoaded = true;
+            var script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.instagram.com/embed.js';
+            document.body.appendChild(script);
+        }
+
+        function initCarouselArrows() {
+            document.querySelectorAll('.instagram-showcase-wrap').forEach(function (wrap) {
+                var track = wrap.querySelector('.instagram-showcase-track');
+                var prevBtn = wrap.querySelector('.instagram-showcase-prev');
+                var nextBtn = wrap.querySelector('.instagram-showcase-next');
+                if (!track) { return; }
+                function scrollByCard(direction) {
+                    var card = track.querySelector('.instagram-showcase-item');
+                    var amount = card ? card.getBoundingClientRect().width + 16 : 320;
+                    track.scrollBy({ left: direction * amount, behavior: 'smooth' });
+                }
+                if (prevBtn) { prevBtn.addEventListener('click', function () { scrollByCard(-1); }); }
+                if (nextBtn) { nextBtn.addEventListener('click', function () { scrollByCard(1); }); }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initCarouselArrows();
+
+            var sections = document.querySelectorAll('.instagram-showcase-section');
+            if (!sections.length) { return; }
+
+            if ('IntersectionObserver' in window) {
+                var observer = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) {
+                            loadInstagramEmbed();
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { rootMargin: '300px' });
+                sections.forEach(function (s) { observer.observe(s); });
+            } else {
+                loadInstagramEmbed();
+            }
+        });
+    })();
+    </script>
+    <?php
+}
+
+/* -------------------------------------------------------------------------
+ * 9. 社群連結卡片
  * ---------------------------------------------------------------------- */
 function ckc_render_module_social_links( $settings ) {
     $fb  = isset( $settings['facebook_url'] ) ? $settings['facebook_url'] : '';
@@ -623,7 +736,7 @@ function ckc_render_module_social_links( $settings ) {
 }
 
 /* -------------------------------------------------------------------------
- * 9. 自訂文字／HTML 區塊
+ * 10. 自訂文字／HTML 區塊
  * ---------------------------------------------------------------------- */
 function ckc_render_module_html_block( $settings ) {
     $content = isset( $settings['content'] ) ? $settings['content'] : '';
