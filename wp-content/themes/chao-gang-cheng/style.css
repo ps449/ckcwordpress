@@ -1266,25 +1266,25 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent-color) !important;
 }
 
-/* --- Cart shipping progress bar --- */
+/* --- Cart shipping progress bar：碼頭航運提單主題（淺色系） --- */
 .cart-shipping-progress-wrapper {
   margin-bottom: 35px;
-  background-color: var(--white);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  background-color: #fffaf1;
+  border: 1px solid #e2d2b3;
+  border-radius: 14px;
   padding: 24px;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 12px rgba(26,20,15,0.04);
 }
 
 .cart-shipping-progress-wrapper .progress-message {
   margin-bottom: 12px;
   font-size: 16px;
-  color: var(--primary-color);
+  color: #3a2f24;
 }
 
 .cart-shipping-progress-wrapper .progress-bar-container {
-  background-color: var(--border-color);
+  background-color: #f2e9d8;
   height: 8px;
   border-radius: 4px;
   overflow: hidden;
@@ -1294,13 +1294,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .cart-shipping-progress-wrapper .progress-bar-fill {
-  background-color: var(--accent-color);
+  background-color: #c9974a;
   height: 100%;
   border-radius: 4px;
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- Custom Checkout Form Overrides --- */
+/* --- Custom Checkout Form Overrides：淺色牛皮紙系 --- */
 .woocommerce-checkout .form-row {
   margin-bottom: 16px !important;
 }
@@ -1308,29 +1308,135 @@ h1, h2, h3, h4, h5, h6 {
 .woocommerce-checkout label {
   font-weight: 500;
   font-size: 14px;
-  color: var(--primary-color);
+  color: #3a2f24;
   margin-bottom: 6px;
   display: inline-block;
 }
 
-.woocommerce-checkout input[type="text"], 
-.woocommerce-checkout input[type="tel"], 
-.woocommerce-checkout input[type="email"], 
+.woocommerce-checkout input[type="text"],
+.woocommerce-checkout input[type="tel"],
+.woocommerce-checkout input[type="email"],
 .woocommerce-checkout select {
   padding: 10px 14px !important;
-  border: 1px solid var(--border-color) !important;
+  border: 1px solid #e2d2b3 !important;
   border-radius: 8px !important;
   font-size: 14px !important;
   width: 100% !important;
-  background-color: var(--white) !important;
+  background-color: #fffaf1 !important;
   outline: none !important;
   box-sizing: border-box !important;
 }
 
-.woocommerce-checkout input:focus, 
+.woocommerce-checkout input:focus,
 .woocommerce-checkout select:focus {
-  border-color: var(--secondary-color) !important;
-  box-shadow: 0 0 0 3px rgba(124, 103, 103, 0.15) !important;
+  border-color: #c9974a !important;
+  box-shadow: 0 0 0 3px rgba(201,151,74,0.18) !important;
+}
+
+/* --- 購物車頁：商品明細表格＋總計卡（提單 / 收據簽名元素） --- */
+.woocommerce-cart table.shop_table.cart,
+.woocommerce-cart table.cart {
+  border: 1px solid #e2d2b3;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fffaf1;
+  border-collapse: separate !important;
+  border-spacing: 0;
+}
+.woocommerce-cart table.shop_table.cart thead th,
+.woocommerce-cart table.cart thead th {
+  background: #f6ecd9;
+  color: #3a2f24;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 2px solid #c9974a !important;
+  padding: 14px 12px !important;
+}
+.woocommerce-cart table.shop_table.cart td,
+.woocommerce-cart table.cart td {
+  border-top: 1px dashed #e2d2b3 !important;
+  padding: 16px 12px !important;
+  color: #3a2f24;
+}
+.woocommerce-cart table.shop_table.cart td.product-remove a.remove {
+  color: #f86f69 !important;
+  background: transparent !important;
+  border: 1px solid #f4c2be !important;
+}
+.woocommerce-cart table.shop_table.cart td.product-remove a.remove:hover {
+  background: #f86f69 !important;
+  color: #fff !important;
+  border-color: #f86f69 !important;
+}
+.woocommerce-cart .quantity .qty {
+  border: 1px solid #e2d2b3 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+}
+.woocommerce-cart table.shop_table.cart .product-price ins,
+.woocommerce-cart table.shop_table.cart .product-subtotal ins {
+  color: #1a140f;
+  text-decoration: none;
+}
+.woocommerce-cart table.shop_table.cart .product-price del,
+.woocommerce-cart table.shop_table.cart .product-subtotal del {
+  color: #b7a889;
+}
+.woocommerce-cart table.shop_table.cart button[name="update_cart"],
+.woocommerce-cart table.shop_table.cart button[name="apply_coupon"],
+.woocommerce-cart .coupon .button {
+  background: #fffaf1 !important;
+  border: 1px solid #c9974a !important;
+  color: #1a140f !important;
+  border-radius: 20px !important;
+  font-weight: 700 !important;
+}
+.woocommerce-cart table.shop_table.cart .coupon input#coupon_code {
+  border: 1px solid #e2d2b3 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+}
+
+.woocommerce-cart .cart_totals,
+.woocommerce-checkout .cart_totals {
+  background: #fffaf1;
+  border: 1px solid #e2d2b3;
+  border-radius: 14px;
+  padding: 8px 20px;
+}
+.woocommerce-cart .cart_totals h2 {
+  color: #1a140f;
+  font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
+}
+.woocommerce-cart .cart_totals table.shop_table th,
+.woocommerce-cart .cart_totals table.shop_table td {
+  border-top: 1px dashed #e2d2b3 !important;
+  color: #3a2f24;
+}
+.woocommerce-cart .cart_totals table.shop_table tr:first-child th,
+.woocommerce-cart .cart_totals table.shop_table tr:first-child td {
+  border-top: none !important;
+}
+/* 簽名元素：總計列上方的「撕線」— 呼應提單/收據撕開取單的意象 */
+.woocommerce-cart .cart_totals table.shop_table tr.order-total th,
+.woocommerce-cart .cart_totals table.shop_table tr.order-total td {
+  border-top: 2px dashed #c9974a !important;
+  padding-top: 14px !important;
+}
+.woocommerce-cart .cart_totals table.shop_table tr.order-total .woocommerce-Price-amount {
+  color: #b91c1c;
+  font-weight: 800;
+  font-size: 18px;
+}
+.woocommerce-cart .wc-proceed-to-checkout a.checkout-button {
+  background-color: #f86f69 !important;
+  border-radius: 24px !important;
+  font-weight: 700 !important;
+}
+.woocommerce-cart .wc-proceed-to-checkout a.checkout-button:hover {
+  background-color: #e85850 !important;
 }
 
 .invoice-conditional-field {

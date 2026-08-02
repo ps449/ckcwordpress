@@ -126,25 +126,25 @@ function chao_checkout_free_shipping_progress() {
 
     $is_free = $coupon_free_shipping || $remaining <= 0;
     ?>
-    <div class="chao-shipping-progress-container" style="margin-bottom: 25px; padding: 18px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="chao-shipping-progress-container" style="margin-bottom: 25px; padding: 18px; border-radius: 10px; background: #fffaf1; border: 1px solid #e2d2b3; box-shadow: 0 1px 3px rgba(26,20,15,0.04);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: 600;">
-            <span style="color: #334155; display: flex; align-items: center; gap: 6px;">
+            <span style="color: #3a2f24; display: flex; align-items: center; gap: 6px;">
                 <?php if ( $coupon_free_shipping ) : ?>
                     <span style="font-size: 16px;"></span> 已套用免運優惠券，本次配送免運費！
                 <?php elseif ( $remaining <= 0 ) : ?>
                     <span style="font-size: 16px;"></span> 恭喜！您已達免運門檻，本次配送免運費！
                 <?php else : ?>
-                    <span style="font-size: 16px;">🚚</span> 距離免運門檻還差 <span style="color: #e11d48; font-size: 16px; font-weight: 700;">NT$<?php echo number_format( $remaining ); ?></span>
+                    <span style="font-size: 16px;">🚚</span> 距離免運門檻還差 <span style="color: #f86f69; font-size: 16px; font-weight: 700;">NT$<?php echo number_format( $remaining ); ?></span>
                 <?php endif; ?>
             </span>
             <?php if ( ! $coupon_free_shipping ) : ?>
-            <span style="color: #64748b; font-size: 13px;">免運門檻 NT$<?php echo number_format( $threshold ); ?></span>
+            <span style="color: #8c7a64; font-size: 13px;">免運門檻 NT$<?php echo number_format( $threshold ); ?></span>
             <?php endif; ?>
         </div>
-        <div class="chao-progress-track" style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden;">
+        <div class="chao-progress-track" style="width: 100%; height: 8px; background: #f2e9d8; border-radius: 4px; overflow: hidden;">
             <?php
             $percentage = $is_free ? 100 : min( 100, max( 0, ( $cart_total / $threshold ) * 100 ) );
-            $bar_color  = $is_free ? 'linear-gradient(90deg, #10b981 0%, #047857 100%)' : 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)';
+            $bar_color  = $is_free ? 'linear-gradient(90deg, #10b981 0%, #047857 100%)' : 'linear-gradient(90deg, #e3c586 0%, #c9974a 100%)';
             ?>
             <div class="chao-progress-bar" style="width: <?php echo esc_attr( $percentage ); ?>%; height: 100%; background: <?php echo esc_attr( $bar_color ); ?>; transition: width 0.4s ease-in-out;"></div>
         </div>
@@ -497,10 +497,10 @@ function chao_cart_estimated_shipping_row() {
                     foreach ( $rates as $title => $cost ) {
                         $parts[] = esc_html( $title ) . ' ' . wc_price( $cost );
                     }
-                    echo '<span class="chao-est-shipping-rates">' . implode( '<span style="color:#94a3b8;">｜</span>', $parts ) . '</span>';
+                    echo '<span class="chao-est-shipping-rates">' . implode( '<span style="color:#c9a86c;">｜</span>', $parts ) . '</span>';
                 }
                 ?>
-                <div style="font-size:12px;color:#64748b;margin-top:4px;">滿 <?php echo wc_price( $threshold ); ?> 免運，實際運費依結帳時選擇的物流方式計算</div>
+                <div style="font-size:12px;color:#8c7a64;margin-top:4px;">滿 <?php echo wc_price( $threshold ); ?> 免運，實際運費依結帳時選擇的物流方式計算</div>
             <?php endif; ?>
         </td>
     </tr>
@@ -654,15 +654,15 @@ function chao_checkout_free_shipping_cross_sell() {
         return;
     }
     ?>
-    <div class="chao-checkout-cross-sell" data-threshold="<?php echo (int) $threshold; ?>" style="margin-bottom:20px;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">
-        <div style="font-size:14px;font-weight:700;color:#334155;margin-bottom:12px;">還差 <strong style="color:#b91c1c;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
+    <div class="chao-checkout-cross-sell" data-threshold="<?php echo (int) $threshold; ?>" style="margin-bottom:20px;padding:16px;background:#fffaf1;border:1px solid #e2d2b3;border-radius:10px;">
+        <div style="font-size:14px;font-weight:700;color:#3a2f24;margin-bottom:12px;">還差 <strong style="color:#f86f69;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
             <?php foreach ( $picks as $product ) : ?>
                 <div style="display:flex;flex-direction:column;gap:6px;text-align:center;">
                     <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="display:block;"><?php echo $product->get_image( 'woocommerce_thumbnail' ); ?></a>
-                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="font-size:13px;color:#1e293b;text-decoration:none;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></a>
-                    <span style="font-size:14px;font-weight:700;color:#b91c1c;"><?php echo $product->get_price_html(); ?></span>
-                    <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" style="border:none;background:#7f6c60;color:#fff;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="font-size:13px;color:#1a140f;text-decoration:none;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></a>
+                    <span style="font-size:14px;font-weight:700;color:#f86f69;"><?php echo $product->get_price_html(); ?></span>
+                    <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" style="border:1px solid #c9974a;background:#fff;color:#1a140f;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -752,22 +752,22 @@ function chao_cart_ux_footer_assets() {
     ?>
     <style>
     /* Continue shopping link */
-    .chao-continue-shopping { display: inline-block; margin-right: 12px; color: #64748b; text-decoration: none; font-size: 14px; line-height: 38px; }
-    .chao-continue-shopping:hover { color: #1e293b; text-decoration: underline; }
+    .chao-continue-shopping { display: inline-block; margin-right: 12px; color: #8c7a64; text-decoration: none; font-size: 14px; line-height: 38px; }
+    .chao-continue-shopping:hover { color: #1a140f; text-decoration: underline; }
     /* De-emphasize the now-automatic update button */
     .woocommerce-cart-form button[name="update_cart"] { opacity: 0.45; }
     /* Trust badges */
-    .chao-cart-trust { margin-top: 12px; text-align: center; font-size: 12px; color: #64748b; line-height: 1.7; }
-    .chao-cart-trust a { color: #64748b; text-decoration: underline; margin-left: 8px; }
+    .chao-cart-trust { margin-top: 12px; text-align: center; font-size: 12px; color: #8c7a64; line-height: 1.7; }
+    .chao-cart-trust a { color: #8c7a64; text-decoration: underline; margin-left: 8px; }
     /* Cross-sell block */
-    .chao-cart-cross-sell { margin: 20px 0; padding: 18px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
-    .chao-cart-cross-sell-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 14px; }
+    .chao-cart-cross-sell { margin: 20px 0; padding: 18px; background: #fffaf1; border: 1px solid #e2d2b3; border-radius: 10px; }
+    .chao-cart-cross-sell-title { font-size: 15px; font-weight: 600; color: #3a2f24; margin-bottom: 14px; }
     .chao-cart-cross-sell-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .chao-cart-cross-sell-item { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
     .chao-cart-cross-sell-item .chao-cross-sell-thumb img { width: 100%; height: auto; border-radius: 8px; display: block; }
-    .chao-cart-cross-sell-item .chao-cross-sell-name { font-size: 13px; color: #1e293b; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
-    .chao-cart-cross-sell-item .chao-cross-sell-price { font-size: 14px; font-weight: 700; color: #b91c1c; }
-    .chao-cart-cross-sell-item .chao-cross-sell-add { font-size: 13px; padding: 6px 12px; width: 100%; text-align: center; }
+    .chao-cart-cross-sell-item .chao-cross-sell-name { font-size: 13px; color: #1a140f; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
+    .chao-cart-cross-sell-item .chao-cross-sell-price { font-size: 14px; font-weight: 700; color: #f86f69; }
+    .chao-cart-cross-sell-item .chao-cross-sell-add { font-size: 13px; padding: 6px 12px; width: 100%; text-align: center; border: 1px solid #c9974a !important; background: #fff !important; color: #1a140f !important; }
     @media (max-width: 768px) {
         .chao-cart-cross-sell-grid { grid-template-columns: repeat(2, 1fr); }
     }
@@ -777,14 +777,14 @@ function chao_cart_ux_footer_assets() {
         #chao-cart-sticky-bar {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
             position: fixed; bottom: 56px; left: 0; right: 0; z-index: 99998;
-            background: #fff; border-top: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08); padding: 10px 16px; box-sizing: border-box;
+            background: #fffaf1; border-top: 1px solid #e2d2b3;
+            box-shadow: 0 -4px 20px rgba(26,20,15,0.1); padding: 10px 16px; box-sizing: border-box;
         }
         #chao-cart-sticky-bar .chao-cart-sticky-info { display: flex; flex-direction: column; line-height: 1.3; }
-        #chao-cart-sticky-bar .chao-cart-sticky-info span { font-size: 12px; color: #64748b; }
-        #chao-cart-sticky-bar .chao-cart-sticky-info strong { font-size: 18px; color: #b91c1c; }
+        #chao-cart-sticky-bar .chao-cart-sticky-info span { font-size: 12px; color: #8c7a64; }
+        #chao-cart-sticky-bar .chao-cart-sticky-info strong { font-size: 18px; color: #f86f69; }
         #chao-cart-sticky-bar .chao-cart-sticky-btn {
-            flex: 1; max-width: 220px; text-align: center; background-color: var(--secondary-color, #7f6c60);
+            flex: 1; max-width: 220px; text-align: center; background-color: #f86f69;
             color: #fff; border-radius: 24px; padding: 12px 18px; font-size: 15px; font-weight: 700; text-decoration: none;
         }
         body.woocommerce-cart { padding-bottom: 130px !important; }

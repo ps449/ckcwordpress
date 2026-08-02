@@ -831,17 +831,17 @@ function ckc_render_coupon_cards( $context = 'cart', $coupons_override = null ) 
     </div>
     <style>
     .ckc-coupon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin: 14px 0; }
-    .ckc-coupon-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px dashed #d6a878; border-radius: 10px; padding: 12px 14px; }
+    .ckc-coupon-card { display: flex; align-items: center; gap: 12px; background: #fffaf1; border: 1px dashed #c9974a; border-radius: 10px; padding: 12px 14px; }
     .ckc-coupon-card.is-applied { border-style: solid; border-color: #16a34a; background: #f0fdf4; }
-    .ckc-coupon-card.is-expired { opacity: 0.55; border-color: #e2e8f0; }
-    .ckc-coupon-left { text-align: center; min-width: 76px; border-right: 1px dashed #e2e8f0; padding-right: 12px; }
-    .ckc-coupon-value { font-size: 17px; font-weight: 800; color: #b91c1c; line-height: 1.3; }
-    .ckc-coupon-min { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .ckc-coupon-card.is-expired { opacity: 0.55; border-color: #e2d2b3; }
+    .ckc-coupon-left { text-align: center; min-width: 76px; border-right: 1px dashed #e2d2b3; padding-right: 12px; }
+    .ckc-coupon-value { font-size: 17px; font-weight: 800; color: #f86f69; line-height: 1.3; }
+    .ckc-coupon-min { font-size: 11px; color: #8c7a64; margin-top: 2px; }
     .ckc-coupon-body { flex: 1; min-width: 0; }
-    .ckc-coupon-title { font-size: 14px; font-weight: 700; color: #1e293b; }
-    .ckc-coupon-meta { font-size: 12px; color: #64748b; margin-top: 3px; }
-    .ckc-coupon-meta code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
-    .ckc-coupon-apply { display: inline-block; background: #7f6c60; color: #fff !important; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+    .ckc-coupon-title { font-size: 14px; font-weight: 700; color: #1a140f; }
+    .ckc-coupon-meta { font-size: 12px; color: #8c7a64; margin-top: 3px; }
+    .ckc-coupon-meta code { background: #f2e9d8; padding: 1px 6px; border-radius: 4px; }
+    .ckc-coupon-apply { display: inline-block; background: #1a140f; color: #e3c586 !important; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
     .ckc-coupon-applied { color: #16a34a; font-size: 13px; font-weight: 700; white-space: nowrap; }
     </style>
     <?php
@@ -2479,18 +2479,18 @@ function ckc_checkout_coupon_panel() {
     echo 'details.ckc-coupon-details summary { list-style: none; }';
     echo '</style>';
     echo '<div class="ckc-coupon-center" style="margin-bottom: 24px;">';
-    echo '<details class="ckc-coupon-details" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 0.3s ease;">';
-    echo '<summary style="font-size: 15px; font-weight: 700; color: #334155; cursor: pointer; display: flex; align-items: center; justify-content: space-between; outline: none; margin: -12px; padding: 12px; border-radius: 8px; user-select: none;">';
-    echo '<span style="display: flex; align-items: center; gap: 8px;">🎟️ 我的優惠券 <span style="font-size:12px;color:#94a3b8;font-weight:normal;">每筆訂單限用一張</span></span>';
-    echo '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ckc-details-icon" style="color: #94a3b8; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    echo '<details class="ckc-coupon-details" style="border: 1px solid #e2d2b3; border-radius: 8px; padding: 12px; background: #fffaf1; box-shadow: 0 1px 3px rgba(26,20,15,0.03); transition: all 0.3s ease;">';
+    echo '<summary style="font-size: 15px; font-weight: 700; color: #1a140f; cursor: pointer; display: flex; align-items: center; justify-content: space-between; outline: none; margin: -12px; padding: 12px; border-radius: 8px; user-select: none;">';
+    echo '<span style="display: flex; align-items: center; gap: 8px;">🎟️ 我的優惠券 <span style="font-size:12px;color:#8c7a64;font-weight:normal;">每筆訂單限用一張</span></span>';
+    echo '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ckc-details-icon" style="color: #8c7a64; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
     echo '</summary>';
-    echo '<div style="padding-top: 16px; margin-top: 4px; border-top: 1px dashed #e2e8f0;">';
+    echo '<div style="padding-top: 16px; margin-top: 4px; border-top: 1px dashed #e2d2b3;">';
     ?>
     <div class="ckc-checkout-coupon-form" style="display:flex;gap:8px;margin-bottom:12px;max-width:440px;">
         <input type="text" id="ckc-checkout-coupon-code" placeholder="輸入折扣碼" autocomplete="off"
-               style="flex:1;min-width:0;border:1px solid #d6a878;border-radius:8px;padding:10px 12px;font-size:14px;">
+               style="flex:1;min-width:0;border:1px solid #c9974a;border-radius:8px;padding:10px 12px;font-size:14px;background:#fff;">
         <button type="button" id="ckc-checkout-coupon-apply"
-                style="border:none;background:#7f6c60;color:#fff;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">套用</button>
+                style="border:none;background:#f86f69;color:#fff;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">套用</button>
     </div>
     <?php
     if ( ! empty( $coupons ) ) {
@@ -2886,45 +2886,45 @@ function ckc_checkout_points_panel() {
 
     ?>
     <div class="ckc-points-center" style="margin-bottom: 24px;">
-        <div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 8px;">🪙 紅利點數折抵</div>
-        
-        <div class="ckc-points-card<?php echo $is_applied ? ' is-applied' : ''; ?>" style="display: flex; align-items: center; gap: 12px; background: #fff; border: 1px dashed #d6a878; border-radius: 10px; padding: 12px 14px; max-width: 480px; position: relative; transition: all 0.25s ease;">
-            <div class="ckc-points-left" style="text-align: center; min-width: 80px; border-right: 1px dashed #e2e8f0; padding-right: 12px;">
-                <div class="ckc-points-value" style="font-size: 17px; font-weight: 800; color: #b91c1c; line-height: 1.3;">
+        <div style="font-size: 15px; font-weight: 700; color: #1a140f; margin-bottom: 8px;">🪙 紅利點數折抵</div>
+
+        <div class="ckc-points-card<?php echo $is_applied ? ' is-applied' : ''; ?>" style="display: flex; align-items: center; gap: 12px; background: #fffaf1; border: 1px dashed #c9974a; border-radius: 10px; padding: 12px 14px; max-width: 480px; position: relative; transition: all 0.25s ease;">
+            <div class="ckc-points-left" style="text-align: center; min-width: 80px; border-right: 1px dashed #e2d2b3; padding-right: 12px;">
+                <div class="ckc-points-value" style="font-size: 17px; font-weight: 800; color: #f86f69; line-height: 1.3;">
                     🪙 <?php echo $is_applied ? esc_html( $applied_points ) : esc_html( $points_to_apply ); ?> 點
                 </div>
-                <div class="ckc-points-worth" style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+                <div class="ckc-points-worth" style="font-size: 11px; color: #8c7a64; margin-top: 2px;">
                     折抵 NT$<?php echo esc_html( number_format( ( $is_applied ? $applied_points : $points_to_apply ) * $one_point_value ) ); ?>
                 </div>
             </div>
-            
+
             <div class="ckc-points-body" style="flex: 1; min-width: 0;">
-                <div class="ckc-points-title" style="font-size: 14px; font-weight: 700; color: #1e293b;">
+                <div class="ckc-points-title" style="font-size: 14px; font-weight: 700; color: #1a140f;">
                     <?php echo $is_applied ? '已套用紅利折抵' : '紅利點數全額折抵'; ?>
                 </div>
-                <div class="ckc-points-meta" style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                <div class="ckc-points-meta" style="font-size: 12px; color: #8c7a64; margin-top: 3px;">
                     您的帳戶餘額： <code><?php echo esc_html( $points ); ?> 點</code>
                 </div>
             </div>
-            
+
             <div class="ckc-points-action" style="white-space: nowrap;">
                 <?php // 兩顆按鈕都輸出，由 CSS 依 .is-applied 顯示其一，AJAX 後前端切換即可即時刷新 ?>
                 <button type="button" class="ckc-points-remove-btn" style="display: inline-block; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                     移除折抵
                 </button>
-                <button type="button" class="ckc-points-apply-btn" data-points="<?php echo (int) $points_to_apply; ?>" style="display: inline-block; background: #7f6c60; color: #fff; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                <button type="button" class="ckc-points-apply-btn" data-points="<?php echo (int) $points_to_apply; ?>" style="display: inline-block; background: #1a140f; color: #e3c586; border: none; border-radius: 16px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                     立即折抵
                 </button>
             </div>
         </div>
 
         <div class="ckc-points-extra"<?php echo $is_applied ? ' style="display:none;"' : ''; ?>>
-            <a href="javascript:void(0);" onclick="jQuery('#ckc-custom-points-wrap').toggle();" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #7f6c60; text-decoration: underline;">自訂折抵點數</a>
+            <a href="javascript:void(0);" onclick="jQuery('#ckc-custom-points-wrap').toggle();" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #f86f69; text-decoration: underline;">自訂折抵點數</a>
 
             <div id="ckc-custom-points-wrap" style="display: none; margin-top: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="number" min="1" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #d1d5db; width: 120px;" />
-                    <button type="button" class="ckc-points-custom-apply-btn" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #7f6c60; color: #fff; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
+                    <input type="number" min="1" max="<?php echo esc_attr( $points_to_apply ); ?>" id="ckc_custom_points_input" placeholder="輸入點數" style="height: 36px; border-radius: 20px; padding: 0 14px; border: 1px solid #e2d2b3; width: 120px;" />
+                    <button type="button" class="ckc-points-custom-apply-btn" style="height: 36px; border-radius: 20px; padding: 0 16px; background: #1a140f; color: #e3c586; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">套用</button>
                 </div>
             </div>
         </div>

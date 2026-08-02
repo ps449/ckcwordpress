@@ -6,27 +6,28 @@ function chao_checkout_custom_js_css() {
     }
     ?>
     <style>
-    /* Custom Checkout Section Styles */
+    /* Custom Checkout Section Styles：淺色牛皮紙系（呼應領券中心／我的帳號設計語彙） */
     .chao-checkout-section {
-        background: #ffffff;
-        border: 1px solid #e1e8ed;
+        background: #fffaf1;
+        border: 1px solid #e2d2b3;
         border-radius: 12px;
         padding: 24px;
         margin-bottom: 24px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        box-shadow: 0 4px 12px rgba(26,20,15,0.04);
     }
     .chao-section-title {
         font-size: 18px;
         font-weight: 700;
-        color: #2c3e50;
+        color: #1a140f;
         margin-bottom: 20px;
-        border-bottom: 2px solid #f1f5f9;
+        border-bottom: 2px solid #c9974a;
         padding-bottom: 10px;
+        font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
     .chao-sub-title {
         font-size: 15px;
         font-weight: 600;
-        color: #34495e;
+        color: #3a2f24;
         margin: 15px 0 10px 0;
     }
     
@@ -90,34 +91,35 @@ function chao_checkout_custom_js_css() {
         line-height: 1.2;
     }
     
-    /* Cards Style */
+    /* Cards Style：金框選取，取代原本的黑框樣板感 */
     .chao-card {
-        border: 1px solid #cbd5e1;
+        border: 1px solid #e2d2b3;
         border-radius: 10px;
         padding: 16px 20px;
         display: flex;
         align-items: center;
         cursor: pointer;
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        background: #fff;
+        background: #fffaf1;
         user-select: none;
     }
     .chao-card:hover {
-        border-color: #94a3b8;
+        border-color: #c9974a;
         transform: translateY(-1px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 10px rgba(26,20,15,0.06);
     }
     .chao-card.active {
-        border: 2px solid #000000 !important;
-        background: #ffffff;
+        border: 2px solid #c9974a !important;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(201,151,74,0.15);
     }
-    
+
     /* Circle Checkmark Icon */
     .chao-card-check {
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        border: 2px solid #cbd5e1;
+        border: 2px solid #d8c39c;
         margin-right: 14px;
         display: flex;
         align-items: center;
@@ -127,8 +129,8 @@ function chao_checkout_custom_js_css() {
         position: relative;
     }
     .chao-card.active .chao-card-check {
-        border-color: #000;
-        background: #000;
+        border-color: #c9974a;
+        background: #c9974a;
     }
     .chao-card.active .chao-card-check::after {
         content: "";
@@ -144,27 +146,28 @@ function chao_checkout_custom_js_css() {
     .chao-card-text {
         font-size: 15px;
         font-weight: 600;
-        color: #1e293b;
+        color: #1a140f;
     }
-    
+
     /* CVS options section */
     .chao-cvs-options {
         margin-top: 20px;
-        border-top: 1px solid #f1f5f9;
+        border-top: 1px dashed #e2d2b3;
         padding-top: 20px;
     }
     .chao-cvs-subcard {
-        border: 1px solid #cbd5e1;
+        border: 1px solid #e2d2b3;
         border-radius: 10px;
         padding: 16px 20px;
         display: flex;
         align-items: center;
-        background: #fff;
+        background: #fffaf1;
         position: relative;
         margin-bottom: 16px;
     }
     .chao-cvs-subcard.active {
-        border: 2px solid #000000;
+        border: 2px solid #c9974a;
+        background: #fff;
     }
     .chao-cvs-info {
         display: flex;
@@ -176,31 +179,31 @@ function chao_checkout_custom_js_css() {
     .chao-cvs-name {
         font-size: 15px;
         font-weight: 600;
-        color: #1e293b;
+        color: #1a140f;
     }
     .chao-cvs-price {
         font-size: 15px;
         font-weight: 700;
-        color: #64748b;
+        color: #8c7a64;
     }
     .chao-cvs-subcard.active .chao-cvs-price {
-        color: #000;
+        color: #1a140f;
     }
     .chao-cvs-free-shipping-msg {
         position: absolute;
         bottom: -22px;
         left: 56px;
         font-size: 12px;
-        color: #ef4444;
+        color: #f86f69;
         font-weight: 500;
     }
-    
+
     /* Custom store selection button */
     .chao-select-store-btn {
         width: 100%;
-        background: #fff;
-        border: 1px solid #000;
-        color: #000;
+        background: #fffaf1;
+        border: 1px solid #c9974a;
+        color: #1a140f;
         font-weight: 600;
         font-size: 14px;
         padding: 12px;
@@ -211,24 +214,24 @@ function chao_checkout_custom_js_css() {
         margin-top: 26px;
     }
     .chao-select-store-btn:hover {
-        background: #f8fafc;
-        border-color: #334155;
+        background: #fdf3e0;
+        border-color: #b28a58;
     }
     .chao-selected-store-info {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+        background: #f6ecd9;
+        border: 1px solid #e2d2b3;
         border-radius: 8px;
         padding: 14px 18px;
         margin-top: 14px;
         font-size: 14px;
-        color: #334155;
+        color: #3a2f24;
         line-height: 1.5;
     }
     .chao-store-name {
         font-weight: 700;
-        color: #0f172a;
+        color: #1a140f;
     }
-    
+
     /* Payment styling */
     .chao-payment-info {
         display: flex;
@@ -240,11 +243,11 @@ function chao_checkout_custom_js_css() {
     .chao-payment-title {
         font-size: 15px;
         font-weight: 700;
-        color: #1e293b;
+        color: #1a140f;
     }
     .chao-payment-desc {
         font-size: 13px;
-        color: #64748b;
+        color: #8c7a64;
         font-weight: 400;
     }
     
@@ -284,15 +287,15 @@ function chao_checkout_custom_js_css() {
         border-radius: 30px !important;
         font-weight: 700 !important;
         transition: all 0.25s ease-in-out !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
-        background-color: #8c7e7e !important;
+        box-shadow: 0 4px 14px rgba(248,111,105,0.3) !important;
+        background-color: #f86f69 !important;
         color: #fff !important;
         border: none !important;
     }
     #place_order:hover {
         transform: translateY(-1px) !important;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
-        background-color: #7a6d6d !important;
+        box-shadow: 0 6px 18px rgba(248,111,105,0.4) !important;
+        background-color: #e85850 !important;
     }
     .woocommerce-terms-and-conditions-wrapper {
         order: 2 !important;
@@ -421,7 +424,7 @@ function chao_checkout_custom_js_css() {
                     <div class="chao-payment-cards-grid">
                         <div class="chao-card chao-payment-card" data-payment="credit">
                             <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1e293b" stroke-width="1.5">
+                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
                                 <rect x="2" y="2" width="32" height="20" rx="3" />
                                 <rect x="6" y="7" width="8" height="6" rx="1" />
                                 <circle cx="24" cy="15" r="3.5" />
@@ -434,7 +437,7 @@ function chao_checkout_custom_js_css() {
                         </div>
                         <div class="chao-card chao-payment-card" data-payment="cod" style="display: none;">
                             <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1e293b" stroke-width="1.5">
+                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
                                 <rect x="3" y="4" width="30" height="16" rx="2" />
                                 <circle cx="18" cy="12" r="3" />
                                 <path d="M7 12h3M26 12h3" />
@@ -457,9 +460,9 @@ function chao_checkout_custom_js_css() {
                         </div>
                         <div class="chao-card chao-payment-card" data-payment="atm">
                             <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1e293b" stroke-width="1.5">
+                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
                                 <rect x="3" y="2" width="30" height="15" rx="2" />
-                                <text x="18" y="11" font-family="sans-serif" font-weight="900" font-size="7" fill="#1e293b" text-anchor="middle" stroke="none">ATM</text>
+                                <text x="18" y="11" font-family="sans-serif" font-weight="900" font-size="7" fill="#1a140f" text-anchor="middle" stroke="none">ATM</text>
                                 <path d="M10,17 L6,22 L30,22 L26,17 Z" />
                             </svg>
                             <div class="chao-payment-info">
@@ -469,7 +472,7 @@ function chao_checkout_custom_js_css() {
                         </div>
                         <div class="chao-card chao-payment-card" data-payment="cvscode">
                             <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1e293b" stroke-width="1.5">
+                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
                                 <rect x="4" y="2" width="28" height="20" rx="2" />
                                 <path d="M8 6h20M8 10h20M8 14h12M8 18h16" />
                             </svg>
