@@ -804,6 +804,18 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
                 if (!scaleEl) { return; }
                 item.__ckcObserved = true;
+                // Facebook 的 fb-video 是用官方 data-width 屬性撐到正確的
+                // 目標寬度（layoutWrap() 裡沒有對它套用 CSS transform:
+                // scale()），所以它的 offsetHeight 量到的就已經是「畫面上
+                // 實際呈現」的高度；只有 Instagram 官方元件是維持原生 326px
+                // 版面、外層再用 transform: scale() 縮小，offsetHeight 量到
+                // 的是縮小前的原始高度，需要再乘上縮放比例才會等於畫面上
+                // 實際呈現的高度。這兩種算法不能共用同一個乘法，之前沒有
+                // 分開處理，導致 Facebook 卡片的高度被誤乘縮放比例（通常
+                // 小於 1）而鎖定得比實際內容矮一截，加上 overflow: hidden
+                // 就把 Facebook 元件自帶的大頭貼／粉專名稱／分享文字列跟
+                // 影片畫面一起裁切、擠壓在一起，看起來像版型跑掉。
+                var isFbVideo = !!scaleEl.querySelector('.fb-video');
                 var ro = new ResizeObserver(function () {
                     // 重要：Instagram 內嵌元件在真正把貼文內容載入完成前，
                     // 量到的高度會是 0（或極小的暫時值）。如果這時候就把
@@ -816,7 +828,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
                     // Instagram 的元件有機會正常完成載入。
                     var rawHeight = scaleEl.offsetHeight;
                     if (rawHeight > 20) {
-                        var scale = wrap.__ckcIgScale || 1;
+                        var scale = isFbVideo ? 1 : (wrap.__ckcIgScale || 1);
                         item.style.height = (rawHeight * scale) + 'px';
                     }
                 });
