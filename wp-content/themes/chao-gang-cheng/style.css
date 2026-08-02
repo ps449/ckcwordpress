@@ -472,6 +472,19 @@ h1, h2, h3, h4, h5, h6 {
 
 .instagram-showcase-viewport {
   overflow: hidden;
+  /* 允許瀏覽器原生處理垂直滑動（讓頁面照常上下捲動），水平方向的手勢交給
+     JS 的拖曳邏輯處理，兩者互不打架。 */
+  touch-action: pan-y;
+}
+
+.instagram-showcase-wrap {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.instagram-showcase-wrap.instagram-showcase-dragging {
+  cursor: grabbing;
 }
 
 .instagram-showcase-track {
@@ -479,6 +492,12 @@ h1, h2, h3, h4, h5, h6 {
   align-items: flex-start;
   gap: 16px;
   will-change: transform;
+}
+
+/* 拖曳放開／點擊箭頭吸附到最近一則時，短暫套用 transition 讓位移平滑一點；
+   自動跑馬燈逐幀位移時不會有這個 class，避免動畫互相打架。 */
+.instagram-showcase-track.instagram-showcase-snap {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .instagram-showcase-item {
@@ -610,6 +629,36 @@ h1, h2, h3, h4, h5, h6 {
   right: 0;
 }
 
+/* 滾動位置指示條：因為捲動是用 transform 位移模擬（不是瀏覽器原生
+   scrollbar),使用者原本完全看不出來這排卡片還能繼續看、看到哪裡了；
+   用一條細細的進度條取代，跟拖曳／自動跑馬燈的 offset 同步更新。項目數
+   不夠多、不需要循環捲動時（.instagram-showcase-static）就沒有意義，直接
+   隱藏。 */
+.instagram-showcase-progress {
+  margin: 18px 0 0;
+}
+
+.instagram-showcase-progress-track {
+  height: 3px;
+  border-radius: 3px;
+  background-color: var(--border-color);
+  overflow: hidden;
+}
+
+.instagram-showcase-progress-fill {
+  height: 100%;
+  width: 100%;
+  background-color: var(--accent-color);
+  border-radius: 3px;
+  transform: scaleX(0.001);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.instagram-showcase-static .instagram-showcase-progress {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .instagram-showcase-wrap {
     padding: 0 15px;
@@ -617,8 +666,25 @@ h1, h2, h3, h4, h5, h6 {
   .instagram-showcase-track {
     gap: 10px;
   }
+  /* 手機版原本直接把箭頭整組隱藏，導致滑動又沒反應、箭頭也不在，變成
+     完全無法手動操作。現在滑動手勢已經支援，箭頭改成縮小＋半透明貼邊，
+     當作保底的手動控制方式（尤其 Instagram/Facebook 內嵌 iframe 範圍內
+     無法直接拖曳時，箭頭仍然可以正常點擊切換）。 */
   .instagram-showcase-arrow {
-    display: none;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+    background-color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+  .instagram-showcase-prev {
+    left: 2px;
+  }
+  .instagram-showcase-next {
+    right: 2px;
+  }
+  .instagram-showcase-progress {
+    margin-top: 14px;
   }
 }
 

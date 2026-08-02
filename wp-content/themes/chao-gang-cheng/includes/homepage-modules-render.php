@@ -676,6 +676,11 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 </div>
             </div>
             <button type="button" class="instagram-showcase-arrow instagram-showcase-next" aria-label="下一則">&gt;</button>
+            <div class="instagram-showcase-progress" aria-hidden="true">
+                <div class="instagram-showcase-progress-track">
+                    <div class="instagram-showcase-progress-fill"></div>
+                </div>
+            </div>
         </div>
     </section>
     <?php
@@ -817,16 +822,35 @@ function ckc_render_module_instagram_showcase( $settings ) {
         }
 
         // 勻速自動向右捲動，捲到（複製那一份的）底就無縫接回開頭；滑鼠移入、
-        // 手指觸控、或點擊左右箭頭時暫停，離開／間隔一段時間後自動恢復。
+        // 手指觸控、拖曳、或點擊左右箭頭時暫停，離開／間隔一段時間後自動恢復。
+        //
+        // 手機版滾動 UX：原本 .instagram-showcase-viewport 是 overflow:hidden
+        // （因為捲動是用 transform 位移模擬，不是瀏覽器原生 scroll），導致手指
+        // 滑動完全沒有反應，使用者只能被動看自動跑馬燈。這裡改用 Pointer Events
+        // 統一處理滑鼠拖曳與手指滑動：拖曳時直接跟著手指位移，放開時吸附到最近
+        // 一則的邊界（snap），並依「只是點一下」或「確實拖曳過」給不同的暫停
+        // 時間，讓使用者拖曳瀏覽時不會太快被打斷。
+        //
+        // 已知限制：Instagram／Facebook 官方內嵌元件最終會渲染成跨網域
+        // iframe，瀏覽器基於安全性不會把發生在 iframe 上的指標事件回傳給外層
+        // 頁面，所以直接在該 iframe 範圍內按住拖曳不會觸發這裡的拖曳邏輯
+        // （需要從卡片間距、Reel 縮圖卡片、或箭頭按鈕開始拖曳／點擊）；這是
+        // 瀏覽器層級的限制，並非本次修正遺漏。
         function initMarquee(wrap) {
             var track = wrap.querySelector('.instagram-showcase-track');
             var prevBtn = wrap.querySelector('.instagram-showcase-prev');
             var nextBtn = wrap.querySelector('.instagram-showcase-next');
+            var progressFill = wrap.querySelector('.instagram-showcase-progress-fill');
             if (!track || wrap.__ckcMarqueeInit) { return; }
             wrap.__ckcMarqueeInit = true;
 
             var offset = 0;
             var paused = false;
+            var dragging = false;
+            var dragMoved = false;
+            var dragStartX = 0;
+            var dragStartOffset = 0;
+            var DRAG_THRESHOLD = 6;
             var speed = 40; // px / 秒
             var lastTs = null;
             var resumeTimer = null;
@@ -836,25 +860,40 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 return count;
             }
 
+            function stepWidth() {
+                return (wrap.__ckcIgFootprint || 326) + (wrap.__ckcIgGap || 16);
+            }
+
             function setWidth() {
                 var perSet = itemsPerSet();
-                if (perSet <= 0) { return 0; }
-                var footprint = wrap.__ckcIgFootprint || 326;
-                var gap = wrap.__ckcIgGap || 16;
-                return perSet * footprint + perSet * gap;
+                return perSet > 0 ? perSet * stepWidth() : 0;
+            }
+
+            function wrapOffset(value) {
+                var w = setWidth();
+                if (w <= 0) { return value; }
+                value = value % w;
+                if (value < 0) { value += w; }
+                return value;
+            }
+
+            function updateProgress() {
+                if (!progressFill) { return; }
+                var w = setWidth();
+                var ratio = w > 0 ? Math.min(1, Math.max(0.001, offset / w)) : 0.001;
+                progressFill.style.transform = 'scaleX(' + ratio + ')';
             }
 
             function applyTransform() {
                 track.style.transform = 'translateX(-' + offset + 'px)';
+                updateProgress();
             }
 
             function tick(ts) {
-                if (!wrap.classList.contains('instagram-showcase-static') && !paused) {
+                if (!wrap.classList.contains('instagram-showcase-static') && !paused && !dragging) {
                     if (lastTs !== null) {
                         var dt = (ts - lastTs) / 1000;
-                        offset += speed * dt;
-                        var w = setWidth();
-                        if (w > 0 && offset >= w) { offset -= w; }
+                        offset = wrapOffset(offset + speed * dt);
                         applyTransform();
                     }
                     lastTs = ts;
@@ -864,26 +903,96 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 requestAnimationFrame(tick);
             }
 
-            function pauseTemporarily() {
+            function pauseTemporarily(duration) {
                 paused = true;
                 if (resumeTimer) { clearTimeout(resumeTimer); }
-                resumeTimer = setTimeout(function () { paused = false; }, 2500);
+                resumeTimer = setTimeout(function () { paused = false; }, duration || 2500);
+            }
+
+            // 拖曳／點擊箭頭放開時，套用短暫的 CSS transition 讓位移吸附到最近
+            // 一則的邊界時有平滑的「喀」一下動畫，而不是瞬間跳過去；自動跑馬燈
+            // 逐幀位移不套用這個 transition，避免動畫互相打架。
+            function withSnapTransition(fn) {
+                track.classList.add('instagram-showcase-snap');
+                fn();
+                window.setTimeout(function () {
+                    track.classList.remove('instagram-showcase-snap');
+                }, 340);
+            }
+
+            function snapToNearest() {
+                var step = stepWidth();
+                if (step <= 0) { return; }
+                withSnapTransition(function () {
+                    offset = wrapOffset(Math.round(offset / step) * step);
+                    applyTransform();
+                });
             }
 
             function nudge(direction) {
-                var w = setWidth();
-                if (w <= 0) { return; }
-                offset += direction * ((wrap.__ckcIgFootprint || 326) + (wrap.__ckcIgGap || 16));
-                if (offset < 0) { offset += w; }
-                if (offset >= w) { offset -= w; }
-                applyTransform();
-                pauseTemporarily();
+                if (setWidth() <= 0) { return; }
+                withSnapTransition(function () {
+                    offset = wrapOffset(offset + direction * stepWidth());
+                    applyTransform();
+                });
+                pauseTemporarily(2500);
             }
 
-            wrap.addEventListener('mouseenter', function () { paused = true; });
-            wrap.addEventListener('mouseleave', function () { paused = false; });
-            wrap.addEventListener('touchstart', function () { paused = true; }, { passive: true });
-            wrap.addEventListener('touchend', pauseTemporarily, { passive: true });
+            function onPointerDown(e) {
+                // 箭頭按鈕自己有點擊邏輯（nudge），不需要也走一次拖曳判斷。
+                if (e.target.closest && e.target.closest('.instagram-showcase-arrow')) { return; }
+                if (e.pointerType === 'mouse' && e.button !== 0) { return; }
+                if (!e.isPrimary) { return; }
+                dragging = true;
+                dragMoved = false;
+                dragStartX = e.clientX;
+                dragStartOffset = offset;
+                paused = true;
+                try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 忽略不支援的環境 */ }
+                wrap.classList.add('instagram-showcase-dragging');
+            }
+
+            function onPointerMove(e) {
+                if (!dragging) { return; }
+                var delta = dragStartX - e.clientX;
+                if (!dragMoved && Math.abs(delta) < DRAG_THRESHOLD) { return; }
+                dragMoved = true;
+                if (e.cancelable) { e.preventDefault(); }
+                offset = wrapOffset(dragStartOffset + delta);
+                applyTransform();
+            }
+
+            function endDrag(e) {
+                if (!dragging) { return; }
+                dragging = false;
+                wrap.classList.remove('instagram-showcase-dragging');
+                if (dragMoved) {
+                    snapToNearest();
+                    // 確實拖曳過，給更長的閱讀時間再恢復自動捲動。
+                    pauseTemporarily(5000);
+                    // 吞掉拖曳放開後瀏覽器補送的 click，避免誤觸卡片內連結／播放鍵。
+                    var guard = function (ev) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        wrap.removeEventListener('click', guard, true);
+                    };
+                    wrap.addEventListener('click', guard, true);
+                    window.setTimeout(function () {
+                        wrap.removeEventListener('click', guard, true);
+                    }, 350);
+                } else {
+                    // 只是點一下（可能是點卡片內連結），維持原本較短的暫停時間。
+                    pauseTemporarily(2500);
+                }
+            }
+
+            wrap.addEventListener('pointerdown', onPointerDown);
+            wrap.addEventListener('pointermove', onPointerMove);
+            wrap.addEventListener('pointerup', endDrag);
+            wrap.addEventListener('pointercancel', endDrag);
+
+            wrap.addEventListener('mouseenter', function () { if (!dragging) { paused = true; } });
+            wrap.addEventListener('mouseleave', function () { if (!dragging) { paused = false; } });
 
             if (prevBtn) { prevBtn.addEventListener('click', function () { nudge(-1); }); }
             if (nextBtn) { nextBtn.addEventListener('click', function () { nudge(1); }); }
