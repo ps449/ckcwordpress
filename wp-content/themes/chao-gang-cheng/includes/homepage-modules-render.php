@@ -579,16 +579,27 @@ function ckc_render_module_instagram_showcase( $settings ) {
     $subheading = isset( $settings['subheading'] ) ? $settings['subheading'] : '';
     $items      = isset( $settings['items'] ) && is_array( $settings['items'] ) ? $settings['items'] : array();
 
-    // 只保留看起來像 Instagram 網址的項目，避免貼錯網址時輸出無效的內嵌元件。
-    $urls = array();
+    // 整理清單：只保留看起來像 Instagram 網址的項目，並判斷是 Reel 還是
+    // 一般貼文——因為 Instagram 官方內嵌元件目前對 Reels 有已知的顯示問題
+    // （連 Instagram 自己的 Reel 都會嵌成空白，經實測確認跟版權音樂無關，
+    // 是 Reels 這個內容類型本身的內嵌管線有問題），一般貼文則完全正常。
+    // 所以：一般貼文＝站內直接播放；Reels＝改成縮圖卡片，點擊開新分頁到
+    // Instagram 播放（縮圖需要後台手動上傳，因為沒有官方 API 可以抓）。
+    $entries = array();
     foreach ( $items as $item ) {
         $url = isset( $item['url'] ) ? trim( $item['url'] ) : '';
-        if ( $url && false !== strpos( $url, 'instagram.com' ) ) {
-            $urls[] = $url;
+        if ( ! $url || false === strpos( $url, 'instagram.com' ) ) {
+            continue;
         }
+        $is_reel = (bool) preg_match( '#instagram\.com/reels?/#i', $url );
+        $entries[] = array(
+            'url'       => $url,
+            'is_reel'   => $is_reel,
+            'thumbnail' => $is_reel && isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
+        );
     }
 
-    if ( empty( $urls ) ) {
+    if ( empty( $entries ) ) {
         return; // 尚未設定任何貼文網址時，這個區塊不輸出，避免首頁出現空區塊。
     }
     ?>
@@ -606,7 +617,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
             <?php endif; ?>
         </div>
 
-        <div class="instagram-showcase-wrap" data-item-count="<?php echo esc_attr( count( $urls ) ); ?>">
+        <div class="instagram-showcase-wrap" data-item-count="<?php echo esc_attr( count( $entries ) ); ?>">
             <button type="button" class="instagram-showcase-arrow instagram-showcase-prev" aria-label="上一則">&lt;</button>
             <div class="instagram-showcase-viewport">
                 <div class="instagram-showcase-track">
@@ -615,14 +626,28 @@ function ckc_render_module_instagram_showcase( $settings ) {
                     // 不會在捲到最後一則時出現「跳一下」的斷點。複製的那一份用
                     // aria-hidden 標記，避免螢幕閱讀器重複朗讀。
                     for ( $pass = 0; $pass < 2; $pass++ ) :
-                        foreach ( $urls as $url ) :
-                            ?>
-                            <div class="instagram-showcase-item"<?php echo $pass > 0 ? ' aria-hidden="true"' : ''; ?>>
-                                <div class="instagram-showcase-embed-scale">
-                                    <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $url ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
+                        foreach ( $entries as $entry ) :
+                            $hidden_attr = $pass > 0 ? ' aria-hidden="true"' : '';
+                            if ( $entry['is_reel'] ) :
+                                ?>
+                                <div class="instagram-showcase-item instagram-showcase-item-reel"<?php echo $hidden_attr; ?>>
+                                    <a class="instagram-showcase-reel-link" href="<?php echo esc_url( $entry['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                        <span class="instagram-showcase-reel-thumb"<?php echo $entry['thumbnail'] ? ' style="background-image:url(' . esc_url( $entry['thumbnail'] ) . ');"' : ''; ?>>
+                                            <span class="instagram-showcase-reel-play" aria-hidden="true">▶</span>
+                                        </span>
+                                        <span class="instagram-showcase-reel-caption">到 Instagram 觀看 Reel</span>
+                                    </a>
                                 </div>
-                            </div>
-                            <?php
+                                <?php
+                            else :
+                                ?>
+                                <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
+                                    <div class="instagram-showcase-embed-scale">
+                                        <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $entry['url'] ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
+                                    </div>
+                                </div>
+                                <?php
+                            endif;
                         endforeach;
                     endfor;
                     ?>

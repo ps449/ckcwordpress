@@ -133,7 +133,7 @@ function ckc_homepage_module_registry() {
 
         'instagram_showcase' => array(
             'label'       => 'Instagram 精選影片',
-            'description' => '橫向可滑動的 Instagram 貼文／Reels 輪播，直接用 Instagram 官方內嵌元件顯示，影片會在頁面內直接播放（不會跳出到 Instagram），可以放任何公開帳號的貼文網址。網址取得方式：到該則 Instagram 貼文或 Reel，點選「⋯」→「複製連結」。⚠️ 目前 Instagram 官方元件對 Reels（/reels/ 網址）有已知的顯示問題，貼上去可能會變成空白卡片；一般貼文（/p/ 網址）目前顯示正常。建議優先使用一般貼文網址，Reels 網址等 Instagram 修好再補上。',
+            'description' => '橫向可滑動的 Instagram 貼文／Reels 輪播，可以放任何公開帳號的貼文網址。網址取得方式：到該則 Instagram 貼文或 Reel，點選「⋯」→「複製連結」。⚠️ 一般貼文（/p/ 網址）會用 Instagram 官方元件直接在頁面內播放；但 Reels（/reel/、/reels/ 網址）目前 Instagram 官方元件有已知的顯示問題（連 Instagram 自己的 Reel 都會顯示空白），所以 Reels 改成顯示縮圖卡片，點擊後開新分頁到 Instagram 播放——請務必上傳一張縮圖（截該則 Reel 的畫面存成圖片即可），不然會顯示預設的空白卡片。',
             'fields'      => array(
                 'heading'    => array( 'label' => '標題（可留空）', 'type' => 'text', 'default' => '' ),
                 'subheading' => array( 'label' => '副標題（可留空）', 'type' => 'text', 'default' => '' ),
@@ -141,7 +141,8 @@ function ckc_homepage_module_registry() {
                     'label'      => '影片清單',
                     'type'       => 'repeater',
                     'row_fields' => array(
-                        'url' => array( 'label' => 'Instagram 貼文網址（建議 /p/ 一般貼文，Reels 目前顯示不穩定）', 'type' => 'url', 'default' => '' ),
+                        'url'       => array( 'label' => 'Instagram 貼文／Reel 網址', 'type' => 'url', 'default' => '' ),
+                        'thumbnail' => array( 'label' => '縮圖（僅 Reels 需要，一般貼文可留空）', 'type' => 'image', 'default' => '' ),
                     ),
                     'default' => array(),
                 ),
@@ -645,6 +646,17 @@ function ckc_homepage_render_repeater_row( $name, $row_fields, $row_value, $row_
             echo '<input type="color" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ? $rval : '#ffffff' ) . '" class="ckc-hb-color" title="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
         } elseif ( 'url' === $rfield['type'] ) {
             echo '<input type="url" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
+        } elseif ( 'image' === $rfield['type'] ) {
+            // 跟頂層 image 欄位共用同一套 wp.media 選圖器（JS 用事件委派綁定，
+            // 動態新增的列也能正常運作，見下方 .ckc-hb-image-pick 的說明）。
+            echo '<div class="ckc-hb-image-field ckc-hb-image-field-inline">';
+            echo '<input type="url" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" class="ckc-hb-image-url" placeholder="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
+            echo '<div class="ckc-hb-image-preview-wrap">';
+            echo '<img class="ckc-hb-image-preview" src="' . esc_url( $rval ) . '" alt=""' . ( $rval ? '' : ' style="display:none;"' ) . '>';
+            echo '</div>';
+            echo '<button type="button" class="button ckc-hb-image-pick">選擇圖片</button> ';
+            echo '<button type="button" class="button ckc-hb-image-clear">清除</button>';
+            echo '</div>';
         } else {
             echo '<input type="text" name="' . esc_attr( $rname ) . '" value="' . esc_attr( $rval ) . '" placeholder="' . esc_attr( $rfield['label'] ) . '"' . $disabled . '>';
         }

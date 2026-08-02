@@ -476,6 +476,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .instagram-showcase-track {
   display: flex;
+  align-items: flex-start;
   gap: 16px;
   will-change: transform;
 }
@@ -491,6 +492,72 @@ h1, h2, h3, h4, h5, h6 {
 .instagram-showcase-embed-scale {
   width: 326px;
   transform-origin: top left;
+}
+
+/* Reels 縮圖卡片（因為 Instagram 官方內嵌元件目前無法穩定顯示 Reels，
+   改成縮圖 + 點擊後開新分頁到 Instagram 播放）。寬度由 JS 統一計算，
+   高度用 9:16 直式比例自動撐開，不需要另外用 JS 同步高度。 */
+.instagram-showcase-reel-link {
+  display: block;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--white);
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.instagram-showcase-reel-link:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.instagram-showcase-reel-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background-color: #efefef;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* 沒有上傳縮圖時，用淡淡的 Instagram 品牌漸層當底色，避免顯示純白空格。 */
+.instagram-showcase-reel-thumb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #405de6, #5b51d8, #833ab4, #c13584, #e1306c, #fd1d1d, #f77737, #fcaf45);
+  opacity: 0.18;
+}
+
+.instagram-showcase-reel-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.55);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  z-index: 2;
+}
+
+.instagram-showcase-reel-caption {
+  display: block;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--primary-color);
+  text-align: center;
+  border-top: 1px solid var(--border-color);
 }
 
 .instagram-showcase-static .instagram-showcase-arrow {
