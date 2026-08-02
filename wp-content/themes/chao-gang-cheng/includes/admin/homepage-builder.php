@@ -133,7 +133,7 @@ function ckc_homepage_module_registry() {
 
         'instagram_showcase' => array(
             'label'       => 'Instagram 精選影片',
-            'description' => '橫向可滑動的 Instagram 貼文／Reels 輪播，直接用 Instagram 官方內嵌元件顯示，影片會在頁面內直接播放（不會跳出到 Instagram），可以放任何公開帳號的貼文網址。網址取得方式：到該則 Instagram 貼文或 Reel，點選「⋯」→「複製連結」。',
+            'description' => '橫向可滑動的 Instagram 貼文／Reels 輪播，直接用 Instagram 官方內嵌元件顯示，影片會在頁面內直接播放（不會跳出到 Instagram），可以放任何公開帳號的貼文網址。網址取得方式：到該則 Instagram 貼文或 Reel，點選「⋯」→「複製連結」。⚠️ 目前 Instagram 官方元件對 Reels（/reels/ 網址）有已知的顯示問題，貼上去可能會變成空白卡片；一般貼文（/p/ 網址）目前顯示正常。建議優先使用一般貼文網址，Reels 網址等 Instagram 修好再補上。',
             'fields'      => array(
                 'heading'    => array( 'label' => '標題（可留空）', 'type' => 'text', 'default' => '' ),
                 'subheading' => array( 'label' => '副標題（可留空）', 'type' => 'text', 'default' => '' ),
@@ -141,7 +141,7 @@ function ckc_homepage_module_registry() {
                     'label'      => '影片清單',
                     'type'       => 'repeater',
                     'row_fields' => array(
-                        'url' => array( 'label' => 'Instagram 貼文／Reel 網址', 'type' => 'url', 'default' => '' ),
+                        'url' => array( 'label' => 'Instagram 貼文網址（建議 /p/ 一般貼文，Reels 目前顯示不穩定）', 'type' => 'url', 'default' => '' ),
                     ),
                     'default' => array(),
                 ),
