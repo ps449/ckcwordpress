@@ -553,11 +553,6 @@ function chao_checkout_custom_js_css() {
                 var cvsCostText = $cvsLabel.length ? $cvsLabel.text().trim() : '';
                 if (cvsCostText) {
                     $('#chao-cvs-rate-price').text(cvsCostText);
-                } else if (/free|免費/i.test(fullLabel)) {
-                    // 已達免運資格（滿額或套用免運優惠券）時，WooCommerce 不會輸出金額，
-                    // 只會在方式名稱後面加註「(Free)／（免費）」，此時沒有 .woocommerce-Price-amount
-                    // 可讀，改直接顯示「免運」，避免卡片停留在舊的 NT$280 不更新。
-                    $('#chao-cvs-rate-price').text('免運');
                 } else {
                     // Fallback: read full label text and strip the method name prefix
                     // label typically looks like: "7-11 超商冷凍取貨：NT$280.00"
@@ -565,6 +560,14 @@ function chao_checkout_custom_js_css() {
                     if (colonIdx === -1) colonIdx = fullLabel.lastIndexOf(':');
                     if (colonIdx !== -1) {
                         $('#chao-cvs-rate-price').text(fullLabel.substring(colonIdx + 1).trim());
+                    } else if (/free|免費/i.test(fullLabel)) {
+                        // 已達免運資格時，WooCommerce 標籤有時會加註「(Free)／（免費）」文字
+                        $('#chao-cvs-rate-price').text('免運');
+                    } else {
+                        // 已達免運資格（滿額或套用免運優惠券）時，此站台實測 cost=0 且無稅額，
+                        // WooCommerce 完全不會輸出任何金額片段（沒有 .woocommerce-Price-amount，
+                        // 也沒有冒號可解析），改直接顯示「免運」，避免卡片停留在舊金額不更新。
+                        $('#chao-cvs-rate-price').text('免運');
                     }
                 }
             }
