@@ -571,7 +571,8 @@ function ckc_render_module_youtube_feed( $settings ) {
 }
 
 /* -------------------------------------------------------------------------
- * 8. Instagram 精選影片（橫向可滑動輪播，Instagram 官方內嵌元件，站內直接播放）
+ * 8. Instagram 精選影片（電腦版一屏 4 則／手機版一屏 2 則，勻速自動向右
+ *    捲動並無縫循環回開頭；Instagram 官方內嵌元件，站內直接播放）
  * ---------------------------------------------------------------------- */
 function ckc_render_module_instagram_showcase( $settings ) {
     $heading    = isset( $settings['heading'] ) ? $settings['heading'] : '';
@@ -605,14 +606,27 @@ function ckc_render_module_instagram_showcase( $settings ) {
             <?php endif; ?>
         </div>
 
-        <div class="instagram-showcase-wrap">
+        <div class="instagram-showcase-wrap" data-item-count="<?php echo esc_attr( count( $urls ) ); ?>">
             <button type="button" class="instagram-showcase-arrow instagram-showcase-prev" aria-label="上一則">&lt;</button>
-            <div class="instagram-showcase-track">
-                <?php foreach ( $urls as $url ) : ?>
-                    <div class="instagram-showcase-item">
-                        <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $url ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
-                    </div>
-                <?php endforeach; ?>
+            <div class="instagram-showcase-viewport">
+                <div class="instagram-showcase-track">
+                    <?php
+                    // 項目清單重複輸出一次（原本 + 複製），讓自動捲動可以無縫接回開頭，
+                    // 不會在捲到最後一則時出現「跳一下」的斷點。複製的那一份用
+                    // aria-hidden 標記，避免螢幕閱讀器重複朗讀。
+                    for ( $pass = 0; $pass < 2; $pass++ ) :
+                        foreach ( $urls as $url ) :
+                            ?>
+                            <div class="instagram-showcase-item"<?php echo $pass > 0 ? ' aria-hidden="true"' : ''; ?>>
+                                <div class="instagram-showcase-embed-scale">
+                                    <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $url ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
+                                </div>
+                            </div>
+                            <?php
+                        endforeach;
+                    endfor;
+                    ?>
+                </div>
             </div>
             <button type="button" class="instagram-showcase-arrow instagram-showcase-next" aria-label="下一則">&gt;</button>
         </div>
@@ -642,24 +656,156 @@ function ckc_render_module_instagram_showcase( $settings ) {
             document.body.appendChild(script);
         }
 
-        function initCarouselArrows() {
-            document.querySelectorAll('.instagram-showcase-wrap').forEach(function (wrap) {
-                var track = wrap.querySelector('.instagram-showcase-track');
-                var prevBtn = wrap.querySelector('.instagram-showcase-prev');
-                var nextBtn = wrap.querySelector('.instagram-showcase-next');
-                if (!track) { return; }
-                function scrollByCard(direction) {
-                    var card = track.querySelector('.instagram-showcase-item');
-                    var amount = card ? card.getBoundingClientRect().width + 16 : 320;
-                    track.scrollBy({ left: direction * amount, behavior: 'smooth' });
-                }
-                if (prevBtn) { prevBtn.addEventListener('click', function () { scrollByCard(-1); }); }
-                if (nextBtn) { nextBtn.addEventListener('click', function () { scrollByCard(1); }); }
+        var MOBILE_QUERY = '(max-width: 768px)';
+
+        // 電腦版一屏顯示 4 則、手機版一屏顯示 2 則：因為 Instagram 官方內嵌
+        // 元件天生有 326px 的最小寬度（無法用一般 CSS 直接改寬度，會破壞
+        // 元件內部版面），所以改用「內層維持 326px、外層用 transform: scale()
+        // 等比縮小」的方式，讓卡片依可視寬度自動縮放到剛好排滿指定則數。
+        function layoutWrap(wrap) {
+            var viewport = wrap.querySelector('.instagram-showcase-viewport');
+            var track = wrap.querySelector('.instagram-showcase-track');
+            var items = track ? track.querySelectorAll('.instagram-showcase-item') : [];
+            if (!viewport || !track || !items.length) { return; }
+
+            var isMobile = window.matchMedia(MOBILE_QUERY).matches;
+            var visibleCount = isMobile ? 2 : 4;
+            var gap = isMobile ? 10 : 16;
+            var viewportWidth = viewport.clientWidth;
+            if (viewportWidth <= 0) { return; }
+
+            var footprint = (viewportWidth - gap * (visibleCount - 1)) / visibleCount;
+            var scale = Math.min(footprint / 326, 1);
+            var actualFootprint = 326 * scale;
+
+            items.forEach(function (item) {
+                item.style.width = actualFootprint + 'px';
+                var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
+                if (scaleEl) { scaleEl.style.transform = 'scale(' + scale + ')'; }
+            });
+
+            wrap.__ckcIgScale = scale;
+            wrap.__ckcIgFootprint = actualFootprint;
+            wrap.__ckcIgGap = gap;
+            wrap.__ckcIgVisibleCount = visibleCount;
+
+            var itemCount = parseInt(wrap.getAttribute('data-item-count'), 10) || 0;
+            wrap.classList.toggle('instagram-showcase-static', itemCount <= visibleCount);
+
+            syncItemHeights(wrap);
+        }
+
+        // 用 ResizeObserver 監看每則貼文實際渲染出來的高度（Instagram 元件
+        // 從 blockquote 換成 iframe 時高度會變、之後也可能再次調整），
+        // 依縮放比例同步外層容器高度，避免卡片之間出現大片空白或裁切。
+        function syncItemHeights(wrap) {
+            if (!('ResizeObserver' in window)) { return; }
+            wrap.querySelectorAll('.instagram-showcase-item').forEach(function (item) {
+                if (item.__ckcObserved) { return; }
+                var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
+                if (!scaleEl) { return; }
+                item.__ckcObserved = true;
+                var ro = new ResizeObserver(function () {
+                    var scale = wrap.__ckcIgScale || 1;
+                    item.style.height = (scaleEl.offsetHeight * scale) + 'px';
+                });
+                ro.observe(scaleEl);
             });
         }
 
+        // 勻速自動向右捲動，捲到（複製那一份的）底就無縫接回開頭；滑鼠移入、
+        // 手指觸控、或點擊左右箭頭時暫停，離開／間隔一段時間後自動恢復。
+        function initMarquee(wrap) {
+            var track = wrap.querySelector('.instagram-showcase-track');
+            var prevBtn = wrap.querySelector('.instagram-showcase-prev');
+            var nextBtn = wrap.querySelector('.instagram-showcase-next');
+            if (!track || wrap.__ckcMarqueeInit) { return; }
+            wrap.__ckcMarqueeInit = true;
+
+            var offset = 0;
+            var paused = false;
+            var speed = 40; // px / 秒
+            var lastTs = null;
+            var resumeTimer = null;
+
+            function itemsPerSet() {
+                var count = parseInt(wrap.getAttribute('data-item-count'), 10) || 0;
+                return count;
+            }
+
+            function setWidth() {
+                var perSet = itemsPerSet();
+                if (perSet <= 0) { return 0; }
+                var footprint = wrap.__ckcIgFootprint || 326;
+                var gap = wrap.__ckcIgGap || 16;
+                return perSet * footprint + perSet * gap;
+            }
+
+            function applyTransform() {
+                track.style.transform = 'translateX(-' + offset + 'px)';
+            }
+
+            function tick(ts) {
+                if (!wrap.classList.contains('instagram-showcase-static') && !paused) {
+                    if (lastTs !== null) {
+                        var dt = (ts - lastTs) / 1000;
+                        offset += speed * dt;
+                        var w = setWidth();
+                        if (w > 0 && offset >= w) { offset -= w; }
+                        applyTransform();
+                    }
+                    lastTs = ts;
+                } else {
+                    lastTs = null;
+                }
+                requestAnimationFrame(tick);
+            }
+
+            function pauseTemporarily() {
+                paused = true;
+                if (resumeTimer) { clearTimeout(resumeTimer); }
+                resumeTimer = setTimeout(function () { paused = false; }, 2500);
+            }
+
+            function nudge(direction) {
+                var w = setWidth();
+                if (w <= 0) { return; }
+                offset += direction * ((wrap.__ckcIgFootprint || 326) + (wrap.__ckcIgGap || 16));
+                if (offset < 0) { offset += w; }
+                if (offset >= w) { offset -= w; }
+                applyTransform();
+                pauseTemporarily();
+            }
+
+            wrap.addEventListener('mouseenter', function () { paused = true; });
+            wrap.addEventListener('mouseleave', function () { paused = false; });
+            wrap.addEventListener('touchstart', function () { paused = true; }, { passive: true });
+            wrap.addEventListener('touchend', pauseTemporarily, { passive: true });
+
+            if (prevBtn) { prevBtn.addEventListener('click', function () { nudge(-1); }); }
+            if (nextBtn) { nextBtn.addEventListener('click', function () { nudge(1); }); }
+
+            requestAnimationFrame(tick);
+        }
+
+        function initAllWraps() {
+            document.querySelectorAll('.instagram-showcase-wrap').forEach(function (wrap) {
+                layoutWrap(wrap);
+                initMarquee(wrap);
+            });
+        }
+
+        var resizeTimer = null;
+        function onResize() {
+            if (resizeTimer) { clearTimeout(resizeTimer); }
+            resizeTimer = setTimeout(function () {
+                document.querySelectorAll('.instagram-showcase-wrap').forEach(layoutWrap);
+            }, 150);
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
-            initCarouselArrows();
+            initAllWraps();
+            window.addEventListener('resize', onResize);
 
             var sections = document.querySelectorAll('.instagram-showcase-section');
             if (!sections.length) { return; }

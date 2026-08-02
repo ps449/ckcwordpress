@@ -452,39 +452,49 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0;
 }
 
-/* --- Instagram 精選影片（橫向可滑動輪播） --- */
+/* --- Instagram 精選影片（電腦版一屏 4 則／手機版一屏 2 則，勻速自動向右捲動並無縫循環） --- */
 .instagram-showcase-section {
   margin: 0;
   padding: 60px 0;
   background-color: var(--white);
 }
 
+/* 這個區塊的可視寬度故意比其他區塊的 1200px 版面寬，讓 4 則 Instagram
+   內嵌貼文（官方元件天生最小寬度 326px）能剛好在電腦版一屏排滿，不需要
+   把每則貼文壓縮得太小。寬度算法：4 × 326px + 3 × 16px 間距 = 1352px，
+   1352 + 左右各 44px 內距 = 1440px。 */
 .instagram-showcase-wrap {
   position: relative;
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 60px;
+  padding: 0 44px;
+}
+
+.instagram-showcase-viewport {
+  overflow: hidden;
 }
 
 .instagram-showcase-track {
   display: flex;
   gap: 16px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding-bottom: 4px;
-}
-
-.instagram-showcase-track::-webkit-scrollbar {
-  display: none;
+  will-change: transform;
 }
 
 .instagram-showcase-item {
   flex: 0 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 內層維持 Instagram 元件原生的 326px 寬度，用 transform: scale() 縮放
+   （而不是直接改 iframe 寬度），避免破壞 Instagram 內嵌元件本身的版面。 */
+.instagram-showcase-embed-scale {
   width: 326px;
-  max-width: 85vw;
-  scroll-snap-align: start;
+  transform-origin: top left;
+}
+
+.instagram-showcase-static .instagram-showcase-arrow {
+  display: none;
 }
 
 .instagram-showcase-arrow {
@@ -523,6 +533,9 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 768px) {
   .instagram-showcase-wrap {
     padding: 0 15px;
+  }
+  .instagram-showcase-track {
+    gap: 10px;
   }
   .instagram-showcase-arrow {
     display: none;
