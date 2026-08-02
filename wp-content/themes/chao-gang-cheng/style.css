@@ -1545,22 +1545,21 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent-color);
 }
 
-/* ── 我的帳號 / 會員證式導覽列：碼頭港務局會員證主題 ───────────────────────────────── */
+/* ── 我的帳號 / 會員證式導覽列：碼頭港務局會員證主題（淺色版） ───────────────────────────────── */
 .woocommerce-MyAccount-navigation {
   float: none !important;
   width: 100% !important;
   margin-bottom: 28px !important;
   border-bottom: none;
   position: relative;
-  background:
-      repeating-linear-gradient(118deg, rgba(201,151,74,0.06) 0 16px, transparent 16px 34px),
-      linear-gradient(135deg, #1a140f 0%, #2c2018 100%);
+  background: #f6ecd9;
+  border: 1px solid #e2d2b3;
   border-radius: 16px;
   padding: 24px 26px 16px;
   overflow: hidden;
 }
 
-/* 會員證：頭像 + 使用者名稱 + VIP 徽章
+/* 會員證：頭像 + 使用者名稱
    （用 :not() 結構選擇器而非猜測子 class 名稱，並全面加上 !important，
    確保能蓋過此元件可能自帶的預設樣式，維持穩定顯示） */
 .woocommerce-account-gravatar {
@@ -1572,7 +1571,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 18px !important;
   padding-bottom: 16px !important;
   text-align: left !important;
-  border-bottom: 1px dashed rgba(243,227,189,0.4) !important;
+  border-bottom: 1px dashed #d8c39c !important;
 }
 .woocommerce-account-gravatar__avatar-wrapper {
   flex-shrink: 0 !important;
@@ -1583,7 +1582,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 56px !important;
   border-radius: 50% !important;
   border: 2px solid #c9974a !important;
-  box-shadow: 0 0 0 3px #1a140f, 0 0 0 4px rgba(227,197,134,0.35) !important;
+  box-shadow: 0 0 0 3px #f6ecd9, 0 0 0 4px #e2d2b3 !important;
   object-fit: cover !important;
 }
 .woocommerce-account-gravatar__username,
@@ -1591,24 +1590,9 @@ h1, h2, h3, h4, h5, h6 {
   font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif !important;
   font-size: 18px !important;
   font-weight: 700 !important;
-  color: #f6e8c8 !important;
+  color: #1a140f !important;
   letter-spacing: 0.02em !important;
   line-height: 1.4 !important;
-}
-.woocommerce-account-gravatar__username::after,
-.woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit)::after {
-  content: '尊爵會員';
-  display: inline-block;
-  margin-left: 10px;
-  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", Arial, sans-serif;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #1a140f;
-  background: #f0d99b;
-  padding: 3px 10px;
-  border-radius: 10px;
-  vertical-align: middle;
 }
 
 .woocommerce-MyAccount-navigation ul {
@@ -1632,26 +1616,26 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 20px;
   font-size: 13.5px;
   font-weight: 500;
-  color: #e3c586;
+  color: #3a2f24;
   text-decoration: none;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  border: 1px solid rgba(227,197,134,0.25);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid #e2d2b3;
+  background: #fffaf1;
   white-space: nowrap;
   letter-spacing: 0.01em;
 }
 
 .woocommerce-MyAccount-navigation li a:hover {
-  background-color: rgba(227,197,134,0.14);
+  background-color: #fdf3e0;
   border-color: #c9974a;
-  color: #e3c586;
+  color: #1a140f;
 }
 
 .woocommerce-MyAccount-navigation li.is-active a {
   background: #c9974a;
   color: #1a140f;
   border-color: #c9974a;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 3px 10px rgba(201,151,74,0.3);
   font-weight: 700;
 }
 
@@ -1666,13 +1650,6 @@ h1, h2, h3, h4, h5, h6 {
   .woocommerce-account-gravatar__username,
   .woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit) {
     font-size: 16px !important;
-  }
-  .woocommerce-account-gravatar__username::after,
-  .woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit)::after {
-    display: block;
-    margin-left: 0;
-    margin-top: 4px;
-    width: fit-content;
   }
   .woocommerce-MyAccount-navigation ul {
     flex-wrap: wrap;
