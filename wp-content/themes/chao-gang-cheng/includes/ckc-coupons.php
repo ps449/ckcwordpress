@@ -1219,7 +1219,9 @@ function ckc_coupon_claim_center_shortcode() {
                                     </div>
                                     <a href="#" class="ckc-rules-trigger">使用規則</a>
                                 </div>
-                                
+
+                                <div class="ckc-card-divider" aria-hidden="true"></div>
+
                                 <div class="ckc-card-middle">
                                     <h3 class="ckc-card-title"><?php echo esc_html( $title ); ?></h3>
                                     <?php if ( $deadline ) : ?>
@@ -1279,7 +1281,9 @@ function ckc_coupon_claim_center_shortcode() {
                                     </div>
                                     <a href="#" class="ckc-rules-trigger">使用規則</a>
                                 </div>
-                                
+
+                                <div class="ckc-card-divider" aria-hidden="true"></div>
+
                                 <div class="ckc-card-middle">
                                     <h3 class="ckc-card-title"><?php echo esc_html( $title ); ?></h3>
                                     <div class="ckc-card-code">代碼：<code><?php echo esc_html( strtoupper( $code ) ); ?></code></div>
@@ -1345,38 +1349,63 @@ function ckc_coupon_claim_center_shortcode() {
         <div id="ckc-toast" class="ckc-toast-box"></div>
     </div>
 
-    <!-- 領券中心專屬樣式 CSS (Modular styling) -->
+    <!-- 領券中心專屬樣式 CSS：港口提貨券主題（Modular styling） -->
     <style>
     #ckc-claim-center-container {
-        max-width: 800px;
+        --ckc-ink: #1a140f;
+        --ckc-ink-soft: #2c2018;
+        --ckc-gold: #c9974a;
+        --ckc-gold-soft: #e3c586;
+        --ckc-coral: #f86f69;
+        --ckc-parchment: #f2e9d8;
+        --ckc-card: #fffaf1;
+        --ckc-rope: #b28a58;
+        --ckc-rope-soft: #e2d2b3;
+        --ckc-text: #3a2f24;
+        --ckc-muted: #8c7a64;
+
+        max-width: 820px;
         margin: 0 auto;
         font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", Arial, sans-serif;
-        color: #334155;
-        background-color: #f8fafc;
-        padding: 20px;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        color: var(--ckc-text);
+        background-color: var(--ckc-parchment);
+        padding: 0 0 22px;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(26,20,15,0.1);
     }
-    
+    #ckc-claim-center-container * {
+        box-sizing: border-box;
+    }
+
+    /* ── 港口售票亭頭部：暗底＋潮金紋理 ── */
     .ckc-claim-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 24px;
         flex-wrap: wrap;
         gap: 12px;
+        margin: 0 0 20px;
+        padding: 22px 22px 20px;
+        background:
+            repeating-linear-gradient(118deg, rgba(201,151,74,0.07) 0 16px, transparent 16px 34px),
+            linear-gradient(135deg, var(--ckc-ink) 0%, var(--ckc-ink-soft) 100%);
+        border-bottom: 3px solid var(--ckc-gold);
     }
     .ckc-claim-title {
-        font-size: 22px;
+        font-size: 21px;
         font-weight: 700;
-        color: #1e293b;
+        color: var(--ckc-gold-soft);
+        letter-spacing: 0.02em;
         margin: 0;
+        font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
     .ckc-claim-nav-buttons {
         display: flex;
-        background: #e2e8f0;
+        background: rgba(255,255,255,0.08);
         padding: 4px;
         border-radius: 30px;
+        border: 1px solid rgba(227,197,134,0.25);
     }
     .ckc-nav-btn {
         background: none !important;
@@ -1384,32 +1413,33 @@ function ckc_coupon_claim_center_shortcode() {
         padding: 8px 20px !important;
         font-size: 14px !important;
         font-weight: 600 !important;
-        color: #64748b !important;
+        color: var(--ckc-gold-soft) !important;
         cursor: pointer !important;
         border-radius: 20px !important;
         transition: all 0.25s ease !important;
         box-shadow: none !important;
     }
     .ckc-nav-btn.active {
-        background: #fff !important;
-        color: #1e293b !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+        background: var(--ckc-gold) !important;
+        color: var(--ckc-ink) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
     }
     .ckc-box-count {
-        background: #ef4444;
+        background: var(--ckc-coral);
         color: #fff;
         padding: 1px 6px;
         font-size: 11px;
         border-radius: 10px;
         margin-left: 4px;
     }
-    
+
+    /* ── 售票窗口：優惠代碼輸入 ── */
     .ckc-search-bar-wrap {
-        background: #fff;
+        background: var(--ckc-card);
         padding: 12px 16px;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-        margin-bottom: 24px;
+        margin: 0 22px 22px;
+        border-radius: 10px;
+        border: 1.5px dashed var(--ckc-rope);
     }
     .ckc-search-bar-inner {
         display: flex;
@@ -1418,22 +1448,23 @@ function ckc_coupon_claim_center_shortcode() {
     .ckc-search-bar-inner input {
         flex: 1;
         height: 42px !important;
-        border: 1px solid #cbd5e1 !important;
+        border: 1px solid var(--ckc-rope-soft) !important;
         border-radius: 8px !important;
         padding: 0 16px !important;
         font-size: 15px !important;
-        background: #f8fafc !important;
+        background: #fff !important;
+        color: var(--ckc-text) !important;
         outline: none !important;
         transition: border-color 0.2s !important;
     }
     .ckc-search-bar-inner input:focus {
-        border-color: #7c6767 !important;
+        border-color: var(--ckc-gold) !important;
     }
     .ckc-search-bar-inner button {
         height: 42px !important;
         line-height: 42px !important;
         padding: 0 24px !important;
-        background: #7c6767 !important;
+        background: var(--ckc-coral) !important;
         color: #fff !important;
         border: none !important;
         border-radius: 8px !important;
@@ -1443,31 +1474,33 @@ function ckc_coupon_claim_center_shortcode() {
         transition: background 0.2s !important;
     }
     .ckc-search-bar-inner button:hover {
-        background: #655248 !important;
+        background: #e85850 !important;
     }
-    
+
     .ckc-spa-panel {
         display: none;
+        padding: 0 22px;
     }
     .ckc-spa-panel.active {
         display: block;
     }
-    
+
+    /* ── 分類：吊牌式標籤 ── */
     .ckc-categories-filter-bar {
         display: flex;
         gap: 8px;
         overflow-x: auto;
         padding-bottom: 12px;
-        margin-bottom: 20px;
+        margin-bottom: 18px;
         scrollbar-width: none;
     }
     .ckc-categories-filter-bar::-webkit-scrollbar {
         display: none;
     }
     .ckc-cat-tab {
-        background: #fff !important;
-        border: 1px solid #e2e8f0 !important;
-        color: #475569 !important;
+        background: var(--ckc-card) !important;
+        border: 1px solid var(--ckc-rope-soft) !important;
+        color: var(--ckc-text) !important;
         padding: 6px 16px !important;
         border-radius: 20px !important;
         font-size: 13px !important;
@@ -1478,52 +1511,61 @@ function ckc_coupon_claim_center_shortcode() {
         box-shadow: none !important;
     }
     .ckc-cat-tab.active {
-        background: #ef0050 !important; /* Matches PX Pay style */
-        border-color: #ef0050 !important;
-        color: #fff !important;
+        background: var(--ckc-ink) !important;
+        border-color: var(--ckc-ink) !important;
+        color: var(--ckc-gold-soft) !important;
     }
-    
+
     .ckc-coupon-cards-grid {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 18px;
     }
     .ckc-no-coupons {
         text-align: center;
         padding: 40px 20px;
-        color: #64748b;
+        color: var(--ckc-muted);
         font-size: 15px;
     }
-    
+
+    /* ── 簽名元素：碼頭提貨券卡片（含撕線打孔）── */
     .ckc-coupon-item-card {
+        position: relative;
         display: flex;
-        align-items: center;
-        background: #fff;
+        align-items: stretch;
+        background: var(--ckc-card);
         border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-        border: 1px solid #f1f5f9;
+        padding: 16px 18px;
+        box-shadow: 0 3px 10px rgba(26,20,15,0.06);
+        border: 1px solid var(--ckc-rope-soft);
         transition: transform 0.2s, box-shadow 0.2s;
-        gap: 16px;
+        gap: 14px;
+        overflow: visible;
     }
     .ckc-coupon-item-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+        box-shadow: 0 8px 18px rgba(26,20,15,0.1);
     }
-    
+    .ckc-coupon-item-card.claimed,
+    .ckc-coupon-item-card.sold-out {
+        opacity: 0.62;
+    }
+
     .ckc-card-left {
         display: flex;
         flex-direction: column;
         align-items: center;
-        min-width: 90px;
+        justify-content: center;
+        min-width: 78px;
         gap: 8px;
     }
     .ckc-card-img-wrap {
-        width: 80px;
-        height: 80px;
-        border-radius: 8px;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
         overflow: hidden;
-        border: 1px solid #f1f5f9;
+        border: 2px solid var(--ckc-gold);
+        box-shadow: 0 0 0 3px var(--ckc-card), 0 0 0 4px var(--ckc-rope-soft);
     }
     .ckc-card-img-wrap img {
         width: 100%;
@@ -1531,49 +1573,86 @@ function ckc_coupon_claim_center_shortcode() {
         object-fit: cover;
     }
     .ckc-rules-trigger {
-        font-size: 12px;
-        color: #64748b;
+        font-size: 11px;
+        color: var(--ckc-muted);
         text-decoration: underline;
+        text-underline-offset: 2px;
         font-weight: 500;
         cursor: pointer;
+        white-space: nowrap;
     }
     .ckc-rules-trigger:hover {
-        color: #ef0050;
+        color: var(--ckc-coral);
     }
-    
+
+    /* 打孔撕線分隔：兩端半圓形「打孔」露出票券外的底色 */
+    .ckc-card-divider {
+        flex: 0 0 auto;
+        width: 0;
+        align-self: stretch;
+        position: relative;
+        border-left: 2px dashed var(--ckc-rope);
+        margin: -16px 0;
+        padding: 16px 0;
+    }
+    .ckc-card-divider::before,
+    .ckc-card-divider::after {
+        content: '';
+        position: absolute;
+        left: -9px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--ckc-parchment);
+        border: 1px solid var(--ckc-rope-soft);
+    }
+    .ckc-card-divider::before {
+        top: -9px;
+    }
+    .ckc-card-divider::after {
+        bottom: -9px;
+    }
+
     .ckc-card-middle {
         flex: 1;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     .ckc-card-title {
         font-size: 16px;
         font-weight: 700;
-        color: #1e293b;
+        color: var(--ckc-ink);
         margin: 0 0 6px 0;
         line-height: 1.4;
         cursor: pointer;
+        font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
     .ckc-card-title:hover {
-        color: #ef0050;
+        color: var(--ckc-coral);
     }
     .ckc-card-deadline {
-        font-size: 13px;
-        color: #64748b;
+        font-size: 12.5px;
+        color: var(--ckc-muted);
     }
     .ckc-card-code {
-        font-size: 13px;
-        color: #64748b;
+        font-size: 12.5px;
+        color: var(--ckc-muted);
     }
     .ckc-card-code code {
-        background: #f1f5f9;
+        background: var(--ckc-parchment);
         padding: 2px 6px;
         border-radius: 4px;
         font-size: 12px;
-        font-family: monospace;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        color: var(--ckc-ink);
+        letter-spacing: 0.02em;
     }
-    
+
     .ckc-card-right {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
         min-width: 94px;
     }
@@ -1582,10 +1661,10 @@ function ckc_coupon_claim_center_shortcode() {
         display: inline-block !important;
         text-align: center !important;
         width: 94px !important;
-        height: 42px !important;
-        line-height: 42px !important;
+        height: 40px !important;
+        line-height: 40px !important;
         padding: 0 !important;
-        background: #ef0050 !important;
+        background: var(--ckc-coral) !important;
         color: #fff !important;
         border: none !important;
         border-radius: 20px !important;
@@ -1595,31 +1674,32 @@ function ckc_coupon_claim_center_shortcode() {
         transition: background 0.2s, opacity 0.2s !important;
         white-space: nowrap !important;
         text-decoration: none !important;
-        box-shadow: 0 2px 4px rgba(239,0,80,0.15) !important;
+        box-shadow: 0 2px 6px rgba(248,111,105,0.3) !important;
     }
     .ckc-claim-action-btn.claimed {
-        background: #f1f5f9 !important;
-        color: #94a3b8 !important;
+        background: var(--ckc-parchment) !important;
+        color: var(--ckc-muted) !important;
         cursor: default !important;
         box-shadow: none !important;
     }
     .ckc-claim-action-btn.sold-out {
-        background: #f1f5f9 !important;
-        color: #cbd5e1 !important;
+        background: var(--ckc-parchment) !important;
+        color: #b7a889 !important;
         cursor: default !important;
         box-shadow: none !important;
     }
     .ckc-apply-action-btn {
-        background: #7c6767 !important;
-        box-shadow: 0 2px 4px rgba(124,103,103,0.15) !important;
+        background: var(--ckc-ink) !important;
+        color: var(--ckc-gold-soft) !important;
+        box-shadow: 0 2px 6px rgba(26,20,15,0.2) !important;
     }
     .ckc-apply-action-btn:hover {
-        background: #655248 !important;
+        background: var(--ckc-ink-soft) !important;
     }
     .ckc-claim-action-btn:not(.claimed):not(.sold-out):hover {
-        background: #d00045 !important;
+        background: #e85850 !important;
     }
-    
+
     /* 滑動彈出說明視窗 (Bottom/Slide-up panel) */
     .ckc-modal-overlay {
         position: fixed;
@@ -1627,7 +1707,7 @@ function ckc_coupon_claim_center_shortcode() {
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.5);
+        background: rgba(20,15,10,0.55);
         display: flex;
         align-items: flex-end;
         justify-content: center;
@@ -1641,7 +1721,7 @@ function ckc_coupon_claim_center_shortcode() {
         pointer-events: auto;
     }
     .ckc-modal-sheet {
-        background: #fff;
+        background: var(--ckc-card, #fffaf1);
         width: 100%;
         max-width: 500px;
         border-radius: 20px 20px 0 0;
@@ -1650,17 +1730,18 @@ function ckc_coupon_claim_center_shortcode() {
         max-height: 85vh;
         transform: translateY(100%);
         transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
     }
     .ckc-modal-overlay.open .ckc-modal-sheet {
         transform: translateY(0);
     }
-    
+
     .ckc-modal-header {
         display: flex;
         align-items: center;
         padding: 16px;
-        border-bottom: 1px solid #f1f5f9;
+        background: var(--ckc-ink, #1a140f);
+        border-bottom: 3px solid var(--ckc-gold, #c9974a);
     }
     .ckc-modal-close-btn {
         background: none !important;
@@ -1677,17 +1758,18 @@ function ckc_coupon_claim_center_shortcode() {
     .ckc-modal-close-btn svg {
         width: 24px;
         height: 24px;
-        fill: #475569;
+        fill: var(--ckc-gold-soft, #e3c586);
     }
     .ckc-modal-header-title {
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 700;
-        color: #1e293b;
+        color: var(--ckc-gold-soft, #e3c586);
         flex: 1;
         text-align: center;
         margin-right: 32px;
+        font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
-    
+
     .ckc-modal-body {
         flex: 1;
         overflow-y: auto;
@@ -1697,7 +1779,7 @@ function ckc_coupon_claim_center_shortcode() {
         width: 100%;
         aspect-ratio: 16/10;
         overflow: hidden;
-        background: #f1f5f9;
+        background: var(--ckc-parchment, #f2e9d8);
     }
     .ckc-modal-banner-wrap img {
         width: 100%;
@@ -1709,17 +1791,19 @@ function ckc_coupon_claim_center_shortcode() {
     }
     .ckc-modal-coupon-title {
         font-size: 19px;
-        font-weight: 800;
-        color: #1e293b;
+        font-weight: 700;
+        color: var(--ckc-ink, #1a140f);
         margin: 0 0 12px 0;
         line-height: 1.4;
+        font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
     }
     .ckc-modal-date-info {
-        background: #f8fafc;
+        background: var(--ckc-parchment, #f2e9d8);
         padding: 12px 16px;
         border-radius: 8px;
         margin-bottom: 20px;
         font-size: 14px;
+        border: 1px dashed var(--ckc-rope, #b28a58);
     }
     .ckc-date-row {
         margin-bottom: 4px;
@@ -1729,7 +1813,7 @@ function ckc_coupon_claim_center_shortcode() {
     }
     .ckc-date-label {
         font-weight: 600;
-        color: #64748b;
+        color: var(--ckc-muted, #8c7a64);
     }
     .ckc-modal-section-group {
         margin-bottom: 20px;
@@ -1737,27 +1821,27 @@ function ckc_coupon_claim_center_shortcode() {
     .ckc-section-heading {
         font-size: 15px;
         font-weight: 700;
-        color: #334155;
-        border-left: 3px solid #ef0050;
+        color: var(--ckc-ink, #1a140f);
+        border-left: 3px solid var(--ckc-coral, #f86f69);
         padding-left: 8px;
         margin: 0 0 10px 0;
     }
     .ckc-section-text {
         font-size: 14px;
         line-height: 1.7;
-        color: #475569;
+        color: var(--ckc-text, #3a2f24);
         white-space: pre-line;
     }
-    
+
     .ckc-modal-footer {
         position: absolute;
         bottom: 0;
         left: 0;
         right: 0;
         padding: 16px 20px;
-        background: rgba(255,255,255,0.9);
+        background: rgba(255,250,241,0.92);
         backdrop-filter: blur(10px);
-        border-top: 1px solid #f1f5f9;
+        border-top: 1px solid var(--ckc-rope-soft, #e2d2b3);
         display: flex;
         justify-content: center;
         z-index: 10;
@@ -1765,7 +1849,7 @@ function ckc_coupon_claim_center_shortcode() {
     .ckc-modal-claim-btn {
         width: 100% !important;
         height: 46px !important;
-        background: #ef0050 !important;
+        background: var(--ckc-coral, #f86f69) !important;
         color: #fff !important;
         border: none !important;
         border-radius: 25px !important;
@@ -1773,35 +1857,36 @@ function ckc_coupon_claim_center_shortcode() {
         font-weight: 700 !important;
         cursor: pointer !important;
         transition: background 0.2s !important;
-        box-shadow: 0 4px 12px rgba(239,0,80,0.2) !important;
+        box-shadow: 0 4px 12px rgba(248,111,105,0.3) !important;
     }
     .ckc-modal-claim-btn.claimed {
-        background: #cbd5e1 !important;
-        color: #94a3b8 !important;
+        background: #d8c9ac !important;
+        color: #8c7a64 !important;
         cursor: default !important;
         box-shadow: none !important;
     }
     .ckc-modal-claim-btn.sold-out {
-        background: #e2e8f0 !important;
-        color: #cbd5e1 !important;
+        background: #e2d2b3 !important;
+        color: #b7a889 !important;
         cursor: default !important;
         box-shadow: none !important;
     }
-    
+
     /* 吐司小提示 Toast */
     .ckc-toast-box {
         position: fixed;
         bottom: 40px;
         left: 50%;
         transform: translateX(-50%) translateY(100px);
-        background: rgba(30,30,30,0.95);
-        color: #fff;
+        background: var(--ckc-ink, #1a140f);
+        color: var(--ckc-gold-soft, #e3c586);
         padding: 12px 28px;
         border-radius: 30px;
         font-size: 14px;
         font-weight: 500;
         z-index: 100000;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        border: 1px solid rgba(227,197,134,0.3);
         opacity: 0;
         pointer-events: none;
         transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
@@ -1810,7 +1895,7 @@ function ckc_coupon_claim_center_shortcode() {
         transform: translateX(-50%) translateY(0);
         opacity: 1;
     }
-    
+
     /* 電腦桌機版彈出視窗微調 */
     @media (min-width: 769px) {
         .ckc-modal-overlay {
@@ -1826,6 +1911,41 @@ function ckc_coupon_claim_center_shortcode() {
         }
         .ckc-modal-footer {
             border-radius: 0 0 16px 16px;
+        }
+    }
+
+    /* 手機版：卡片欄位縮排、按鈕維持可點面積 */
+    @media (max-width: 480px) {
+        .ckc-claim-header {
+            padding: 18px 16px 16px;
+        }
+        .ckc-search-bar-wrap,
+        .ckc-spa-panel {
+            margin-left: 0;
+            margin-right: 0;
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+        .ckc-search-bar-wrap {
+            margin: 0 16px 18px;
+        }
+        .ckc-coupon-item-card {
+            padding: 14px 12px;
+            gap: 10px;
+        }
+        .ckc-card-left {
+            min-width: 60px;
+        }
+        .ckc-card-img-wrap {
+            width: 52px;
+            height: 52px;
+        }
+        .ckc-card-right {
+            min-width: 78px;
+        }
+        .ckc-claim-action-btn,
+        .ckc-apply-action-btn {
+            width: 78px !important;
         }
     }
     </style>
@@ -1993,6 +2113,7 @@ function ckc_coupon_claim_center_shortcode() {
                                     </div>
                                     <a href="#" class="ckc-rules-trigger">使用規則</a>
                                 </div>
+                                <div class="ckc-card-divider" aria-hidden="true"></div>
                                 <div class="ckc-card-middle">
                                     <h3 class="ckc-card-title">${title}</h3>
                                     <div class="ckc-card-code">代碼：<code>${code.toUpperCase()}</code></div>
