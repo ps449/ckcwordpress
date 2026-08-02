@@ -497,6 +497,12 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
+/* 項目數量不夠多（不需要無縫循環）時，把複製出來、專門給自動捲動用的
+   那一份隱藏起來，避免同一則貼文在畫面上重複顯示兩次。 */
+.instagram-showcase-static .instagram-showcase-item[aria-hidden="true"] {
+  display: none;
+}
+
 .instagram-showcase-arrow {
   position: absolute;
   top: 50%;
