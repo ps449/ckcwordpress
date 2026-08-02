@@ -3295,8 +3295,8 @@ function chao_gang_cheng_account_dashboard_overview() {
         'order'       => 'DESC',
     ) );
 
-    $card_style  = 'background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);';
-    $title_style = 'font-size: 14px; font-weight: 700; color: #64748b; margin: 0 0 12px; letter-spacing: 0.5px;';
+    $card_style  = 'background: #fffaf1; border: 1px solid #e2d2b3; border-radius: 14px; padding: 20px; box-shadow: 0 2px 8px rgba(26,20,15,0.05);';
+    $title_style = 'font-size: 13px; font-weight: 700; color: #8c7a64; margin: 0 0 12px; letter-spacing: 0.08em; text-transform: uppercase;';
     ?>
     <style>
     .chao-account-overview { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin: 20px 0; }
@@ -3304,25 +3304,25 @@ function chao_gang_cheng_account_dashboard_overview() {
     .chao-account-quicklinks { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
     .chao-account-quicklinks a {
         display: inline-flex; align-items: center; gap: 6px;
-        padding: 9px 18px; border: 1px solid #e2e8f0; border-radius: 20px;
-        background: #fff; color: #374151; font-size: 13px; font-weight: 600; text-decoration: none;
-        transition: border-color .2s ease, color .2s ease;
+        padding: 9px 18px; border: 1px solid #e2d2b3; border-radius: 20px;
+        background: #fffaf1; color: #3a2f24; font-size: 13px; font-weight: 600; text-decoration: none;
+        transition: border-color .2s ease, color .2s ease, background .2s ease;
     }
-    .chao-account-quicklinks a:hover { border-color: #7f6c60; color: #7f6c60; }
-    .chao-account-order-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+    .chao-account-quicklinks a:hover { border-color: #f86f69; color: #f86f69; background: #fff5f4; }
+    .chao-account-order-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed #e2d2b3; font-size: 14px; }
     .chao-account-order-row:last-child { border-bottom: none; }
-    .chao-order-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #f1f5f9; color: #475569; white-space: nowrap; }
+    .chao-order-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #f2e9d8; color: #3a2f24; white-space: nowrap; }
     </style>
- 
+
     <div class="chao-account-overview">
         <div style="<?php echo esc_attr( $card_style ); ?>">
             <p style="<?php echo esc_attr( $title_style ); ?>; display: flex; align-items: center; gap: 6px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
                 紅利點數
             </p>
-            <div style="font-size: 32px; font-weight: 700; color: #7f6c60; line-height: 1.2;"><?php echo esc_html( number_format( $points ) ); ?> <span style="font-size: 14px; color: #94a3b8;">點</span></div>
-            <p style="font-size: 12px; color: #94a3b8; margin: 8px 0 14px;"><?php echo esc_html( $rate_text ); ?>，結帳時直接折抵</p>
-            <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'points' ) ); ?>" style="font-size: 13px; color: #7f6c60; font-weight: 600; text-decoration: underline;">查看點數紀錄 →</a>
+            <div style="font-size: 32px; font-weight: 700; color: #c9974a; line-height: 1.2; font-family: Georgia, 'Times New Roman', 'Songti TC', 'PMingLiU', serif;"><?php echo esc_html( number_format( $points ) ); ?> <span style="font-size: 14px; color: #8c7a64; font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'PingFang TC', Arial, sans-serif;">點</span></div>
+            <p style="font-size: 12px; color: #8c7a64; margin: 8px 0 14px;"><?php echo esc_html( $rate_text ); ?>，結帳時直接折抵</p>
+            <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'points' ) ); ?>" style="font-size: 13px; color: #f86f69; font-weight: 600; text-decoration: underline;">查看點數紀錄 →</a>
         </div>
 
         <div style="<?php echo esc_attr( $card_style ); ?>">
@@ -3333,16 +3333,16 @@ function chao_gang_cheng_account_dashboard_overview() {
             <?php if ( ! empty( $recent_orders ) ) : ?>
                 <?php foreach ( $recent_orders as $order ) : ?>
                     <div class="chao-account-order-row">
-                        <a href="<?php echo esc_url( $order->get_view_order_url() ); ?>" style="color: #1e293b; font-weight: 600; text-decoration: none;">#<?php echo esc_html( $order->get_order_number() ); ?></a>
-                        <span style="color: #94a3b8; font-size: 13px;"><?php echo esc_html( $order->get_date_created() ? $order->get_date_created()->date_i18n( 'Y/m/d' ) : '' ); ?></span>
+                        <a href="<?php echo esc_url( $order->get_view_order_url() ); ?>" style="color: #1a140f; font-weight: 600; text-decoration: none;">#<?php echo esc_html( $order->get_order_number() ); ?></a>
+                        <span style="color: #8c7a64; font-size: 13px;"><?php echo esc_html( $order->get_date_created() ? $order->get_date_created()->date_i18n( 'Y/m/d' ) : '' ); ?></span>
                         <span class="chao-order-status"><?php echo esc_html( wc_get_order_status_name( $order->get_status() ) ); ?></span>
-                        <span style="font-weight: 700; color: #1e293b;"><?php echo wp_kses_post( $order->get_formatted_order_total() ); ?></span>
+                        <span style="font-weight: 700; color: #1a140f;"><?php echo wp_kses_post( $order->get_formatted_order_total() ); ?></span>
                     </div>
                 <?php endforeach; ?>
-                <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>" style="display: inline-block; margin-top: 12px; font-size: 13px; color: #7f6c60; font-weight: 600; text-decoration: underline;">查看全部訂單 →</a>
+                <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>" style="display: inline-block; margin-top: 12px; font-size: 13px; color: #f86f69; font-weight: 600; text-decoration: underline;">查看全部訂單 →</a>
             <?php else : ?>
-                <p style="font-size: 14px; color: #64748b; margin: 0 0 12px;">還沒有任何訂單，來看看主廚為您準備了什麼吧！</p>
-                <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>" style="display: inline-block; background-color: #7f6c60; color: #fff; border-radius: 20px; padding: 8px 24px; text-decoration: none; font-size: 13px; font-weight: 600;">前往商店選購</a>
+                <p style="font-size: 14px; color: #8c7a64; margin: 0 0 12px;">還沒有任何訂單，來看看主廚為您準備了什麼吧！</p>
+                <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>" style="display: inline-block; background-color: #f86f69; color: #fff; border-radius: 20px; padding: 8px 24px; text-decoration: none; font-size: 13px; font-weight: 600;">前往商店選購</a>
             <?php endif; ?>
         </div>
     </div>
