@@ -587,7 +587,10 @@ function ckc_render_module_instagram_showcase( $settings ) {
     //   縮圖卡片，點擊開新分頁到 Instagram 播放（縮圖需要後台手動上傳，
     //   因為沒有官方 API 可以抓）。
     // - Facebook 貼文／Reel：用 Facebook 官方 Video Plugin（fb-video），
-    //   經實測 Reels 也能正常站內播放，不需要縮圖 fallback。
+    //   經實測 Reels 也能正常站內播放，不需要縮圖 fallback；有加
+    //   data-show-text="false"，避免 Facebook 官方元件內建的大頭貼／
+    //   粉專名稱／分享文字列跟影片畫面擠在同一個卡片高度裡，看起來像是
+    //   版型跑掉、文字疊在影片上。
     $entries = array();
     foreach ( $items as $item ) {
         $url = isset( $item['url'] ) ? trim( $item['url'] ) : '';
@@ -657,7 +660,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
                                 ?>
                                 <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
                                     <div class="instagram-showcase-embed-scale instagram-showcase-fb-embed">
-                                        <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true"></div>
+                                        <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true" data-show-text="false"></div>
                                     </div>
                                 </div>
                                 <?php
