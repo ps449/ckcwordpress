@@ -1560,17 +1560,22 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-/* 會員證：頭像 + 使用者名稱 + VIP 徽章 */
+/* 會員證：頭像 + 使用者名稱 + VIP 徽章
+   （用 :not() 結構選擇器而非猜測子 class 名稱，並全面加上 !important，
+   確保能蓋過此元件可能自帶的預設樣式，維持穩定顯示） */
 .woocommerce-account-gravatar {
   display: flex !important;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
-  padding-bottom: 16px;
-  border-bottom: 1px dashed rgba(227,197,134,0.28);
+  align-items: center !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  gap: 14px !important;
+  margin-bottom: 18px !important;
+  padding-bottom: 16px !important;
+  text-align: left !important;
+  border-bottom: 1px dashed rgba(243,227,189,0.4) !important;
 }
 .woocommerce-account-gravatar__avatar-wrapper {
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
 }
 .woocommerce-account-gravatar__avatar-wrapper img,
 .woocommerce-account-gravatar__avatar-wrapper .avatar {
@@ -1579,16 +1584,19 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 50% !important;
   border: 2px solid #c9974a !important;
   box-shadow: 0 0 0 3px #1a140f, 0 0 0 4px rgba(227,197,134,0.35) !important;
-  object-fit: cover;
+  object-fit: cover !important;
 }
-.woocommerce-account-gravatar__username {
-  font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: #e3c586;
-  letter-spacing: 0.02em;
+.woocommerce-account-gravatar__username,
+.woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit) {
+  font-family: Georgia, "Times New Roman", "Songti TC", "PMingLiU", serif !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #f6e8c8 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.4 !important;
 }
-.woocommerce-account-gravatar__username::after {
+.woocommerce-account-gravatar__username::after,
+.woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit)::after {
   content: '尊爵會員';
   display: inline-block;
   margin-left: 10px;
@@ -1597,7 +1605,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #1a140f;
-  background: #c9974a;
+  background: #f0d99b;
   padding: 3px 10px;
   border-radius: 10px;
   vertical-align: middle;
@@ -1655,10 +1663,12 @@ h1, h2, h3, h4, h5, h6 {
     width: 100% !important;
     padding: 18px 16px 14px;
   }
-  .woocommerce-account-gravatar__username {
-    font-size: 16px;
+  .woocommerce-account-gravatar__username,
+  .woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit) {
+    font-size: 16px !important;
   }
-  .woocommerce-account-gravatar__username::after {
+  .woocommerce-account-gravatar__username::after,
+  .woocommerce-account-gravatar > *:not(.woocommerce-account-gravatar__avatar-wrapper):not(.woocommerce-account-gravatar__edit-wrapper):not(.woocommerce-account-gravatar__edit)::after {
     display: block;
     margin-left: 0;
     margin-top: 4px;
