@@ -1762,18 +1762,37 @@ function chao_gang_cheng_product_promo_box() {
 }
 
 /**
+ * 加價專區設定的預設值／讀取小工具。原本這裡的參與分類、優惠金額、
+ * 顯示件數上限都寫死在程式碼裡，後台完全沒有設定入口；現在改成從
+ * chao_gang_cheng_addon_zone_settings 這個 option 讀取（後台「首頁 >
+ * 加價專區設定」可調整），這裡的常數只當作「第一次還沒存過設定時」
+ * 的預設值，跟原本的行為完全一致，不影響既有網站。
+ */
+function chao_gang_cheng_get_addon_zone_settings() {
+    return wp_parse_args(
+        get_option( 'chao_gang_cheng_addon_zone_settings', array() ),
+        array(
+            'categories' => array( 'frozen', 'side-dishes' ),
+            'discount'   => 20,
+            'max_items'  => 6,
+        )
+    );
+}
+
+/**
  * Add-on Purchase Zone
  */
 add_action( 'woocommerce_after_single_product_summary', 'chao_gang_cheng_addon_purchase_section', 5 );
 function chao_gang_cheng_addon_purchase_section() {
-    // Query up to 6 products to display in the slider addons (excluding current product)
-    // Use date-based ordering instead of 'rand' (avoids costly ORDER BY RAND() full table scan)
-    // Focused add-on selection: only complementary food categories, so the block
-    // matches its「主廚經典手路菜」copy (no skincare / apparel / tickets).
-    $addon_categories = apply_filters( 'chao_addon_zone_categories', array( 'frozen', 'side-dishes' ) );
+    // 顯示幾件、從哪些分類抽、以及下面每件優惠多少錢，都改成讀取後台
+    // 「首頁 > 加價專區設定」的設定值（chao_gang_cheng_get_addon_zone_settings()），
+    // 而不是寫死在這裡。用日期排序而非 'rand'，避免 ORDER BY RAND() 整表掃描的效能成本。
+    $addon_settings   = chao_gang_cheng_get_addon_zone_settings();
+    $addon_categories = apply_filters( 'chao_addon_zone_categories', $addon_settings['categories'] );
+    $addon_max_items  = max( 1, (int) $addon_settings['max_items'] );
     $args = array(
         'post_type'      => 'product',
-        'posts_per_page' => 6,
+        'posts_per_page' => $addon_max_items,
         'post__not_in'   => array( get_the_ID() ),
         'orderby'        => 'date',
         'order'          => 'DESC',
@@ -1821,7 +1840,7 @@ function chao_gang_cheng_addon_purchase_section() {
                         setup_postdata( $post );
                         $_product = wc_get_product( $post->ID );
                         $regular_price = $_product->get_regular_price();
-                        $discount = 20; // 20 TWD discount for addons
+                        $discount = (float) $addon_settings['discount']; // 後台「加價專區設定」可調整的每件優惠金額
                         $addon_price = max( 10, $regular_price - $discount );
                         $image_id = $_product->get_image_id();
                         $image_url = $image_id ? wp_get_attachment_image_url( $image_id, 'medium' ) : wc_placeholder_img_src();
@@ -5764,6 +5783,168 @@ function ckc_floating_btns_page_html() {
 
         <hr style="margin:32px 0 20px;">
         <p style="font-size:12px;color:#bbb;">潮港城客製電商主題 · 快捷列設定 · 由 Antigravity AI 建置</p>
+    </div>
+    <?php
+}
+
+
+// =============================================================================
+// WordPress 後台：首頁 > 加價專區設定
+//
+// 背景：商品頁的「加價專區」（下單即可加購主廚經典手路菜）原本參與的
+// 分類（冷凍／下酒菜）、每件優惠金額（NT$20）、最多顯示幾件（6 件）
+// 全部寫死在 chao_gang_cheng_addon_purchase_section() 裡，後台完全沒有
+// 調整入口。這裡比照「快捷列設定」同樣的做法（WordPress Settings API +
+// 收整到「首頁」頂層選單底下），新增一個設定頁面，讓這三項可以直接在
+// 後台調整、儲存後即時生效，不用改程式碼。
+// =============================================================================
+
+/**
+ * 在「首頁」頂層選單底下新增「加價專區設定」子選單。
+ * 優先權 16，排在「Logo 設定」（優先權 15）之後。
+ */
+add_action( 'admin_menu', 'ckc_addon_zone_add_menu', 16 );
+function ckc_addon_zone_add_menu() {
+    add_submenu_page(
+        'ckc-homepage-builder',
+        '加價專區設定',
+        '加價專區設定',
+        'manage_options',
+        'ckc-addon-zone',
+        'ckc_addon_zone_page_html'
+    );
+}
+
+/**
+ * 向 WordPress Settings API 註冊設定
+ */
+add_action( 'admin_init', 'ckc_addon_zone_register_settings' );
+function ckc_addon_zone_register_settings() {
+    register_setting(
+        'ckc_addon_zone_group',
+        'chao_gang_cheng_addon_zone_settings',
+        array(
+            'sanitize_callback' => 'ckc_addon_zone_sanitize',
+        )
+    );
+}
+
+/**
+ * 資料清理與驗證。
+ * - categories：只留下真的存在於商品分類（product_cat）裡的 slug，避免存進
+ *   已被刪除或打錯字的分類 slug，導致前台完全查不到任何加購商品。
+ * - discount：優惠金額，限制在 0 ~ 原價之間都合理的正整數範圍（0 ~ 100000）。
+ * - max_items：最多顯示幾件，限制在 1 ~ 20（太多會讓橫向滑動的卡片列表塞爆版面）。
+ */
+function ckc_addon_zone_sanitize( $input ) {
+    $clean = array();
+
+    $submitted_categories = isset( $input['categories'] ) && is_array( $input['categories'] )
+        ? array_map( 'sanitize_title', $input['categories'] )
+        : array();
+
+    $valid_slugs = array();
+    $all_cats    = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) );
+    if ( ! is_wp_error( $all_cats ) ) {
+        foreach ( $all_cats as $cat ) {
+            $valid_slugs[] = $cat->slug;
+        }
+    }
+    $clean['categories'] = array_values( array_intersect( $submitted_categories, $valid_slugs ) );
+
+    // 一個分類都沒勾會讓前台完全查不到商品、整個區塊消失，保守起見退回
+    // 原本的預設分類，而不是存一個空陣列。
+    if ( empty( $clean['categories'] ) ) {
+        $clean['categories'] = array( 'frozen', 'side-dishes' );
+    }
+
+    $discount          = isset( $input['discount'] ) ? (float) $input['discount'] : 20;
+    $clean['discount'] = max( 0, min( 100000, $discount ) );
+
+    $max_items          = isset( $input['max_items'] ) ? (int) $input['max_items'] : 6;
+    $clean['max_items'] = max( 1, min( 20, $max_items ) );
+
+    return $clean;
+}
+
+/**
+ * 後台設定頁面 HTML
+ */
+function ckc_addon_zone_page_html() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( '您沒有權限存取此頁面。' );
+    }
+
+    $opts = chao_gang_cheng_get_addon_zone_settings();
+
+    $all_cats = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) );
+    if ( is_wp_error( $all_cats ) ) {
+        $all_cats = array();
+    }
+    ?>
+    <div class="wrap" id="ckc-addon-zone-settings">
+        <h1 style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:24px;">🛒</span>
+            加價專區設定
+        </h1>
+        <p style="color:#666;margin-top:4px;">控制商品頁「加價專區」要從哪些分類抽商品、每件優惠多少錢、最多顯示幾件。設定儲存後立即在前台生效。</p>
+        <hr style="margin:20px 0;">
+
+        <?php if ( isset( $_GET['settings-updated'] ) ) : ?>
+        <div id="setting-error-settings_updated" class="notice notice-success settings-error is-dismissible">
+            <p><strong>✅ 設定已成功儲存！</strong></p>
+        </div>
+        <?php endif; ?>
+
+        <form method="post" action="options.php" style="max-width:680px;">
+            <?php settings_fields( 'ckc_addon_zone_group' ); ?>
+
+            <!-- ── 參與分類 ── -->
+            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:24px 28px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+                <h3 style="margin:0 0 4px;">參與分類</h3>
+                <p style="margin:0 0 14px;color:#888;font-size:13px;">加價專區只會從勾選的分類裡抽商品（依上架時間新到舊排序）。</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px 24px;">
+                    <?php foreach ( $all_cats as $cat ) : ?>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;">
+                            <input type="checkbox"
+                                   name="chao_gang_cheng_addon_zone_settings[categories][]"
+                                   value="<?php echo esc_attr( $cat->slug ); ?>"
+                                   <?php checked( in_array( $cat->slug, $opts['categories'], true ) ); ?>
+                                   style="width:16px;height:16px;cursor:pointer;">
+                            <?php echo esc_html( $cat->name ); ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- ── 優惠金額與顯示件數 ── -->
+            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:24px 28px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+                <div style="margin-bottom:18px;">
+                    <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">每件優惠金額（NT$）</label>
+                    <input type="number" min="0" step="1"
+                           name="chao_gang_cheng_addon_zone_settings[discount]"
+                           value="<?php echo esc_attr( $opts['discount'] ); ?>"
+                           style="width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <p style="margin:6px 0 0;font-size:12px;color:#aaa;">加購價 = 該商品原價 - 這個金額（最低不會低於 NT$10）。</p>
+                </div>
+                <div>
+                    <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">最多顯示幾件</label>
+                    <input type="number" min="1" max="20" step="1"
+                           name="chao_gang_cheng_addon_zone_settings[max_items]"
+                           value="<?php echo esc_attr( $opts['max_items'] ); ?>"
+                           style="width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <p style="margin:6px 0 0;font-size:12px;color:#aaa;">建議 4～8 件，太多會讓橫向滑動列表過長。</p>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+                <?php submit_button( '💾 儲存設定', 'primary large', 'submit', false, array( 'style' => 'height:44px;padding:0 28px;font-size:15px;font-weight:600;border-radius:8px;' ) ); ?>
+                <span style="font-size:13px;color:#aaa;">設定儲存後即時生效，無需清除快取</span>
+            </div>
+        </form>
+
+        <hr style="margin:32px 0 20px;">
+        <p style="font-size:12px;color:#bbb;">潮港城客製電商主題 · 加價專區設定 · 由 Antigravity AI 建置</p>
     </div>
     <?php
 }
