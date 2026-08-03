@@ -5089,6 +5089,45 @@ function chao_gang_cheng_hide_downloadable_giftcard_checkboxes() {
     </style>';
 }
 
+/**
+ * 把「庫存狀態」裡的「延期交貨」（WooCommerce 內建 onbackorder 狀態，
+ * 核心英文原文 On backorder）改標籤為「預購商品」，比較貼近餐廳實際
+ * 用法（現貨已出完、之後現做現出的商品，用這個狀態代表「開放預購」
+ * 而不是字面上的「缺貨延後出貨」）。
+ *
+ * 底層關聯檢查（已逐一確認，只有這兩個地方會顯示這個狀態的文字，
+ * 沒有遺漏）：
+ * 1. 後台商品編輯畫面「庫存狀態」下拉選單／單選——由 WooCommerce 核心
+ *    wc_get_product_stock_status_options() 透過
+ *    woocommerce_product_stock_status_options 這個 filter 產生選項文字，
+ *    這裡攔截並只覆蓋 onbackorder 這個 key，instock／outofstock 不動。
+ * 2. 前台商品頁「貨況」文字——由 WC_Product::get_availability_text()
+ *    透過 woocommerce_get_availability_text 這個 filter 輸出，這裡攔截
+ *    並只在 $product->get_stock_status() 真的是 'onbackorder' 時才覆蓋，
+ *    避免用文字比對（不同語系原文不同、不可靠）。
+ * 3. 確認過站內沒有其他寫死「延期交貨」或 'onbackorder' 字樣的地方
+ *    （唯一一處是 admin-theme.css 裡 mark.onbackorder 這個純樣式選擇器，
+ *    只是圖示顏色樣式，不含文字，不用改）；購物車／結帳頁 WooCommerce
+ *    本身也沒有另外針對這個狀態顯示提示文字，不需要額外處理。
+ * 4. 資料庫欄位本身（_stock_status = 'onbackorder'）完全沒有變動，只是
+ *    顯示文字換了，不影響庫存邏輯、允許缺貨訂購設定、或既有訂單資料。
+ */
+add_filter( 'woocommerce_product_stock_status_options', 'chao_gang_cheng_relabel_backorder_stock_status' );
+function chao_gang_cheng_relabel_backorder_stock_status( $options ) {
+    if ( isset( $options['onbackorder'] ) ) {
+        $options['onbackorder'] = '預購商品';
+    }
+    return $options;
+}
+
+add_filter( 'woocommerce_get_availability_text', 'chao_gang_cheng_relabel_backorder_availability_text', 10, 2 );
+function chao_gang_cheng_relabel_backorder_availability_text( $availability, $product ) {
+    if ( $product && is_a( $product, 'WC_Product' ) && 'onbackorder' === $product->get_stock_status() && '' !== $availability ) {
+        return '預購商品';
+    }
+    return $availability;
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
