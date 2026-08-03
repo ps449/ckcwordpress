@@ -4892,7 +4892,13 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
 add_filter( 'woocommerce_product_data_tabs', 'chao_gang_cheng_remove_product_data_tabs', 999 );
 function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     unset( $tabs['fb_commerce_tab'] );
-    unset( $tabs['pinterest_attributes_tab'] );
+    // 注意：Pinterest for WooCommerce 實際註冊的 array key 是
+    // 'pinterest_attributes'，不是看起來很像的 'pinterest_attributes_tab'
+    // （後者其實是 WooCommerce 樣板組出來的 CSS class 名稱
+    // "{$key}_tab"，不是 key 本身）。第一次上版時猜錯 key，導致
+    // Facebook 分頁消失了但 Pinterest 分頁還在，這裡修正。
+    unset( $tabs['pinterest_attributes'] );
+    unset( $tabs['pinterest_attributes_tab'] ); // 保留以防萬一，不影響其他 key
     return $tabs;
 }
 
