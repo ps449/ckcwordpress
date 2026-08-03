@@ -6606,6 +6606,21 @@ function ckc_fix_nav_menus_admin_highlight() {
     }
 }
 
+/**
+ * 隱藏「選單管理」（nav-menus.php）畫面裡的「分類」區塊。
+ *
+ * 這個「分類」區塊是 WordPress 原生的「文章分類」（taxonomy: category），
+ * 跟商品完全無關——本站是電商網站，沒有在用文章分類建選單，畫面上
+ * 「首頁Banner」這種詞彙看起來就是誤植的文章分類詞彙，容易讓人誤以為
+ * 跟「分類管理」（商品分類 product_cat，在畫面更下面另一個獨立區塊
+ * 「商品分類」）是同一套資料，造成混淆。只隱藏這個區塊本身，不刪除
+ * 底下任何文章分類詞彙資料，也完全不影響「商品分類」區塊。
+ */
+add_action( 'admin_head-nav-menus.php', 'chao_gang_cheng_hide_post_category_nav_menu_box' );
+function chao_gang_cheng_hide_post_category_nav_menu_box() {
+    remove_meta_box( 'add-category', 'nav-menus', 'side' );
+}
+
 
 /**
  * 27. 出貨AI助理頁面渲染回呼
