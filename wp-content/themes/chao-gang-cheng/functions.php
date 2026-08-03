@@ -4766,6 +4766,136 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
     return $rates;
 }
 
+/**
+ * 22c. 讓後台商品「運送方式」分頁裡的「運送類別」下拉選單真正對前台結帳
+ * 生效，而不再只是一個沒有作用的欄位。
+ *
+ * 自動建立三個運送類別（如果還不存在的話）：
+ *   超商自取 (cvs-pickup)    → 對應「綠界物流 超商取貨」系列
+ *   宅配     (home-delivery) → 對應「免費運送 / 單一費率 / 綠界物流 宅配 黑貓」
+ *   自取     (self-pickup)   → 對應「自行取貨」(local_pickup)
+ *
+ * 用固定的英文代稱（slug）而非讓 WordPress 自動把中文名稱轉成
+ * %e9%9b%a2...這種百分比編碼代稱，避免程式裡比對代稱時不穩定。
+ */
+add_action( 'init', 'chao_gang_cheng_ensure_shipping_classes' );
+function chao_gang_cheng_ensure_shipping_classes() {
+    if ( ! taxonomy_exists( 'product_shipping_class' ) ) {
+        return;
+    }
+    $classes = array(
+        'cvs-pickup'    => '超商自取',
+        'home-delivery' => '宅配',
+        'self-pickup'   => '自取',
+    );
+    foreach ( $classes as $slug => $name ) {
+        if ( ! term_exists( $slug, 'product_shipping_class' ) && ! term_exists( $name, 'product_shipping_class' ) ) {
+            wp_insert_term( $name, 'product_shipping_class', array( 'slug' => $slug ) );
+        }
+    }
+}
+
+/**
+ * 22d. 依購物車內商品的「運送類別」，過濾結帳頁可選的運送方式。
+ *
+ * 掛在比 chao_gang_cheng_adjust_shipping_rates()（優先權 10）更後面的
+ * 優先權 20，確保離島運費調整、以及「達免運門檻時 7-11 取貨一併免運」
+ * 這兩個既有邏輯都先跑完、$rates 裡的費用都算好之後，才在這裡依運送
+ * 類別把不符合的「方式」整個移除——這樣才不會因為這裡先把 free_shipping
+ * 移除掉，反而讓前面判斷「是否達免運資格」的依據消失。
+ *
+ * 作法：檢查購物車每一項商品的運送類別，換算成「這件商品限定只能用
+ * 哪些運送方式」，取所有商品的交集作為這張訂單最終可選方式。商品沒有
+ * 設定運送類別（目前絕大多數商品都是這樣）視為不限制，維持原本行為。
+ * 如果購物車內商品的運送類別彼此衝突、交集後完全沒有共同可用方式
+ * （例如同時有「限自取」跟「限超商取貨」的商品），保守起見不限制、
+ * 回傳原本全部方式，避免客人卡在結帳頁完全無法選擇任何運送方式。
+ */
+add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_restrict_rates_by_shipping_class', 20, 2 );
+function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
+    if ( empty( $package['contents'] ) || ! is_array( $package['contents'] ) ) {
+        return $rates;
+    }
+
+    $method_groups = array(
+        'cvs-pickup'    => array( 'prefix' => 'Wooecpay_Logistic_CVS' ),
+        'home-delivery' => array( 'exact' => array( 'free_shipping', 'flat_rate', 'Wooecpay_Logistic_Home_Tcat' ) ),
+        'self-pickup'   => array( 'exact' => array( 'local_pickup' ) ),
+    );
+
+    $required_classes = array();
+
+    foreach ( $package['contents'] as $item ) {
+        if ( empty( $item['product_id'] ) ) {
+            continue;
+        }
+        $product = wc_get_product( $item['product_id'] );
+        if ( ! $product ) {
+            continue;
+        }
+        $shipping_class = $product->get_shipping_class(); // term slug，沒設定時為空字串
+
+        if ( '' === $shipping_class || ! isset( $method_groups[ $shipping_class ] ) ) {
+            // 沒設定運送類別、或用的是本功能不認識的類別（例如既有的
+            // 「離島」類別），視為不限制此商品的運送方式。
+            continue;
+        }
+
+        $required_classes[ $shipping_class ] = true;
+    }
+
+    if ( empty( $required_classes ) ) {
+        return $rates;
+    }
+
+    $method_matches_group = function ( $method_id, $group ) {
+        if ( isset( $group['prefix'] ) && false !== strpos( $method_id, $group['prefix'] ) ) {
+            return true;
+        }
+        if ( isset( $group['exact'] ) && in_array( $method_id, $group['exact'], true ) ) {
+            return true;
+        }
+        return false;
+    };
+
+    $filtered_rates = array();
+    foreach ( $rates as $rate_key => $rate ) {
+        $keep = true;
+        foreach ( array_keys( $required_classes ) as $class_slug ) {
+            if ( ! $method_matches_group( $rate->method_id, $method_groups[ $class_slug ] ) ) {
+                $keep = false;
+                break;
+            }
+        }
+        if ( $keep ) {
+            $filtered_rates[ $rate_key ] = $rate;
+        }
+    }
+
+    if ( empty( $filtered_rates ) ) {
+        // 交集為空（購物車內商品的運送類別彼此衝突），保守起見不限制。
+        return $rates;
+    }
+
+    return $filtered_rates;
+}
+
+/**
+ * 22e. 移除商品編輯畫面「商品資料」面板裡的 Facebook／Pinterest 分頁。
+ *
+ * 這兩個分頁是「Facebook for WooCommerce」跟「Pinterest for WooCommerce」
+ * 外掛各自掛上去的（fb_commerce_tab／pinterest_attributes_tab），不是這個
+ * 佈景主題加的，所以用官方建議的 woocommerce_product_data_tabs 過濾器
+ * 把這兩個 key 移除，而不是去改外掛程式碼。優先權設 999，確保排在外掛
+ * 自己掛上去（通常是預設優先權 10）之後執行，才能真的移除得掉。
+ */
+add_filter( 'woocommerce_product_data_tabs', 'chao_gang_cheng_remove_product_data_tabs', 999 );
+function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
+    unset( $tabs['fb_commerce_tab'] );
+    unset( $tabs['pinterest_attributes_tab'] );
+    return $tabs;
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
