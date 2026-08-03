@@ -6720,72 +6720,54 @@ function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
         $query->set( 'tax_query', array_values( $tax_query ) );
     }
     $query->set( 'product_cat', '' );
-
-    // 暫時除錯：把套用後的 tax_query 陣列記下來，稍後在 wp_footer 印出來看，
-    // 確認「共 21 項」這個數字到底是被什麼條件算出來的，問題排除後會移除。
-    $GLOBALS['ckc_debug_allitem_tax_query_after'] = $query->get( 'tax_query' );
 }
 
-// 進一步除錯：直接攔截這個查詢實際跑出來的 SQL、是否被 posts_pre_query
-// 短路（例如被搜尋索引/快取層直接接管，沒有真的跑 SQL），以及
-// found_posts 篩選器最後被誰改成什麼值，藉此找出 21 這個數字真正的來源。
-add_filter( 'posts_request', 'chao_gang_cheng_debug_capture_sql', 10, 2 );
-function chao_gang_cheng_debug_capture_sql( $sql, $q ) {
-    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
-        $GLOBALS['ckc_debug_allitem_sql'] = $sql;
-    }
-    return $sql;
-}
-add_filter( 'posts_pre_query', 'chao_gang_cheng_debug_capture_pre_query', 10, 2 );
-function chao_gang_cheng_debug_capture_pre_query( $posts, $q ) {
-    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
-        $GLOBALS['ckc_debug_allitem_pre_query_shortcircuited'] = ( null !== $posts ) ? 'YES (' . count( (array) $posts ) . ' posts)' : 'no';
-    }
-    return $posts;
-}
-add_filter( 'found_posts', 'chao_gang_cheng_debug_capture_found_posts', 999, 2 );
-function chao_gang_cheng_debug_capture_found_posts( $found_posts, $q ) {
-    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
-        $GLOBALS['ckc_debug_allitem_found_posts_filter'] = $found_posts;
-    }
-    return $found_posts;
-}
-
-add_action( 'wp_footer', 'chao_gang_cheng_debug_allitem_count' );
-function chao_gang_cheng_debug_allitem_count() {
-    if ( ! is_tax( 'product_cat', 'allitem' ) ) {
+/**
+ * 修正「全部商品」分類頁的「共 N 項」計數文字。
+ *
+ * 背景：上面 chao_gang_cheng_allitem_category_shows_all_products() 已經讓
+ * 這個分類頁的商品「卡片」正確顯示全站 4 件已發佈商品（實際測試過標題
+ * 完全對應，沒有多餘或重複）。但頁面上方「共 N 項」這段文字（以及背後
+ * 用來算分頁頁數的數字）是另外由 $wp_query->found_posts 算出來的，實測
+ * 發現這個數字异常變成 21（透過除錯輸出直接確認過：全站 wp_count_posts()
+ * 的 publish 數量明明是 4，$wpdb 直接查詢也是 4，但 $wp_query->found_posts
+ * 卻是 21，且找不到對應的 SQL／篩選器來源，判斷是查詢快取層級的異常，
+ * 不是我們自己 tax_query 邏輯的問題）。
+ *
+ * 為了不管背後根本原因為何，都能保證頁面顯示的數字正確，這裡直接在
+ * woocommerce_before_shop_loop（優先權 15，wc_setup_loop 預設優先權 10 之後、
+ * woocommerce_result_count 預設優先權 20 之前）用一次獨立、直接的資料庫
+ * 查詢重新計算真正的商品總數，強制覆蓋 wc_get_loop_prop('total') 與
+ * 'total_pages'，讓「共 N 項」與分頁頁數都反映真實數字。
+ */
+add_action( 'woocommerce_before_shop_loop', 'chao_gang_cheng_fix_allitem_result_count', 15 );
+function chao_gang_cheng_fix_allitem_result_count() {
+    if ( is_admin() || ! is_tax( 'product_cat', 'allitem' ) ) {
         return;
     }
-    global $wp_query;
-    echo '<pre style="position:fixed;bottom:0;left:0;z-index:999999;background:#fff;color:#000;font-size:12px;max-width:100%;max-height:50vh;overflow:auto;border:2px solid red;padding:8px;">';
-    echo 'found_posts: ' . esc_html( $wp_query->found_posts ) . "\n";
-    echo 'post_count: ' . esc_html( $wp_query->post_count ) . "\n";
-    echo 'request SQL (property): ' . esc_html( $wp_query->request ) . "\n";
-    echo 'posts_request captured SQL: ' . esc_html( $GLOBALS['ckc_debug_allitem_sql'] ?? 'not captured' ) . "\n";
-    echo 'posts_pre_query short-circuited: ' . esc_html( $GLOBALS['ckc_debug_allitem_pre_query_shortcircuited'] ?? 'filter never ran' ) . "\n";
-    echo 'found_posts filter final value: ' . esc_html( $GLOBALS['ckc_debug_allitem_found_posts_filter'] ?? 'filter never ran' ) . "\n\n";
-    echo 'tax_query (after our filter set it): ' . esc_html( print_r( $GLOBALS['ckc_debug_allitem_tax_query_after'] ?? 'not set', true ) ) . "\n";
-    echo 'query_vars[tax_query]: ' . esc_html( print_r( $wp_query->query_vars['tax_query'] ?? 'not set', true ) ) . "\n\n";
+    global $wpdb;
 
-    // 進一步除錯：直接列出「全站」status=publish 的 product 貼文數量與標題，
-    // 對照後台「全部(4)」的數字，確認 21 件到底是哪些貼文。
-    $counts = wp_count_posts( 'product' );
-    echo 'wp_count_posts(product): ' . esc_html( print_r( $counts, true ) ) . "\n";
+    $sql = "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p WHERE p.post_type = 'product' AND p.post_status = 'publish'";
 
-    $all_ids = get_posts(
-        array(
-            'post_type'      => 'product',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'suppress_filters' => true,
-        )
-    );
-    echo 'get_posts(publish, suppress_filters=true) count: ' . esc_html( count( $all_ids ) ) . "\n";
-    foreach ( $all_ids as $pid ) {
-        echo '  #' . esc_html( $pid ) . ' - ' . esc_html( get_the_title( $pid ) ) . "\n";
+    if ( function_exists( 'wc_get_product_visibility_term_ids' ) ) {
+        $visibility_terms = wc_get_product_visibility_term_ids();
+        $exclude_id       = isset( $visibility_terms['exclude-from-catalog'] ) ? (int) $visibility_terms['exclude-from-catalog'] : 0;
+        if ( $exclude_id ) {
+            $sql .= $wpdb->prepare(
+                " AND p.ID NOT IN ( SELECT tr.object_id FROM {$wpdb->term_relationships} tr WHERE tr.term_taxonomy_id = %d )",
+                $exclude_id
+            );
+        }
     }
-    echo '</pre>';
+
+    $real_total = (int) $wpdb->get_var( $sql );
+
+    wc_set_loop_prop( 'total', $real_total );
+
+    $per_page = (int) wc_get_loop_prop( 'per_page' );
+    if ( $per_page > 0 ) {
+        wc_set_loop_prop( 'total_pages', (int) ceil( $real_total / $per_page ) );
+    }
 }
 
 
