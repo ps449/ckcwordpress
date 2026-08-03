@@ -5068,6 +5068,27 @@ function chao_gang_cheng_hide_jetpack_contact_form_button() {
     echo '<style>#insert-jetpack-contact-form{display:none !important;}</style>';
 }
 
+/**
+ * 隱藏商品編輯畫面「商品資料 —」標題列旁邊的「可下載」「禮物卡」兩個
+ * 核取方塊（保留「虛擬」）。
+ *
+ * 這兩個核取方塊是 WooCommerce 核心／WooCommerce Gift Cards 外掛直接
+ * 用 action 印出來的 <label>，不是走可以 unset key 的陣列機制（跟前面
+ * 「附加選項」分頁同一種情況），所以一樣改用 CSS 隱藏，已從實際 DOM
+ * 確認過對應的 label 選擇器（label[for="_downloadable"] 與
+ * label.gift_card_checkbox），不是用猜的。只隱藏勾選 UI，不影響任何
+ * 既有商品本身「可下載」／「禮物卡」資料或功能。
+ */
+add_action( 'admin_head', 'chao_gang_cheng_hide_downloadable_giftcard_checkboxes' );
+function chao_gang_cheng_hide_downloadable_giftcard_checkboxes() {
+    echo '<style>
+        label[for="_downloadable"],
+        label.gift_card_checkbox {
+            display: none !important;
+        }
+    </style>';
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
