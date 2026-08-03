@@ -579,6 +579,14 @@ function ckc_render_module_instagram_showcase( $settings ) {
     $subheading = isset( $settings['subheading'] ) ? $settings['subheading'] : '';
     $items      = isset( $settings['items'] ) && is_array( $settings['items'] ) ? $settings['items'] : array();
 
+    // 暫時除錯：前台實測顯示 12 則（等於後台設定 6 則的兩倍），但後台編輯畫面
+    // 讀出來的 items 陣列明明只有 6 筆——先直接印出這個 function 實際收到的
+    // $items 內容跟筆數，確認是這裡收到的資料本身就是 12 筆（例如快取／資料
+    // 不同步），還是資料真的只有 6 筆、卻在後面的邏輯被重複輸出。
+    if ( ! is_admin() && current_user_can( 'manage_options' ) ) {
+        echo '<!-- CKC_DEBUG items count: ' . count( $items ) . ' | ' . esc_html( wp_json_encode( $items ) ) . ' -->';
+    }
+
     // 整理清單：判斷平台（Instagram／Facebook）跟是否為 Reel。
     // - Instagram 一般貼文（/p/）：官方內嵌元件站內直接播放，完全正常。
     // - Instagram Reels（/reel/、/reels/）：官方內嵌元件目前有已知的顯示
@@ -597,23 +605,30 @@ function ckc_render_module_instagram_showcase( $settings ) {
         if ( ! $url ) {
             continue;
         }
-        if ( false !== strpos( $url, 'instagram.com' ) ) {
-            $is_reel = (bool) preg_match( '#instagram\.com/reels?/#i', $url );
+        if ( false !== stripos( $url, 'instagram.com' ) || false !== stripos( $url, 'instagr.am' ) ) {
+            $is_reel = (bool) preg_match( '#instagr(\.am|am\.com)/reels?/#i', $url );
             $entries[] = array(
                 'platform'  => 'instagram',
                 'url'       => $url,
                 'is_reel'   => $is_reel,
                 'thumbnail' => $is_reel && isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
             );
-        } elseif ( false !== strpos( $url, 'facebook.com' ) || false !== strpos( $url, 'fb.watch' ) ) {
+        } elseif ( false !== stripos( $url, 'facebook.com' ) || false !== stripos( $url, 'fb.watch' ) || false !== stripos( $url, 'fb.me' ) ) {
             $entries[] = array(
                 'platform'  => 'facebook',
                 'url'       => $url,
                 'is_reel'   => false,
                 'thumbnail' => '',
             );
+        } else {
+            // Fallback for other URLs so they don't disappear and cause "out of sync" confusion
+            $entries[] = array(
+                'platform'  => 'facebook', // use FB embed as generic fallback, it might fail but won't hide the count
+                'url'       => $url,
+                'is_reel'   => false,
+                'thumbnail' => '',
+            );
         }
-        // 其他網址（貼錯或不支援的平台）直接忽略，避免輸出無效的內嵌元件。
     }
 
     if ( empty( $entries ) ) {
@@ -639,42 +654,37 @@ function ckc_render_module_instagram_showcase( $settings ) {
             <div class="instagram-showcase-viewport">
                 <div class="instagram-showcase-track">
                     <?php
-                    // 項目清單重複輸出一次（原本 + 複製），讓自動捲動可以無縫接回開頭，
-                    // 不會在捲到最後一則時出現「跳一下」的斷點。複製的那一份用
-                    // aria-hidden 標記，避免螢幕閱讀器重複朗讀。
-                    for ( $pass = 0; $pass < 2; $pass++ ) :
-                        foreach ( $entries as $entry ) :
-                            $hidden_attr = $pass > 0 ? ' aria-hidden="true"' : '';
-                            if ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) :
-                                ?>
-                                <div class="instagram-showcase-item instagram-showcase-item-reel"<?php echo $hidden_attr; ?>>
-                                    <a class="instagram-showcase-reel-link" href="<?php echo esc_url( $entry['url'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                        <span class="instagram-showcase-reel-thumb"<?php echo $entry['thumbnail'] ? ' style="background-image:url(' . esc_url( $entry['thumbnail'] ) . ');"' : ''; ?>>
-                                            <span class="instagram-showcase-reel-play" aria-hidden="true">▶</span>
-                                        </span>
-                                        <span class="instagram-showcase-reel-caption">到 Instagram 觀看 Reel</span>
-                                    </a>
+                    foreach ( $entries as $entry ) :
+                        $hidden_attr = '';
+                        if ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) :
+                            ?>
+                            <div class="instagram-showcase-item instagram-showcase-item-reel"<?php echo $hidden_attr; ?>>
+                                <a class="instagram-showcase-reel-link" href="<?php echo esc_url( $entry['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                    <span class="instagram-showcase-reel-thumb"<?php echo $entry['thumbnail'] ? ' style="background-image:url(' . esc_url( $entry['thumbnail'] ) . ');"' : ''; ?>>
+                                        <span class="instagram-showcase-reel-play" aria-hidden="true">▶</span>
+                                    </span>
+                                    <span class="instagram-showcase-reel-caption">到 Instagram 觀看 Reel</span>
+                                </a>
+                            </div>
+                            <?php
+                        elseif ( 'facebook' === $entry['platform'] ) :
+                            ?>
+                            <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
+                                <div class="instagram-showcase-embed-scale instagram-showcase-fb-embed">
+                                    <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true" data-show-text="false"></div>
                                 </div>
-                                <?php
-                            elseif ( 'facebook' === $entry['platform'] ) :
-                                ?>
-                                <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
-                                    <div class="instagram-showcase-embed-scale instagram-showcase-fb-embed">
-                                        <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true" data-show-text="false"></div>
-                                    </div>
+                            </div>
+                            <?php
+                        else :
+                            ?>
+                            <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
+                                <div class="instagram-showcase-embed-scale">
+                                    <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $entry['url'] ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
                                 </div>
-                                <?php
-                            else :
-                                ?>
-                                <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
-                                    <div class="instagram-showcase-embed-scale">
-                                        <blockquote class="instagram-media" data-instgrm-permalink="<?php echo esc_url( $entry['url'] ); ?>" data-instgrm-version="14" style="margin: 0; width: 100%;"></blockquote>
-                                    </div>
-                                </div>
-                                <?php
-                            endif;
-                        endforeach;
-                    endfor;
+                            </div>
+                            <?php
+                        endif;
+                    endforeach;
                     ?>
                 </div>
             </div>
@@ -853,6 +863,15 @@ function ckc_render_module_instagram_showcase( $settings ) {
         // 瀏覽器層級的限制，並非本次修正遺漏。
         function initMarquee(wrap) {
             var track = wrap.querySelector('.instagram-showcase-track');
+            if (track && !wrap.__ckcCloned) {
+                var originalItems = Array.prototype.slice.call(track.querySelectorAll('.instagram-showcase-item'));
+                originalItems.forEach(function(item) {
+                    var clone = item.cloneNode(true);
+                    clone.setAttribute('aria-hidden', 'true');
+                    track.appendChild(clone);
+                });
+                wrap.__ckcCloned = true;
+            }
             var prevBtn = wrap.querySelector('.instagram-showcase-prev');
             var nextBtn = wrap.querySelector('.instagram-showcase-next');
             var progressFill = wrap.querySelector('.instagram-showcase-progress-fill');
