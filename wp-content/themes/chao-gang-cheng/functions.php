@@ -6669,6 +6669,40 @@ function chao_gang_cheng_relabel_portfolio_nav_menu_box( $object ) {
     return $object;
 }
 
+/**
+ * 讓「全部商品」這個商品分類（代稱 allitem）瀏覽頁真的顯示「全部商品」，
+ * 而不是照字面上的分類邏輯只顯示「有被指派到這個分類」的商品。
+ *
+ * 背景：allitem 其實是這個網站的商品分類「未分類」預設分類被改名、
+ * 改代稱而來（後台分類列表看得到「設成預設」，代表它是 WooCommerce
+ * 的預設分類），本質上代表「沒有被指派任何實際分類的商品」，目前
+ * 項目數量顯示 0，因為現有商品都已經各自被分類到冷凍食品／下酒菜／
+ * 節慶禮盒，沒有商品落在這個預設分類底下。
+ *
+ * 這裡不採取「把每件商品都手動也指派一次 allitem 分類」的做法——那樣
+ * 除了要處理現有全部商品，以後每上架一件新商品都要記得再指派一次，
+ * 很容易漏掉；而且會讓這件商品同時掛兩個分類，可能連帶影響其他地方
+ * 依分類數量／分類篩選的邏輯（例如分類下拉選單的商品數量統計）。
+ * 改成在瀏覽這個分類頁面時，直接把分類限制拿掉、當作「顯示所有商品」
+ * 的頁面來處理，效果上等於商店首頁，但維持在分類頁的網址／麵包屑，
+ * 之後不管新增多少商品都不用額外維護。
+ *
+ * 用 pre_get_posts 優先權 20，確保排在 WooCommerce 自己的
+ * WC_Query::product_query()（預設優先權 10，會依網址判斷的分類把
+ * tax_query 加上去）之後執行，這裡才能把它清空、真正生效。
+ */
+add_action( 'pre_get_posts', 'chao_gang_cheng_allitem_category_shows_all_products', 20 );
+function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
+    if ( is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+    if ( ! is_tax( 'product_cat', 'allitem' ) ) {
+        return;
+    }
+    $query->set( 'tax_query', array() );
+    $query->set( 'product_cat', '' );
+}
+
 
 /**
  * 27. 出貨AI助理頁面渲染回呼
