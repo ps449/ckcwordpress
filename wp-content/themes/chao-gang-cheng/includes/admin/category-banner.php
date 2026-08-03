@@ -54,7 +54,17 @@ function ckc_category_banner_add_field( $taxonomy ) {
 /**
  * 「編輯分類」畫面（有 term_id，欄位要用 tr/th/td 包，符合 WP 內建表格版面）
  */
-add_action( 'product_cat_edit_form_fields', 'ckc_category_banner_edit_field' );
+// 注意：product_cat_edit_form_fields 這個 hook 實際上會傳入兩個參數
+// （$term, $taxonomy），add_action() 若沒有明確指定 accepted_args，
+// 預設只會轉呼叫端的第 1 個參數。原本這裡漏了第三、四個參數
+// （10, 2），導致 WordPress 只把 $term 傳進來，$taxonomy 卻沒有預設值，
+// PHP 會丟出「Too few arguments」的嚴重錯誤（Fatal Error）。這個錯誤發生
+// 在「編輯分類」畫面渲染表單欄位的過程中，會讓 WordPress 從此處之後的
+// 所有輸出（縮圖、顯示方式、Google 商品分類欄位、表單結尾與「更新」
+// 按鈕）整個中斷、不會印出來——這正是後台「編輯分類」頁面看不到儲存
+// 按鈕的根本原因（「新增分類」畫面用的是另一個只有 1 個參數的函式，
+// 不受影響，所以那邊看起來正常）。
+add_action( 'product_cat_edit_form_fields', 'ckc_category_banner_edit_field', 10, 2 );
 function ckc_category_banner_edit_field( $term, $taxonomy ) {
     $banner_id  = absint( get_term_meta( $term->term_id, '_ckc_category_banner_id', true ) );
     $banner_url = $banner_id ? wp_get_attachment_url( $banner_id ) : '';
