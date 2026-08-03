@@ -6699,7 +6699,26 @@ function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
     if ( ! is_tax( 'product_cat', 'allitem' ) ) {
         return;
     }
-    $query->set( 'tax_query', array() );
+
+    // 注意：一開始直接把整個 tax_query 清空（設成空陣列），結果「共 N 項」
+    // 的統計數字（分頁用的 found_posts）從原本正確的 4 件變成 21 件，但
+    // 實際畫面渲染出來的商品卡片仍然只有 4 件——代表 WC_Query::product_query()
+    // 本來就會把「排除隱藏／目錄搜尋排除商品」（product_visibility 這個
+    // taxonomy 的條件）跟「這個分類本身」的條件合併放在同一個 tax_query
+    // 陣列裡；整個清空等於連目錄可見性的排除條件也一起拿掉了，導致 SQL
+    // 查詢本身多算進了不該出現在目錄的商品（前台清單另外有 is_visible()
+    // 判斷才把它們擋掉沒顯示出來，但分頁計數已經是錯的）。
+    // 修正：只挑出 taxonomy 是 product_cat 的那個子句移除，其餘（例如
+    // product_visibility）維持不動，這樣才不會連目錄可見性的過濾一起拿掉。
+    $tax_query = $query->get( 'tax_query' );
+    if ( is_array( $tax_query ) ) {
+        foreach ( $tax_query as $key => $clause ) {
+            if ( is_array( $clause ) && isset( $clause['taxonomy'] ) && 'product_cat' === $clause['taxonomy'] ) {
+                unset( $tax_query[ $key ] );
+            }
+        }
+        $query->set( 'tax_query', array_values( $tax_query ) );
+    }
     $query->set( 'product_cat', '' );
 }
 
