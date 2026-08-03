@@ -2341,6 +2341,14 @@ function chao_gang_cheng_custom_product_tabs( $tabs ) {
  */
 function chao_gang_cheng_specs_tab_content() {
     global $product;
+
+    // 後台個別填寫過「規格說明」時優先顯示，沒填的商品完全比照原本行為。
+    $custom_specs_html = $product ? get_post_meta( $product->get_id(), '_ckc_product_specs_html', true ) : '';
+    if ( ! empty( $custom_specs_html ) ) {
+        echo '<div class="product-specs-content">' . wp_kses_post( $custom_specs_html ) . '</div>';
+        return;
+    }
+
     if ( $product->has_attributes() || $product->has_dimensions() || $product->has_weight() ) {
         wc_display_product_attributes( $product );
     } else {
@@ -2369,6 +2377,15 @@ function chao_gang_cheng_specs_tab_content() {
  * Shipping Method Tab Content Callback
  */
 function chao_gang_cheng_shipping_tab_content() {
+    global $product;
+
+    // 後台個別填寫過「運送方式說明」時優先顯示，沒填的商品完全比照原本
+    // 寫死的預設文字，不影響既有商品。
+    $custom_shipping_html = $product ? get_post_meta( $product->get_id(), '_ckc_product_shipping_html', true ) : '';
+    if ( ! empty( $custom_shipping_html ) ) {
+        echo '<div class="product-shipping-content" style="line-height: 1.8; color: var(--primary-color);">' . wp_kses_post( $custom_shipping_html ) . '</div>';
+        return;
+    }
     ?>
     <div class="product-shipping-content" style="line-height: 1.8; color: var(--primary-color);">
         <p style="margin-bottom: 10px; font-weight: bold; color: var(--accent-color);">🚚 配送說明：</p>
@@ -2386,6 +2403,91 @@ function chao_gang_cheng_shipping_tab_content() {
         </ul>
     </div>
     <?php
+}
+
+/**
+ * 每個商品各自可編輯的「規格說明」／「運送方式」前台顯示內容。
+ *
+ * 背景：前台商品頁的「規格說明」分頁除了有填商品屬性時會顯示屬性表格，
+ * 其餘情況全部商品共用同一段寫死在程式碼裡的文字；「運送方式」分頁則
+ * 不論哪個商品，一律顯示同一段寫死文字，完全沒有欄位可以讓後台針對
+ * 「這一件」商品個別調整（例如這件商品保存期限、產地跟別的商品不同，
+ * 或這件商品因為運送類別設定只提供超商取貨，運費說明理應跟其他商品
+ * 不一樣）。
+ *
+ * 這裡新增一個獨立的中繼資料方塊（跟 WooCommerce 內建「商品資料」面板
+ * 裡同樣叫「運送方式」的分頁是兩件不同的東西——那個分頁管的是重量／
+ * 尺寸／運送類別，這裡管的是前台文字說明——故意用不同標題避免混淆），
+ * 讓後台可以個別填寫規格說明／運送方式說明。有填寫時優先顯示這裡的
+ * 內容；留空則完全比照原本行為，不影響尚未填寫過的既有商品。
+ */
+add_action( 'add_meta_boxes', 'chao_gang_cheng_add_product_specs_shipping_meta_box' );
+function chao_gang_cheng_add_product_specs_shipping_meta_box() {
+    add_meta_box(
+        'ckc_product_specs_shipping_box',
+        '前台顯示內容：規格說明／運送方式（個別覆蓋預設文字，留空則使用預設）',
+        'chao_gang_cheng_render_product_specs_shipping_meta_box',
+        'product',
+        'normal',
+        'default'
+    );
+}
+
+function chao_gang_cheng_render_product_specs_shipping_meta_box( $post ) {
+    wp_nonce_field( 'ckc_product_specs_shipping_save', 'ckc_product_specs_shipping_nonce' );
+
+    $specs_html    = get_post_meta( $post->ID, '_ckc_product_specs_html', true );
+    $shipping_html = get_post_meta( $post->ID, '_ckc_product_shipping_html', true );
+    ?>
+    <p style="margin-top:0;">
+        <label for="ckc_product_specs_html"><strong>規格說明</strong>（前台「規格說明」分頁；留空則沿用商品屬性或系統預設內容）</label>
+    </p>
+    <?php
+    wp_editor(
+        $specs_html,
+        'ckc_product_specs_html',
+        array(
+            'textarea_name' => 'ckc_product_specs_html',
+            'media_buttons' => false,
+            'textarea_rows' => 6,
+            'teeny'         => true,
+        )
+    );
+    ?>
+    <p style="margin-top:20px;">
+        <label for="ckc_product_shipping_html"><strong>運送方式說明</strong>（前台「運送方式」分頁；留空則沿用系統預設文字）</label>
+    </p>
+    <?php
+    wp_editor(
+        $shipping_html,
+        'ckc_product_shipping_html',
+        array(
+            'textarea_name' => 'ckc_product_shipping_html',
+            'media_buttons' => false,
+            'textarea_rows' => 6,
+            'teeny'         => true,
+        )
+    );
+}
+
+add_action( 'save_post_product', 'chao_gang_cheng_save_product_specs_shipping_meta_box' );
+function chao_gang_cheng_save_product_specs_shipping_meta_box( $post_id ) {
+    if ( ! isset( $_POST['ckc_product_specs_shipping_nonce'] ) || ! wp_verify_nonce( $_POST['ckc_product_specs_shipping_nonce'], 'ckc_product_specs_shipping_save' ) ) {
+        return;
+    }
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
+    }
+    if ( ! current_user_can( 'edit_product', $post_id ) ) {
+        return;
+    }
+
+    if ( isset( $_POST['ckc_product_specs_html'] ) ) {
+        update_post_meta( $post_id, '_ckc_product_specs_html', wp_kses_post( wp_unslash( $_POST['ckc_product_specs_html'] ) ) );
+    }
+    if ( isset( $_POST['ckc_product_shipping_html'] ) ) {
+        update_post_meta( $post_id, '_ckc_product_shipping_html', wp_kses_post( wp_unslash( $_POST['ckc_product_shipping_html'] ) ) );
+    }
 }
 
 /**
