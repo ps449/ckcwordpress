@@ -6720,6 +6720,25 @@ function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
         $query->set( 'tax_query', array_values( $tax_query ) );
     }
     $query->set( 'product_cat', '' );
+
+    // 暫時除錯：把套用後的 tax_query 陣列記下來，稍後在 wp_footer 印出來看，
+    // 確認「共 21 項」這個數字到底是被什麼條件算出來的，問題排除後會移除。
+    $GLOBALS['ckc_debug_allitem_tax_query_after'] = $query->get( 'tax_query' );
+}
+
+add_action( 'wp_footer', 'chao_gang_cheng_debug_allitem_count' );
+function chao_gang_cheng_debug_allitem_count() {
+    if ( ! is_tax( 'product_cat', 'allitem' ) ) {
+        return;
+    }
+    global $wp_query;
+    echo '<pre style="position:fixed;bottom:0;left:0;z-index:999999;background:#fff;color:#000;font-size:12px;max-width:100%;max-height:50vh;overflow:auto;border:2px solid red;padding:8px;">';
+    echo 'found_posts: ' . esc_html( $wp_query->found_posts ) . "\n";
+    echo 'post_count: ' . esc_html( $wp_query->post_count ) . "\n";
+    echo 'request SQL: ' . esc_html( $wp_query->request ) . "\n\n";
+    echo 'tax_query (after our filter set it): ' . esc_html( print_r( $GLOBALS['ckc_debug_allitem_tax_query_after'] ?? 'not set', true ) ) . "\n";
+    echo 'query_vars[tax_query]: ' . esc_html( print_r( $wp_query->query_vars['tax_query'] ?? 'not set', true ) ) . "\n";
+    echo '</pre>';
 }
 
 
