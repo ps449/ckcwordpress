@@ -6737,7 +6737,26 @@ function chao_gang_cheng_debug_allitem_count() {
     echo 'post_count: ' . esc_html( $wp_query->post_count ) . "\n";
     echo 'request SQL: ' . esc_html( $wp_query->request ) . "\n\n";
     echo 'tax_query (after our filter set it): ' . esc_html( print_r( $GLOBALS['ckc_debug_allitem_tax_query_after'] ?? 'not set', true ) ) . "\n";
-    echo 'query_vars[tax_query]: ' . esc_html( print_r( $wp_query->query_vars['tax_query'] ?? 'not set', true ) ) . "\n";
+    echo 'query_vars[tax_query]: ' . esc_html( print_r( $wp_query->query_vars['tax_query'] ?? 'not set', true ) ) . "\n\n";
+
+    // 進一步除錯：直接列出「全站」status=publish 的 product 貼文數量與標題，
+    // 對照後台「全部(4)」的數字，確認 21 件到底是哪些貼文。
+    $counts = wp_count_posts( 'product' );
+    echo 'wp_count_posts(product): ' . esc_html( print_r( $counts, true ) ) . "\n";
+
+    $all_ids = get_posts(
+        array(
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'suppress_filters' => true,
+        )
+    );
+    echo 'get_posts(publish, suppress_filters=true) count: ' . esc_html( count( $all_ids ) ) . "\n";
+    foreach ( $all_ids as $pid ) {
+        echo '  #' . esc_html( $pid ) . ' - ' . esc_html( get_the_title( $pid ) ) . "\n";
+    }
     echo '</pre>';
 }
 
