@@ -5001,6 +5001,17 @@ function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     // Facebook 分頁消失了但 Pinterest 分頁還在，這裡修正。
     unset( $tabs['pinterest_attributes'] );
     unset( $tabs['pinterest_attributes_tab'] ); // 保留以防萬一，不影響其他 key
+
+    // 移除「屬性」「進階」（WooCommerce 內建）與「附加選項」
+    // （WooCommerce Product Add-ons 外掛）三個分頁。
+    // 「屬性」拿掉後不影響前台「規格說明」分頁——那裡已經改成優先讀取
+    // 商品編輯畫面新增的可視化編輯器欄位（_ckc_product_specs_html），
+    // 沒填才會回退看商品屬性；屬性資料本身不會被刪除，只是分頁不顯示，
+    // 之後如需要仍可以把這行拿掉即可恢復。
+    unset( $tabs['attribute'] );
+    unset( $tabs['advanced'] );
+    unset( $tabs['addons'] );
+    unset( $tabs['addons_tab'] ); // 保留以防猜錯 key，不影響其他 key
     return $tabs;
 }
 
