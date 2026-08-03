@@ -6726,6 +6726,31 @@ function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
     $GLOBALS['ckc_debug_allitem_tax_query_after'] = $query->get( 'tax_query' );
 }
 
+// 進一步除錯：直接攔截這個查詢實際跑出來的 SQL、是否被 posts_pre_query
+// 短路（例如被搜尋索引/快取層直接接管，沒有真的跑 SQL），以及
+// found_posts 篩選器最後被誰改成什麼值，藉此找出 21 這個數字真正的來源。
+add_filter( 'posts_request', 'chao_gang_cheng_debug_capture_sql', 10, 2 );
+function chao_gang_cheng_debug_capture_sql( $sql, $q ) {
+    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
+        $GLOBALS['ckc_debug_allitem_sql'] = $sql;
+    }
+    return $sql;
+}
+add_filter( 'posts_pre_query', 'chao_gang_cheng_debug_capture_pre_query', 10, 2 );
+function chao_gang_cheng_debug_capture_pre_query( $posts, $q ) {
+    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
+        $GLOBALS['ckc_debug_allitem_pre_query_shortcircuited'] = ( null !== $posts ) ? 'YES (' . count( (array) $posts ) . ' posts)' : 'no';
+    }
+    return $posts;
+}
+add_filter( 'found_posts', 'chao_gang_cheng_debug_capture_found_posts', 999, 2 );
+function chao_gang_cheng_debug_capture_found_posts( $found_posts, $q ) {
+    if ( $q->is_main_query() && is_tax( 'product_cat', 'allitem' ) ) {
+        $GLOBALS['ckc_debug_allitem_found_posts_filter'] = $found_posts;
+    }
+    return $found_posts;
+}
+
 add_action( 'wp_footer', 'chao_gang_cheng_debug_allitem_count' );
 function chao_gang_cheng_debug_allitem_count() {
     if ( ! is_tax( 'product_cat', 'allitem' ) ) {
@@ -6735,7 +6760,10 @@ function chao_gang_cheng_debug_allitem_count() {
     echo '<pre style="position:fixed;bottom:0;left:0;z-index:999999;background:#fff;color:#000;font-size:12px;max-width:100%;max-height:50vh;overflow:auto;border:2px solid red;padding:8px;">';
     echo 'found_posts: ' . esc_html( $wp_query->found_posts ) . "\n";
     echo 'post_count: ' . esc_html( $wp_query->post_count ) . "\n";
-    echo 'request SQL: ' . esc_html( $wp_query->request ) . "\n\n";
+    echo 'request SQL (property): ' . esc_html( $wp_query->request ) . "\n";
+    echo 'posts_request captured SQL: ' . esc_html( $GLOBALS['ckc_debug_allitem_sql'] ?? 'not captured' ) . "\n";
+    echo 'posts_pre_query short-circuited: ' . esc_html( $GLOBALS['ckc_debug_allitem_pre_query_shortcircuited'] ?? 'filter never ran' ) . "\n";
+    echo 'found_posts filter final value: ' . esc_html( $GLOBALS['ckc_debug_allitem_found_posts_filter'] ?? 'filter never ran' ) . "\n\n";
     echo 'tax_query (after our filter set it): ' . esc_html( print_r( $GLOBALS['ckc_debug_allitem_tax_query_after'] ?? 'not set', true ) ) . "\n";
     echo 'query_vars[tax_query]: ' . esc_html( print_r( $wp_query->query_vars['tax_query'] ?? 'not set', true ) ) . "\n\n";
 
