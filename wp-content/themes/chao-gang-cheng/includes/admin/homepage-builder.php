@@ -142,7 +142,7 @@ function ckc_homepage_module_registry() {
                     'type'       => 'repeater',
                     'row_fields' => array(
                         'url'       => array( 'label' => 'Instagram／Facebook 貼文或 Reel 網址', 'type' => 'url', 'default' => '' ),
-                        'thumbnail' => array( 'label' => '縮圖（僅 Instagram Reels 需要，其餘可留空）', 'type' => 'image', 'default' => '' ),
+                        'thumbnail' => array( 'label' => '縮圖（Facebook 影片／Instagram Reels 需要，一般 Instagram 貼文可留空）', 'type' => 'image', 'default' => '' ),
                     ),
                     'default' => array(),
                 ),
@@ -722,7 +722,13 @@ function ckc_homepage_module_summary( $module ) {
         case 'youtube_feed':
             return isset( $s['heading'] ) ? $s['heading'] : '';
         case 'instagram_showcase':
-            $count = isset( $s['items'] ) && is_array( $s['items'] ) ? count( array_filter( $s['items'], function( $row ) { return ! empty( $row['url'] ); } ) ) : 0;
+            $count = 0;
+            if ( isset( $s['items'] ) && is_array( $s['items'] ) ) {
+                foreach ( $s['items'] as $row ) {
+                    $url = isset( $row['url'] ) ? trim( $row['url'] ) : '';
+                    if ( $url ) $count++;
+                }
+            }
             return $count . ' 則影片' . ( isset( $s['heading'] ) && $s['heading'] ? '｜' . $s['heading'] : '' );
         case 'html_block':
             return isset( $s['content'] ) ? wp_strip_all_tags( mb_strimwidth( $s['content'], 0, 30, '…' ) ) : '';

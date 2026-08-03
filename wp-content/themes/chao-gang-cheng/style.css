@@ -513,16 +513,10 @@ h1, h2, h3, h4, h5, h6 {
   transform-origin: top left;
 }
 
-/* Facebook 的 Video Plugin 用官方的 data-width 屬性自己控制寬度（不像
-   Instagram 元件需要用 transform: scale() 縮放），所以外層包裝不需要
-   固定 326px、也不需要縮放 transform，讓元件自己撐滿容器寬度即可。 */
-.instagram-showcase-fb-embed {
-  width: 100%;
-}
-
-/* Reels 縮圖卡片（因為 Instagram 官方內嵌元件目前無法穩定顯示 Reels，
-   改成縮圖 + 點擊後開新分頁到 Instagram 播放）。寬度由 JS 統一計算，
-   高度用 9:16 直式比例自動撐開，不需要另外用 JS 同步高度。 */
+/* Reels／Facebook 影片縮圖卡片。Instagram Reels 官方內嵌元件無法穩定
+   顯示、Facebook Video Plugin 又會不穩定地被 Facebook 伺服器回絕
+   （503），兩者都改成縮圖 + 點擊後開新分頁到原平台播放。寬度由 JS
+   統一計算，高度用 9:16 直式比例自動撐開，不需要另外用 JS 同步高度。 */
 .instagram-showcase-reel-link {
   display: block;
   border: 1px solid var(--border-color);
@@ -558,6 +552,13 @@ h1, h2, h3, h4, h5, h6 {
   inset: 0;
   background: linear-gradient(135deg, #405de6, #5b51d8, #833ab4, #c13584, #e1306c, #fd1d1d, #f77737, #fcaf45);
   opacity: 0.18;
+}
+
+/* Facebook 影片縮圖卡片：跟 Instagram Reels 共用同一套卡片結構，但沒有
+   上傳縮圖時的底色改用 Facebook 品牌藍，避免看起來像貼錯平台。 */
+.instagram-showcase-reel-thumb-fb::before {
+  background: linear-gradient(135deg, #1877f2, #0a5dc2);
+  opacity: 0.16;
 }
 
 .instagram-showcase-reel-play {

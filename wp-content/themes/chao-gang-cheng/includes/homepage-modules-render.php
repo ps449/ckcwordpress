@@ -586,11 +586,13 @@ function ckc_render_module_instagram_showcase( $settings ) {
     //   音樂無關，是 Reels 這個內容類型本身的內嵌管線有問題），所以改成
     //   縮圖卡片，點擊開新分頁到 Instagram 播放（縮圖需要後台手動上傳，
     //   因為沒有官方 API 可以抓）。
-    // - Facebook 貼文／Reel：用 Facebook 官方 Video Plugin（fb-video），
-    //   經實測 Reels 也能正常站內播放，不需要縮圖 fallback；有加
-    //   data-show-text="false"，避免 Facebook 官方元件內建的大頭貼／
-    //   粉專名稱／分享文字列跟影片畫面擠在同一個卡片高度裡，看起來像是
-    //   版型跑掉、文字疊在影片上。
+    // - Facebook 貼文／影片：原本用 Facebook 官方 Video Plugin（fb-video）
+    //   即時內嵌播放，但實測發現 Facebook 自己的內嵌伺服器
+    //   （facebook.com/.../plugins/video.php）會不穩定地回傳 503（服務
+    //   暫時無法使用），而且我們這邊沒有申請 Facebook App ID、是用匿名
+    //   方式呼叫，更容易被限流／拒絕，導致卡片整個空白、找不出程式碼面
+    //   的解法。改成跟 Instagram Reels 一樣的縮圖卡片（點擊開新分頁到
+    //   Facebook 觀看），徹底不依賴 Facebook 這個不穩定的即時內嵌服務。
     $entries = array();
     foreach ( $items as $item ) {
         $url = isset( $item['url'] ) ? trim( $item['url'] ) : '';
@@ -610,15 +612,15 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 'platform'  => 'facebook',
                 'url'       => $url,
                 'is_reel'   => false,
-                'thumbnail' => '',
+                'thumbnail' => isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
             );
         } else {
             // Fallback for other URLs so they don't disappear and cause "out of sync" confusion
             $entries[] = array(
-                'platform'  => 'facebook', // use FB embed as generic fallback, it might fail but won't hide the count
+                'platform'  => 'facebook',
                 'url'       => $url,
                 'is_reel'   => false,
-                'thumbnail' => '',
+                'thumbnail' => isset( $item['thumbnail'] ) ? trim( $item['thumbnail'] ) : '',
             );
         }
     }
@@ -658,23 +660,18 @@ function ckc_render_module_instagram_showcase( $settings ) {
                     // 只需要 PHP 端輸出一份真實項目就好。
                     foreach ( $entries as $entry ) :
                         $hidden_attr = '';
-                        if ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) :
+                        if ( 'facebook' === $entry['platform'] || ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) ) :
+                            $is_fb       = 'facebook' === $entry['platform'];
+                            $thumb_class = 'instagram-showcase-reel-thumb' . ( $is_fb ? ' instagram-showcase-reel-thumb-fb' : '' );
+                            $caption     = $is_fb ? '到 Facebook 觀看影片' : '到 Instagram 觀看 Reel';
                             ?>
                             <div class="instagram-showcase-item instagram-showcase-item-reel"<?php echo $hidden_attr; ?>>
                                 <a class="instagram-showcase-reel-link" href="<?php echo esc_url( $entry['url'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                    <span class="instagram-showcase-reel-thumb"<?php echo $entry['thumbnail'] ? ' style="background-image:url(' . esc_url( $entry['thumbnail'] ) . ');"' : ''; ?>>
+                                    <span class="<?php echo esc_attr( $thumb_class ); ?>"<?php echo $entry['thumbnail'] ? ' style="background-image:url(' . esc_url( $entry['thumbnail'] ) . ');"' : ''; ?>>
                                         <span class="instagram-showcase-reel-play" aria-hidden="true">▶</span>
                                     </span>
-                                    <span class="instagram-showcase-reel-caption">到 Instagram 觀看 Reel</span>
+                                    <span class="instagram-showcase-reel-caption"><?php echo esc_html( $caption ); ?></span>
                                 </a>
-                            </div>
-                            <?php
-                        elseif ( 'facebook' === $entry['platform'] ) :
-                            ?>
-                            <div class="instagram-showcase-item"<?php echo $hidden_attr; ?>>
-                                <div class="instagram-showcase-embed-scale instagram-showcase-fb-embed">
-                                    <div class="fb-video" data-href="<?php echo esc_url( $entry['url'] ); ?>" data-width="326" data-allowfullscreen="true" data-show-text="false"></div>
-                                </div>
                             </div>
                             <?php
                         else :
@@ -723,29 +720,15 @@ function ckc_render_module_instagram_showcase( $settings ) {
             document.body.appendChild(script);
         }
 
-        // Facebook 官方 Video Plugin：跟 Instagram 內嵌元件不同套系統，需要
-        // 另外載入 Facebook JavaScript SDK（xfbml=1）。經實測，Facebook 的
-        // Reels 用這個官方元件可以正常站內播放，沒有 Instagram Reels 那個
-        // 顯示問題。
-        var fbLoaded = false;
-        function loadFacebookEmbed() {
-            if (fbLoaded) {
-                if (window.FB && window.FB.XFBML) { window.FB.XFBML.parse(); }
-                return;
-            }
-            fbLoaded = true;
-            if (!document.getElementById('fb-root')) {
-                var fbRoot = document.createElement('div');
-                fbRoot.id = 'fb-root';
-                document.body.appendChild(fbRoot);
-            }
-            var script = document.createElement('script');
-            script.async = true;
-            script.defer = true;
-            script.crossOrigin = 'anonymous';
-            script.src = 'https://connect.facebook.net/zh_TW/sdk.js#xfbml=1&version=v19.0';
-            document.body.appendChild(script);
-        }
+        // 注意：Facebook 影片原本這裡有一段用官方 Video Plugin（fb-video +
+        // Facebook JS SDK）即時內嵌播放的程式碼。實測發現 Facebook 自己的
+        // 內嵌伺服器會不穩定地回傳 503（服務暫時無法使用）——我們這邊沒有
+        // 申請 Facebook App ID、是用匿名方式呼叫，更容易被限流／拒絕，
+        // 導致卡片整個空白、真實使用者也看得到這個問題，且完全不是我們
+        // 這邊的程式碼可以修好的（伺服器端的問題）。已改成跟 Instagram
+        // Reels 一樣的縮圖卡片方案（見上面 PHP 輸出的部分），徹底不依賴
+        // Facebook 這個不穩定的即時內嵌服務，因此這裡不再需要載入
+        // Facebook JavaScript SDK。
 
         var MOBILE_QUERY = '(max-width: 768px)';
 
@@ -769,49 +752,18 @@ function ckc_render_module_instagram_showcase( $settings ) {
             var scale = Math.min(footprint / 326, 1);
             var actualFootprint = 326 * scale;
 
-            // Facebook 的 Video Plugin 官方最小寬度是 220px，太窄會被元件
-            // 自己擋掉／跑版，所以 fb-video 的寬度要另外夾在 220px 以上
-            // （比對其他卡片的 footprint 可能會稍微寬一點，屬於可接受的
-            // 小誤差）。
-            var fbNeedsReparse = false;
-
+            // 注意：Facebook 影片改成縮圖卡片方案後，這裡不再需要處理
+            // fb-video 的寬度／reparse 邏輯（縮圖卡片跟 Instagram Reels
+            // 共用同一套「沒有 .instagram-showcase-embed-scale，靠外層
+            // width + CSS aspect-ratio 自動撐高」的卡片結構，不需要 JS
+            // 縮放）。只剩下 Instagram 一般貼文（blockquote 官方內嵌元件）
+            // 需要用 transform: scale() 縮小。
             items.forEach(function (item) {
                 item.style.width = actualFootprint + 'px';
                 var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
                 if (!scaleEl) { return; }
-                var fbVideo = scaleEl.querySelector('.fb-video');
-                if (fbVideo) {
-                    var fbWidth = Math.max(220, Math.round(actualFootprint));
-                    if (fbVideo.getAttribute('data-width') !== String(fbWidth)) {
-                        // 注意：Facebook 官方 Video Plugin 一旦被解析成真正的
-                        // <iframe> 之後，單純改 data-width 再呼叫一次
-                        // XFBML.parse() 並不會真的重新縮放它——FB 的解析器會
-                        // 直接跳過已經處理過的節點，什麼事都不做。之前沒有
-                        // 處理這個情況，導致只要版面在初次解析「之後」又重新
-                        // 計算過一次寬度（例如網頁字型載入、捲軸出現/消失
-                        // 造成的 resize），這張卡片的 iframe 就會卡在舊寬度、
-                        // 甚至卡在初次解析時期還沒穩定的暫時尺寸，永遠停在
-                        // 0 高度看起來像整個空白（實測過就是這個原因）。
-                        // 修正：如果這個 fb-video 已經被解析成 iframe，先把
-                        // 它清空、拿掉 FB 自己加上的 class，還原成「尚未解析」
-                        // 的乾淨狀態，才更新 data-width，讓等一下的 parse()
-                        // 是真的重新渲染一次，而不是被判定為「已處理」而跳過。
-                        var alreadyRendered = !!fbVideo.querySelector('iframe');
-                        if (alreadyRendered) {
-                            fbVideo.innerHTML = '';
-                            fbVideo.className = 'fb-video';
-                        }
-                        fbVideo.setAttribute('data-width', fbWidth);
-                        fbNeedsReparse = true;
-                    }
-                } else {
-                    scaleEl.style.transform = 'scale(' + scale + ')';
-                }
+                scaleEl.style.transform = 'scale(' + scale + ')';
             });
-
-            if (fbNeedsReparse && window.FB && window.FB.XFBML) {
-                window.FB.XFBML.parse();
-            }
 
             wrap.__ckcIgScale = scale;
             wrap.__ckcIgFootprint = actualFootprint;
@@ -834,18 +786,10 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 var scaleEl = item.querySelector('.instagram-showcase-embed-scale');
                 if (!scaleEl) { return; }
                 item.__ckcObserved = true;
-                // Facebook 的 fb-video 是用官方 data-width 屬性撐到正確的
-                // 目標寬度（layoutWrap() 裡沒有對它套用 CSS transform:
-                // scale()），所以它的 offsetHeight 量到的就已經是「畫面上
-                // 實際呈現」的高度；只有 Instagram 官方元件是維持原生 326px
-                // 版面、外層再用 transform: scale() 縮小，offsetHeight 量到
-                // 的是縮小前的原始高度，需要再乘上縮放比例才會等於畫面上
-                // 實際呈現的高度。這兩種算法不能共用同一個乘法，之前沒有
-                // 分開處理，導致 Facebook 卡片的高度被誤乘縮放比例（通常
-                // 小於 1）而鎖定得比實際內容矮一截，加上 overflow: hidden
-                // 就把 Facebook 元件自帶的大頭貼／粉專名稱／分享文字列跟
-                // 影片畫面一起裁切、擠壓在一起，看起來像版型跑掉。
-                var isFbVideo = !!scaleEl.querySelector('.fb-video');
+                // scaleEl 現在只會是 Instagram 一般貼文的官方內嵌元件
+                // （blockquote），維持原生 326px 版面、外層用 transform:
+                // scale() 縮小，所以 offsetHeight 量到的是縮小前的原始
+                // 高度，需要再乘上縮放比例才會等於畫面上實際呈現的高度。
                 var ro = new ResizeObserver(function () {
                     // 重要：Instagram 內嵌元件在真正把貼文內容載入完成前，
                     // 量到的高度會是 0（或極小的暫時值）。如果這時候就把
@@ -858,7 +802,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
                     // Instagram 的元件有機會正常完成載入。
                     var rawHeight = scaleEl.offsetHeight;
                     if (rawHeight > 20) {
-                        var scale = isFbVideo ? 1 : (wrap.__ckcIgScale || 1);
+                        var scale = wrap.__ckcIgScale || 1;
                         item.style.height = (rawHeight * scale) + 'px';
                     }
                 });
@@ -1129,18 +1073,12 @@ function ckc_render_module_instagram_showcase( $settings ) {
 
             function loadNeededEmbeds(section) {
                 if (section.querySelector('.instagram-media')) { loadInstagramEmbed(); }
-                if (section.querySelector('.fb-video')) { loadFacebookEmbed(); }
             }
 
-            // 注意：這裡原本用 IntersectionObserver 延遲載入，實測發現在正式站
-            // 上 Facebook Video Plugin（.fb-video）完全沒有被觸發載入——SDK
-            // 從頭到尾都沒有請求，畫面上對應的卡片永遠是塌陷的空白（高度 0），
-            // 使用者完全看不到這些影片，找不出 IntersectionObserver 沒有正確
-            // 觸發的確切原因（手動呼叫同一段程式碼是完全正常、可以成功載入並
-            // 渲染的）。與其讓一半的精選影片持續悄悄壞掉，改成頁面一載入完成
-            // 就直接載入，不再依賴 IntersectionObserver 這個延遲載入的中間層；
-            // 這兩個 SDK 都不算重量級資源，直接載入换來的可靠性比延遲載入省下
-            // 的一點效能更重要。
+            // 注意：這裡原本用 IntersectionObserver 延遲載入，後來改成頁面一
+            // 載入完成就直接載入 Instagram 內嵌元件的腳本，不再依賴
+            // IntersectionObserver 這個延遲載入的中間層（原本用來延遲載入的
+            // Facebook Video Plugin 已經改成縮圖卡片方案，這裡不再需要）。
             sections.forEach(loadNeededEmbeds);
         });
     })();
