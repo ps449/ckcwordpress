@@ -6621,6 +6621,54 @@ function chao_gang_cheng_hide_post_category_nav_menu_box() {
     remove_meta_box( 'add-category', 'nav-menus', 'side' );
 }
 
+/**
+ * 隱藏「選單管理」畫面裡的「專案類型」「專案標籤」兩個區塊。
+ *
+ * 這兩個是 Jetpack Portfolio（作品集）這個自訂文章類型自帶的分類法
+ * （taxonomy slug：jetpack-portfolio-type／jetpack-portfolio-tag），
+ * 本站沒有在用作品集的分類/標籤功能建選單，隱藏掉避免選單建置畫面
+ * 塞一堆用不到的區塊。已從實際畫面 DOM 確認過 meta box id
+ * （add-jetpack-portfolio-type／add-jetpack-portfolio-tag），不是用猜的。
+ * 只隱藏區塊本身，不刪除任何詞彙資料。
+ */
+add_action( 'admin_head-nav-menus.php', 'chao_gang_cheng_hide_portfolio_taxonomy_nav_menu_boxes' );
+function chao_gang_cheng_hide_portfolio_taxonomy_nav_menu_boxes() {
+    remove_meta_box( 'add-jetpack-portfolio-type', 'nav-menus', 'side' );
+    remove_meta_box( 'add-jetpack-portfolio-tag', 'nav-menus', 'side' );
+}
+
+/**
+ * 把「選單管理」畫面裡 Jetpack Portfolio（作品集）這個自訂文章類型的
+ * 區塊標題，從「文章」改成「新聞」。
+ *
+ * 背景：ckc_rename_portfolio_cpt_labels()（見上面「23. 將後台「專案/
+ * 作品集」自訂文章類型文字改成「文章」」那段）把這個自訂文章類型全站
+ * labels->name 都改成了「文章」，方便編輯者日常操作時把它當「文章」
+ * 使用；但 WordPress 原生真正的「文章 (Posts)」post type 本身仍然存在
+ * （只是後台選單被隱藏，見 ckc_remove_posts_admin_menu()），選單建置
+ * 畫面的「新增選單項目」清單是直接列出所有 show_in_nav_menus 的文章
+ * 類型，不受選單隱藏影響，所以會同時看到兩個一模一樣的「文章」區塊，
+ * 分不出哪個才是實際在用的內容。
+ *
+ * 這裡只針對「選單管理」這一個畫面用 nav_menu_meta_box_object 這個
+ * filter，把 Jetpack Portfolio 這個區塊的標題改顯示為「新聞」，跟另一個
+ * 真正的（但沒在用的）「文章」區塊區分開來。特別注意：這個 filter 拿到
+ * 的 \$object 是全站共用、跟 \$wp_post_types 裡註冊物件同一份參照，如果
+ * 直接改它的 labels->name，會連帶把全站其他地方（選單列、管理列等）
+ * 也一起改掉，跟上面 ckc_rename_portfolio_cpt_labels() 打架；所以這裡
+ * 先 clone 一份（包含巢狀的 labels 物件也要另外 clone），只影響這個
+ * filter 回傳出去的這一份，不動到全站共用的註冊物件本身。
+ */
+add_filter( 'nav_menu_meta_box_object', 'chao_gang_cheng_relabel_portfolio_nav_menu_box' );
+function chao_gang_cheng_relabel_portfolio_nav_menu_box( $object ) {
+    if ( isset( $object->name ) && 'jetpack-portfolio' === $object->name ) {
+        $object          = clone $object;
+        $object->labels  = clone $object->labels;
+        $object->labels->name = '新聞';
+    }
+    return $object;
+}
+
 
 /**
  * 27. 出貨AI助理頁面渲染回呼
