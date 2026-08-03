@@ -5024,12 +5024,15 @@ function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     return $tabs;
 }
 
-add_action( 'admin_notices', 'chao_gang_cheng_debug_show_remaining_tab_keys' );
+// 注意：改用 admin_footer（頁面最後才輸出），而不是 admin_notices
+// （在商品資料面板渲染之前就先跑過了，$GLOBALS 那時候還沒被設定，
+// 用 admin_notices 會抓不到值，導致除錯訊息一直顯示不出來）。
+add_action( 'admin_footer', 'chao_gang_cheng_debug_show_remaining_tab_keys' );
 function chao_gang_cheng_debug_show_remaining_tab_keys() {
     if ( empty( $GLOBALS['ckc_debug_remaining_tab_keys'] ) || ! current_user_can( 'manage_options' ) ) {
         return;
     }
-    echo '<div class="notice notice-info"><p>[CKC 除錯] product_data_tabs 剩餘 keys：' . esc_html( implode( ', ', $GLOBALS['ckc_debug_remaining_tab_keys'] ) ) . '</p></div>';
+    echo '<div class="notice notice-info" style="position:fixed;bottom:20px;right:20px;z-index:99999;max-width:400px;"><p>[CKC 除錯] product_data_tabs 剩餘 keys：' . esc_html( implode( ', ', $GLOBALS['ckc_debug_remaining_tab_keys'] ) ) . '</p></div>';
 }
 
 /**
