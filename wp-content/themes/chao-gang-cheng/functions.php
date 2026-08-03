@@ -5058,6 +5058,22 @@ function chao_gang_cheng_hide_product_addons_tab() {
 }
 
 /**
+ * 移除「商品」選單底下的「附加選項」子選單（WooCommerce Product Add-ons
+ * 外掛的全域附加選項管理頁，slug 是 edit.php?post_type=product&page=addons，
+ * 已從實際後台選單 DOM 確認過這個 page slug，不是用猜的）。
+ *
+ * 用 remove_submenu_page() 精確移除，優先權設 99999：比照本檔案其他
+ * 「移除選單較晚才生效」案例的既有經驗（見
+ * ckc_remove_product_category_from_products_menu() 的註解），較早的
+ * admin_menu 優先權有可能因為外掛更晚才註冊這個子選單而移除不掉，
+ * 優先權設得夠晚才能確保外掛已經把選單加上去之後再移除。
+ */
+add_action( 'admin_menu', 'chao_gang_cheng_remove_product_addons_submenu', 99999 );
+function chao_gang_cheng_remove_product_addons_submenu() {
+    remove_submenu_page( 'edit.php?post_type=product', 'addons' );
+}
+
+/**
  * 移除文章／商品內容編輯器工具列上 Jetpack 的「新增聯絡表單」按鈕
  * （id="insert-jetpack-contact-form"，已從商品編輯畫面實際 DOM 確認過
  * 這個 id，不是用猜的）。只隱藏這顆按鈕本身，不停用 Jetpack 聯絡表單
