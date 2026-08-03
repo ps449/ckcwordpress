@@ -1093,19 +1093,16 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 if (section.querySelector('.fb-video')) { loadFacebookEmbed(); }
             }
 
-            if ('IntersectionObserver' in window) {
-                var observer = new IntersectionObserver(function (entries) {
-                    entries.forEach(function (entry) {
-                        if (entry.isIntersecting) {
-                            loadNeededEmbeds(entry.target);
-                            observer.unobserve(entry.target);
-                        }
-                    });
-                }, { rootMargin: '300px' });
-                sections.forEach(function (s) { observer.observe(s); });
-            } else {
-                sections.forEach(loadNeededEmbeds);
-            }
+            // 注意：這裡原本用 IntersectionObserver 延遲載入，實測發現在正式站
+            // 上 Facebook Video Plugin（.fb-video）完全沒有被觸發載入——SDK
+            // 從頭到尾都沒有請求，畫面上對應的卡片永遠是塌陷的空白（高度 0），
+            // 使用者完全看不到這些影片，找不出 IntersectionObserver 沒有正確
+            // 觸發的確切原因（手動呼叫同一段程式碼是完全正常、可以成功載入並
+            // 渲染的）。與其讓一半的精選影片持續悄悄壞掉，改成頁面一載入完成
+            // 就直接載入，不再依賴 IntersectionObserver 這個延遲載入的中間層；
+            // 這兩個 SDK 都不算重量級資源，直接載入换來的可靠性比延遲載入省下
+            // 的一點效能更重要。
+            sections.forEach(loadNeededEmbeds);
         });
     })();
     </script>
