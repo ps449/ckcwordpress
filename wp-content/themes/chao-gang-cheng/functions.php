@@ -5002,37 +5002,40 @@ function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     unset( $tabs['pinterest_attributes'] );
     unset( $tabs['pinterest_attributes_tab'] ); // 保留以防萬一，不影響其他 key
 
-    // 移除「屬性」「進階」（WooCommerce 內建）與「附加選項」
-    // （WooCommerce Product Add-ons 外掛）三個分頁。
+    // 移除「屬性」「進階」（WooCommerce 內建）兩個分頁。
+    // （「附加選項」分頁改在下面 chao_gang_cheng_hide_product_addons_tab()
+    // 用 CSS 隱藏，原因見該函式註解。）
     // 「屬性」拿掉後不影響前台「規格說明」分頁——那裡已經改成優先讀取
     // 商品編輯畫面新增的可視化編輯器欄位（_ckc_product_specs_html），
     // 沒填才會回退看商品屬性；屬性資料本身不會被刪除，只是分頁不顯示，
     // 之後如需要仍可以把這行拿掉即可恢復。
     unset( $tabs['attribute'] );
     unset( $tabs['advanced'] );
-    unset( $tabs['addons'] );
-    unset( $tabs['addons_tab'] ); // 保留以防猜錯 key，不影響其他 key
-
-    // 除錯用：「附加選項」分頁上一版猜 key 猜錯（試過 addons／
-    // addons_tab 都拿不掉），這裡暫時把當下剩餘的 tabs key 印成一則
-    // 只有管理者看得到的畫面提示，方便直接確認正確 key 是什麼；
-    // 確認後這段連同下面的 admin_notices 掛勾都會移除，不會留在正式版。
-    if ( current_user_can( 'manage_options' ) ) {
-        $GLOBALS['ckc_debug_remaining_tab_keys'] = array_keys( $tabs );
-    }
 
     return $tabs;
 }
 
-// 注意：改用 admin_footer（頁面最後才輸出），而不是 admin_notices
-// （在商品資料面板渲染之前就先跑過了，$GLOBALS 那時候還沒被設定，
-// 用 admin_notices 會抓不到值，導致除錯訊息一直顯示不出來）。
-add_action( 'admin_footer', 'chao_gang_cheng_debug_show_remaining_tab_keys' );
-function chao_gang_cheng_debug_show_remaining_tab_keys() {
-    if ( empty( $GLOBALS['ckc_debug_remaining_tab_keys'] ) || ! current_user_can( 'manage_options' ) ) {
-        return;
-    }
-    echo '<div class="notice notice-info" style="position:fixed;bottom:20px;right:20px;z-index:99999;max-width:400px;"><p>[CKC 除錯] product_data_tabs 剩餘 keys：' . esc_html( implode( ', ', $GLOBALS['ckc_debug_remaining_tab_keys'] ) ) . '</p></div>';
+/**
+ * 「附加選項」分頁（WooCommerce Product Add-ons 外掛）用 CSS 隱藏，
+ * 而不是像上面兩個一樣去 unset woocommerce_product_data_tabs 的 array key。
+ *
+ * 原因：曾經加過 unset( $tabs['addons'] ) / unset( $tabs['addons_tab'] )，
+ * 並用除錯訊息實際印出過濾後的 $tabs 剩餘 key，證實 'addons' 這個 key
+ * 當時就已經不在陣列裡了——但分頁在畫面上還是照樣出現。代表這個外掛
+ * 的分頁根本不是透過 woocommerce_product_data_tabs 這個 filter 陣列
+ * 加上去的，而是用另一套機制直接輸出 DOM，unset 陣列 key 對它沒有
+ * 作用。因此改用實際從畫面 DOM 確認過的 class（li.addons_tab）跟分頁
+ * 內容目標（#product_addons_data）直接用 CSS 隱藏，效果一樣是「後台
+ * 看不到這個分頁」，且不用再猜第二次 array key。
+ */
+add_action( 'admin_head', 'chao_gang_cheng_hide_product_addons_tab' );
+function chao_gang_cheng_hide_product_addons_tab() {
+    echo '<style>
+        .product_data_tabs li.addons_tab,
+        #woocommerce-product-data #product_addons_data {
+            display: none !important;
+        }
+    </style>';
 }
 
 /**
