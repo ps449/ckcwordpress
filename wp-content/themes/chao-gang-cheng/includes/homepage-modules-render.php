@@ -579,14 +579,6 @@ function ckc_render_module_instagram_showcase( $settings ) {
     $subheading = isset( $settings['subheading'] ) ? $settings['subheading'] : '';
     $items      = isset( $settings['items'] ) && is_array( $settings['items'] ) ? $settings['items'] : array();
 
-    // 暫時除錯：前台實測顯示 12 則（等於後台設定 6 則的兩倍），但後台編輯畫面
-    // 讀出來的 items 陣列明明只有 6 筆——先直接印出這個 function 實際收到的
-    // $items 內容跟筆數，確認是這裡收到的資料本身就是 12 筆（例如快取／資料
-    // 不同步），還是資料真的只有 6 筆、卻在後面的邏輯被重複輸出。
-    if ( ! is_admin() && current_user_can( 'manage_options' ) ) {
-        echo '<!-- CKC_DEBUG items count: ' . count( $items ) . ' | ' . esc_html( wp_json_encode( $items ) ) . ' -->';
-    }
-
     // 整理清單：判斷平台（Instagram／Facebook）跟是否為 Reel。
     // - Instagram 一般貼文（/p/）：官方內嵌元件站內直接播放，完全正常。
     // - Instagram Reels（/reel/、/reels/）：官方內嵌元件目前有已知的顯示
@@ -654,6 +646,16 @@ function ckc_render_module_instagram_showcase( $settings ) {
             <div class="instagram-showcase-viewport">
                 <div class="instagram-showcase-track">
                     <?php
+                    // 注意：這裡只輸出每則貼文「一次」——不要在這裡重複輸出一份
+                    // aria-hidden 的複製品。無縫循環捲動的複製品是由下面 JS 的
+                    // initMarquee()（.instagram-showcase-item 全部 cloneNode 一次、
+                    // 加上 aria-hidden）在瀏覽器端自己補上的，PHP 這裡如果也複製
+                    // 一次，會變成「PHP 複製一次 + JS 又複製一次」，跟後台設定的
+                    // 筆數對不上（實測發現後台設定 6 則，卻在畫面 DOM 裡變成 12
+                    // 則，同一部影片出現兩次；使用者誤以為多了兩部沒設定過的
+                    // 影片）。data-item-count 這個屬性也是用 count($entries)
+                    // 這個「未重複」的筆數，跟 JS 的分頁換算邏輯本來就是設計成
+                    // 只需要 PHP 端輸出一份真實項目就好。
                     foreach ( $entries as $entry ) :
                         $hidden_attr = '';
                         if ( 'instagram' === $entry['platform'] && $entry['is_reel'] ) :
