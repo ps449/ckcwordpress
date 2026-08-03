@@ -866,9 +866,16 @@ function ckc_render_module_instagram_showcase( $settings ) {
             var dragStartX = 0;
             var dragStartOffset = 0;
             var DRAG_THRESHOLD = 6;
-            var speed = 40; // px / 秒
-            var lastTs = null;
             var resumeTimer = null;
+
+            // 分頁式自動輪播：改版前是逐幀（requestAnimationFrame）連續平移的
+            // 跑馬燈效果；改版需求是參考網站（Ck Lee Garden）那種一次翻一整頁
+            // 的切換方式，因此拿掉連續位移的 tick()，改成每隔
+            // PAGE_ADVANCE_INTERVAL 用計時器一次跳過「一整組」（畫面上目前
+            // 可見的張數），並沿用跟手動點擊箭頭相同的吸附動畫（withSnapTransition）
+            // 呈現，效果上比較接近一般分頁式輪播元件，而不是連續捲動。
+            var PAGE_ADVANCE_INTERVAL = 4500; // 每頁停留時間（毫秒）
+            var autoAdvanceTimer = null;
 
             function itemsPerSet() {
                 var count = parseInt(wrap.getAttribute('data-item-count'), 10) || 0;
@@ -882,6 +889,14 @@ function ckc_render_module_instagram_showcase( $settings ) {
             function setWidth() {
                 var perSet = itemsPerSet();
                 return perSet > 0 ? perSet * stepWidth() : 0;
+            }
+
+            // 一「頁」＝目前畫面上實際看得到的張數（依螢幕寬度不同，見
+            // layoutWrap() 算出來、存在 wrap.__ckcIgVisibleCount 的響應式值），
+            // 讓自動輪播跟箭頭切換都是「一次翻一整頁」，跟畫面上排版對齊。
+            function pageWidth() {
+                var visible = wrap.__ckcIgVisibleCount || itemsPerSet() || 1;
+                return visible * stepWidth();
             }
 
             function wrapOffset(value) {
@@ -904,20 +919,6 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 updateProgress();
             }
 
-            function tick(ts) {
-                if (!wrap.classList.contains('instagram-showcase-static') && !paused && !dragging) {
-                    if (lastTs !== null) {
-                        var dt = (ts - lastTs) / 1000;
-                        offset = wrapOffset(offset + speed * dt);
-                        applyTransform();
-                    }
-                    lastTs = ts;
-                } else {
-                    lastTs = null;
-                }
-                requestAnimationFrame(tick);
-            }
-
             function pauseTemporarily(duration) {
                 paused = true;
                 if (resumeTimer) { clearTimeout(resumeTimer); }
@@ -925,8 +926,8 @@ function ckc_render_module_instagram_showcase( $settings ) {
             }
 
             // 拖曳／點擊箭頭放開時，套用短暫的 CSS transition 讓位移吸附到最近
-            // 一則的邊界時有平滑的「喀」一下動畫，而不是瞬間跳過去；自動跑馬燈
-            // 逐幀位移不套用這個 transition，避免動畫互相打架。
+            // 一頁的邊界時有平滑的「喀」一下動畫，而不是瞬間跳過去；分頁式自動
+            // 輪播每次跳頁也共用同一個 transition，動畫節奏維持一致。
             function withSnapTransition(fn) {
                 track.classList.add('instagram-showcase-snap');
                 fn();
@@ -936,21 +937,34 @@ function ckc_render_module_instagram_showcase( $settings ) {
             }
 
             function snapToNearest() {
-                var step = stepWidth();
-                if (step <= 0) { return; }
+                var page = pageWidth();
+                if (page <= 0) { return; }
                 withSnapTransition(function () {
-                    offset = wrapOffset(Math.round(offset / step) * step);
+                    offset = wrapOffset(Math.round(offset / page) * page);
                     applyTransform();
                 });
             }
 
             function nudge(direction) {
-                if (setWidth() <= 0) { return; }
+                var page = pageWidth();
+                if (page <= 0) { return; }
                 withSnapTransition(function () {
-                    offset = wrapOffset(offset + direction * stepWidth());
+                    offset = wrapOffset(offset + direction * page);
                     applyTransform();
                 });
                 pauseTemporarily(2500);
+            }
+
+            // 每隔 PAGE_ADVANCE_INTERVAL 檢查一次：沒有在拖曳／暫停中，且項目
+            // 數多到需要捲動（非 static）才翻下一頁；不論這次有沒有實際翻頁，
+            // 都會再排下一次檢查，讓計時器持續運作、支援暫停後自動恢復。
+            function scheduleAutoAdvance() {
+                autoAdvanceTimer = window.setTimeout(function () {
+                    if (!wrap.classList.contains('instagram-showcase-static') && !paused && !dragging) {
+                        nudge(1);
+                    }
+                    scheduleAutoAdvance();
+                }, PAGE_ADVANCE_INTERVAL);
             }
 
             // 手勢方向鎖：手指按下時先不急著判斷是拖曳影片列還是要捲動頁面，
@@ -1049,7 +1063,7 @@ function ckc_render_module_instagram_showcase( $settings ) {
             if (prevBtn) { prevBtn.addEventListener('click', function () { nudge(-1); }); }
             if (nextBtn) { nextBtn.addEventListener('click', function () { nudge(1); }); }
 
-            requestAnimationFrame(tick);
+            scheduleAutoAdvance();
         }
 
         function initAllWraps() {
