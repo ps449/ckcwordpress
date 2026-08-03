@@ -783,6 +783,24 @@ function ckc_render_module_instagram_showcase( $settings ) {
                 if (fbVideo) {
                     var fbWidth = Math.max(220, Math.round(actualFootprint));
                     if (fbVideo.getAttribute('data-width') !== String(fbWidth)) {
+                        // 注意：Facebook 官方 Video Plugin 一旦被解析成真正的
+                        // <iframe> 之後，單純改 data-width 再呼叫一次
+                        // XFBML.parse() 並不會真的重新縮放它——FB 的解析器會
+                        // 直接跳過已經處理過的節點，什麼事都不做。之前沒有
+                        // 處理這個情況，導致只要版面在初次解析「之後」又重新
+                        // 計算過一次寬度（例如網頁字型載入、捲軸出現/消失
+                        // 造成的 resize），這張卡片的 iframe 就會卡在舊寬度、
+                        // 甚至卡在初次解析時期還沒穩定的暫時尺寸，永遠停在
+                        // 0 高度看起來像整個空白（實測過就是這個原因）。
+                        // 修正：如果這個 fb-video 已經被解析成 iframe，先把
+                        // 它清空、拿掉 FB 自己加上的 class，還原成「尚未解析」
+                        // 的乾淨狀態，才更新 data-width，讓等一下的 parse()
+                        // 是真的重新渲染一次，而不是被判定為「已處理」而跳過。
+                        var alreadyRendered = !!fbVideo.querySelector('iframe');
+                        if (alreadyRendered) {
+                            fbVideo.innerHTML = '';
+                            fbVideo.className = 'fb-video';
+                        }
                         fbVideo.setAttribute('data-width', fbWidth);
                         fbNeedsReparse = true;
                     }
