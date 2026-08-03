@@ -4991,7 +4991,7 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
  * 把這兩個 key 移除，而不是去改外掛程式碼。優先權設 999，確保排在外掛
  * 自己掛上去（通常是預設優先權 10）之後執行，才能真的移除得掉。
  */
-add_filter( 'woocommerce_product_data_tabs', 'chao_gang_cheng_remove_product_data_tabs', 999 );
+add_filter( 'woocommerce_product_data_tabs', 'chao_gang_cheng_remove_product_data_tabs', PHP_INT_MAX );
 function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     unset( $tabs['fb_commerce_tab'] );
     // 注意：Pinterest for WooCommerce 實際註冊的 array key 是
@@ -5012,7 +5012,35 @@ function chao_gang_cheng_remove_product_data_tabs( $tabs ) {
     unset( $tabs['advanced'] );
     unset( $tabs['addons'] );
     unset( $tabs['addons_tab'] ); // 保留以防猜錯 key，不影響其他 key
+
+    // 除錯用：「附加選項」分頁上一版猜 key 猜錯（試過 addons／
+    // addons_tab 都拿不掉），這裡暫時把當下剩餘的 tabs key 印成一則
+    // 只有管理者看得到的畫面提示，方便直接確認正確 key 是什麼；
+    // 確認後這段連同下面的 admin_notices 掛勾都會移除，不會留在正式版。
+    if ( current_user_can( 'manage_options' ) ) {
+        $GLOBALS['ckc_debug_remaining_tab_keys'] = array_keys( $tabs );
+    }
+
     return $tabs;
+}
+
+add_action( 'admin_notices', 'chao_gang_cheng_debug_show_remaining_tab_keys' );
+function chao_gang_cheng_debug_show_remaining_tab_keys() {
+    if ( empty( $GLOBALS['ckc_debug_remaining_tab_keys'] ) || ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+    echo '<div class="notice notice-info"><p>[CKC 除錯] product_data_tabs 剩餘 keys：' . esc_html( implode( ', ', $GLOBALS['ckc_debug_remaining_tab_keys'] ) ) . '</p></div>';
+}
+
+/**
+ * 移除文章／商品內容編輯器工具列上 Jetpack 的「新增聯絡表單」按鈕
+ * （id="insert-jetpack-contact-form"，已從商品編輯畫面實際 DOM 確認過
+ * 這個 id，不是用猜的）。只隱藏這顆按鈕本身，不停用 Jetpack 聯絡表單
+ * 模組，不影響網站上其他地方既有的聯絡表單功能。
+ */
+add_action( 'admin_head', 'chao_gang_cheng_hide_jetpack_contact_form_button' );
+function chao_gang_cheng_hide_jetpack_contact_form_button() {
+    echo '<style>#insert-jetpack-contact-form{display:none !important;}</style>';
 }
 
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
