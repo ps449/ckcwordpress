@@ -1624,11 +1624,18 @@ function chao_gang_cheng_product_social_proof() {
         $badge_text = '潮港城 30 年辦桌口碑'; // Default when the field is left empty
     }
 
-    if ( ! $show_sold && $hide_heritage ) {
+    // 溫層徽章（常溫／冷藏／冷凍），只在單一商品頁顯示，跟其他徽章
+    // 共用同一列、同一種樣式，只是各溫層配色不同，方便一眼辨識。
+    $temperature_zone = chao_gang_cheng_get_temperature_zone_info( $product->get_meta( '_ckc_temperature_zone' ) );
+
+    if ( ! $show_sold && $hide_heritage && ! $temperature_zone ) {
         return; // Nothing to show for this product
     }
     ?>
     <div class="chao-social-proof" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px;">
+        <?php if ( $temperature_zone ) : ?>
+            <span style="display: inline-flex; align-items: center; gap: 4px; background: <?php echo esc_attr( $temperature_zone['bg'] ); ?>; color: <?php echo esc_attr( $temperature_zone['color'] ); ?>; border: 1px solid <?php echo esc_attr( $temperature_zone['border'] ); ?>; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;"><?php echo esc_html( $temperature_zone['icon'] . ' ' . $temperature_zone['label'] ); ?></span>
+        <?php endif; ?>
         <?php if ( $show_sold ) : ?>
             <span style="display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;">🔥 已售出 <?php echo esc_html( number_format( $sold ) ); ?> 件</span>
         <?php endif; ?>
@@ -1637,6 +1644,76 @@ function chao_gang_cheng_product_social_proof() {
         <?php endif; ?>
     </div>
     <?php
+}
+
+/**
+ * 溫層（常溫／冷藏／冷凍）的顯示資料（icon、標籤文字、配色）。
+ * 集中定義在這一個函式，前台徽章跟後台下拉選單都從這裡取用同一份
+ * 對照表，避免兩邊文字或選項各自維護、之後改一個地方漏改另一個。
+ *
+ * @param string $zone 儲存在 _ckc_temperature_zone 的值：''｜'ambient'｜'chilled'｜'frozen'
+ * @return array|false 沒有對應資料（例如還沒設定過）時回傳 false
+ */
+function chao_gang_cheng_get_temperature_zone_info( $zone ) {
+    $zones = array(
+        'ambient' => array(
+            'label'  => '常溫',
+            'icon'   => '🌡️',
+            'bg'     => '#fdf6ec',
+            'color'  => '#8a5a2b',
+            'border' => '#f0e0c8',
+        ),
+        'chilled' => array(
+            'label'  => '冷藏',
+            'icon'   => '🧊',
+            'bg'     => '#eef7fb',
+            'color'  => '#2b6a8a',
+            'border' => '#cde6f0',
+        ),
+        'frozen'  => array(
+            'label'  => '冷凍',
+            'icon'   => '❄️',
+            'bg'     => '#eef2fb',
+            'color'  => '#2b3f8a',
+            'border' => '#ccd6f0',
+        ),
+    );
+    return isset( $zones[ $zone ] ) ? $zones[ $zone ] : false;
+}
+
+/**
+ * 後台：商品編輯畫面「商品資料 > 一般」新增「溫層」下拉選單
+ * （常溫／冷藏／冷凍），對應前台 chao_gang_cheng_product_social_proof()
+ * 顯示的徽章。存成 post meta _ckc_temperature_zone，留空（預設「未設定」）
+ * 時前台不顯示這個徽章，不影響既有商品。
+ */
+add_action( 'woocommerce_product_options_general_product_data', 'chao_gang_cheng_temperature_zone_admin_field' );
+function chao_gang_cheng_temperature_zone_admin_field() {
+    echo '<div class="options_group">';
+    woocommerce_wp_select(
+        array(
+            'id'          => '_ckc_temperature_zone',
+            'label'       => '溫層',
+            'options'     => array(
+                ''        => '未設定（前台不顯示徽章）',
+                'ambient' => '常溫',
+                'chilled' => '冷藏',
+                'frozen'  => '冷凍',
+            ),
+            'description' => '設定後會在前台商品頁標題附近顯示對應的溫層徽章。',
+            'desc_tip'    => true,
+        )
+    );
+    echo '</div>';
+}
+
+add_action( 'woocommerce_admin_process_product_object', 'chao_gang_cheng_temperature_zone_save' );
+function chao_gang_cheng_temperature_zone_save( $product ) {
+    $zone = isset( $_POST['_ckc_temperature_zone'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_temperature_zone'] ) ) : '';
+    if ( ! in_array( $zone, array( '', 'ambient', 'chilled', 'frozen' ), true ) ) {
+        $zone = '';
+    }
+    $product->update_meta_data( '_ckc_temperature_zone', $zone );
 }
 
 /**
