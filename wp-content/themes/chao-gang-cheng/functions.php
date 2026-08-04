@@ -5448,6 +5448,30 @@ function chao_gang_cheng_simplify_product_cat_columns( $columns ) {
 }
 
 /**
+ * 同一批「數量下限／數量上限／數量單位」欄位（WooCommerce Min/Max
+ * Quantities 外掛）也會出現在「新增分類」／「編輯分類」表單裡，跟上面
+ * 列表欄位是分開的兩個地方，所以另外用 CSS 隱藏。已從實際表單畫面
+ * 確認過對應 <label for="minimum_quantity">／<label for="maximum_quantity">／
+ * <label for="group_of_quantity">，用 :has() 精準只隱藏這三個欄位的
+ * .form-field 外層，不影響表單裡其他欄位（名稱／代稱／上層分類等）。
+ * 只隱藏 UI，不影響外掛功能或既有分類已設定的數量限制資料。
+ */
+add_action( 'admin_head-edit-tags.php', 'chao_gang_cheng_hide_product_cat_minmax_form_fields' );
+add_action( 'admin_head-term.php', 'chao_gang_cheng_hide_product_cat_minmax_form_fields' );
+function chao_gang_cheng_hide_product_cat_minmax_form_fields() {
+    if ( ! isset( $_GET['taxonomy'] ) || 'product_cat' !== $_GET['taxonomy'] ) {
+        return;
+    }
+    echo '<style>
+        .form-field:has( label[for="minimum_quantity"] ),
+        .form-field:has( label[for="maximum_quantity"] ),
+        .form-field:has( label[for="group_of_quantity"] ) {
+            display: none !important;
+        }
+    </style>';
+}
+
+/**
  * 把「庫存狀態」裡的「延期交貨」（WooCommerce 內建 onbackorder 狀態，
  * 核心英文原文 On backorder）改標籤為「預購商品」，比較貼近餐廳實際
  * 用法（現貨已出完、之後現做現出的商品，用這個狀態代表「開放預購」
