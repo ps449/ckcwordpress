@@ -6154,6 +6154,36 @@ function chao_gang_cheng_discount_badge_css() {
             left: 25px !important; /* Mobile: 15px padding left + 10px */
         }
     }
+
+    /* 修正：上面 .single-product .product span.onsale 選擇器範圍太大，
+       連帶誤傷了商品頁下方「AI 智慧推薦商品／相關商品」格線裡每張
+       卡片的折扣標籤（因為格線裡每個 <li> 也帶有 .product class，
+       跟商品主圖共用同一組選擇器），把標籤位移到 50px（電腦）／
+       30px（手機），跟格線版面的圖片位置對不上，造成跑版。這裡把
+       相關商品／加購商品區塊的標籤位置改回跟一般商品格線一樣的
+       10px，不影響商品主圖本身的標籤定位；電腦/手機都要覆蓋。 */
+    .single-product .related.products span.onsale.chao-onsale,
+    .single-product .up-sells.products span.onsale.chao-onsale,
+    .single-product .cross-sells.products span.onsale.chao-onsale {
+        top: 10px !important;
+        left: 10px !important;
+    }
+    @media (max-width: 992px) {
+        .single-product .related.products span.onsale.chao-onsale,
+        .single-product .up-sells.products span.onsale.chao-onsale,
+        .single-product .cross-sells.products span.onsale.chao-onsale {
+            top: 10px !important;
+            left: 10px !important;
+        }
+    }
+    @media (max-width: 768px) {
+        .single-product .related.products span.onsale.chao-onsale,
+        .single-product .up-sells.products span.onsale.chao-onsale,
+        .single-product .cross-sells.products span.onsale.chao-onsale {
+            top: 10px !important;
+            left: 10px !important;
+        }
+    }
     </style>
     <?php
 }
