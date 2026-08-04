@@ -5452,9 +5452,72 @@ function chao_gang_cheng_relabel_backorder_stock_status( $options ) {
 add_filter( 'woocommerce_get_availability_text', 'chao_gang_cheng_relabel_backorder_availability_text', 10, 2 );
 function chao_gang_cheng_relabel_backorder_availability_text( $availability, $product ) {
     if ( $product && is_a( $product, 'WC_Product' ) && 'onbackorder' === $product->get_stock_status() && '' !== $availability ) {
-        return '預購商品';
+        $note = trim( (string) $product->get_meta( '_ckc_preorder_note' ) );
+        return '預購商品' . ( '' !== $note ? '（' . $note . '）' : '' );
     }
     return $availability;
+}
+
+/**
+ * 「預購商品」自訂備註文字（例如：預計 12/25 起陸續出貨）。
+ * 存成 post meta _ckc_preorder_note，同步顯示在前台「預購商品」文字
+ * 後面（括號附加，見上面 chao_gang_cheng_relabel_backorder_availability_text）。
+ *
+ * 後台：欄位一律都會送出存檔（不用 disabled，避免庫存狀態切換時
+ * 資料被清空），但只有「庫存狀態」目前選到「預購商品」（onbackorder）
+ * 才能打字編輯，其餘狀態用 readonly 反灰鎖定，避免存進跟目前庫存
+ * 狀態矛盾的文字，同時保留舊值方便之後切回預購商品時還在。
+ */
+add_action( 'woocommerce_product_options_stock', 'chao_gang_cheng_preorder_note_admin_field' );
+function chao_gang_cheng_preorder_note_admin_field() {
+    global $product_object;
+    $note = $product_object ? $product_object->get_meta( '_ckc_preorder_note' ) : '';
+    woocommerce_wp_text_input(
+        array(
+            'id'            => '_ckc_preorder_note',
+            'label'         => '預購說明文字',
+            'placeholder'   => '例如：預計 12/25 起陸續出貨',
+            'description'   => '只有庫存狀態選「預購商品」時才能編輯，會同步顯示在前台「預購商品」文字後面；其餘狀態此欄位反灰鎖定。',
+            'desc_tip'      => true,
+            'value'         => $note,
+            'wrapper_class' => 'ckc-preorder-note-field',
+        )
+    );
+}
+
+add_action( 'woocommerce_admin_process_product_object', 'chao_gang_cheng_preorder_note_save' );
+function chao_gang_cheng_preorder_note_save( $product ) {
+    $note = isset( $_POST['_ckc_preorder_note'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_preorder_note'] ) ) : '';
+    $product->update_meta_data( '_ckc_preorder_note', $note );
+}
+
+/**
+ * 後台 JS：「庫存狀態」切換時，即時反灰／解鎖「預購說明文字」欄位
+ * （readonly，非 disabled，確保欄位值仍會隨表單送出、不會遺失）。
+ */
+add_action( 'admin_footer', 'chao_gang_cheng_preorder_note_toggle_script' );
+function chao_gang_cheng_preorder_note_toggle_script() {
+    global $pagenow, $typenow;
+    if ( 'product' !== $typenow || ! in_array( $pagenow, array( 'post.php', 'post-new.php' ), true ) ) {
+        return;
+    }
+    ?>
+    <script>
+    jQuery(function ($) {
+        function ckcTogglePreorderNote() {
+            var checked = $('input[name="_stock_status"]:checked').val();
+            var $field  = $('.ckc-preorder-note-field input[name="_ckc_preorder_note"]');
+            if ('onbackorder' === checked) {
+                $field.prop('readonly', false).css('opacity', '');
+            } else {
+                $field.prop('readonly', true).css('opacity', '0.5');
+            }
+        }
+        $(document).on('change', 'input[name="_stock_status"]', ckcTogglePreorderNote);
+        ckcTogglePreorderNote();
+    });
+    </script>
+    <?php
 }
 
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
