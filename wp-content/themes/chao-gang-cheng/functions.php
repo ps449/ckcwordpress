@@ -5595,6 +5595,126 @@ function chao_gang_cheng_limit_product_type_selector_to_simple( $types ) {
     );
 }
 
+/**
+ * 「廣告審查用主圖」：跟官網真正顯示的主圖（特色圖像 Featured Image，
+ * 可能含優惠標籤／文字疊圖）分開，讓 Google／Meta 商品目錄同步／廣告
+ * 審查改用這張「乾淨」的圖，官網實際顯示的特色圖像完全不受影響。
+ *
+ * 存成 post meta _ckc_ad_review_image_id（附件 ID）。留空＝不啟用，
+ * 兩個通路都照常使用特色圖像，不影響任何既有商品。
+ *
+ * 同步機制：
+ * - Google（Google Listings & Ads）：用該外掛官方提供的
+ *   `woocommerce_gla_product_attribute_values` filter 覆蓋 imageLink，
+ *   這是外掛文件明載、用來覆蓋主圖的正式做法，不是猜的。
+ * - Meta（Facebook for WooCommerce）：這個外掛本身就有內建的「自訂圖片」
+ *   來源機制（meta key _wc_facebook_product_image_source＝custom，
+ *   圖片網址存在 fb_product_image），所以直接寫這兩個 meta 讓外掛自己
+ *   的同步邏輯採用我們這張圖，不用另外重複實作一次 Meta 目錄的圖片
+ *   輸出。這兩個 meta key 是 facebook-for-woocommerce 外掛原始碼裡的
+ *   常數 Products::PRODUCT_IMAGE_SOURCE_META_KEY／
+ *   WC_Facebook_Product::FB_PRODUCT_IMAGE 對應的字串，來源：
+ *   https://github.com/woocommerce/facebook-for-woocommerce
+ *   （若店家自己在「Facebook」分頁手動設定過其他圖片來源，這裡不會
+ *   覆蓋，只有先前是「這個欄位」寫入 custom 來源時，清空欄位才會
+ *   自動還原，避免互相打架）。
+ */
+add_action( 'woocommerce_product_options_general_product_data', 'chao_gang_cheng_ad_review_image_admin_field' );
+function chao_gang_cheng_ad_review_image_admin_field() {
+    global $product_object;
+    $image_id  = $product_object ? (int) $product_object->get_meta( '_ckc_ad_review_image_id' ) : 0;
+    $image_url = $image_id ? wp_get_attachment_image_url( $image_id, 'thumbnail' ) : '';
+    echo '<div class="options_group ckc-ad-review-image-field">';
+    echo '<p class="form-field">';
+    echo '<label>' . esc_html__( '廣告審查用主圖', 'chao-gang-cheng' ) . '</label>';
+    echo '<span style="display:inline-block;vertical-align:middle;">';
+    echo '<img src="' . esc_url( $image_url ) . '" class="ckc-ad-review-image-preview" style="max-width:80px;max-height:80px;display:' . ( $image_id ? 'inline-block' : 'none' ) . ';vertical-align:middle;margin-right:10px;border:1px solid #ddd;" />';
+    echo '<input type="hidden" name="_ckc_ad_review_image_id" class="ckc-ad-review-image-id" value="' . esc_attr( $image_id ) . '" />';
+    echo '<button type="button" class="button ckc-ad-review-image-select">' . esc_html__( '選擇圖片', 'chao-gang-cheng' ) . '</button> ';
+    echo '<button type="button" class="button ckc-ad-review-image-remove" style="' . ( $image_id ? '' : 'display:none;' ) . '">' . esc_html__( '移除圖片', 'chao-gang-cheng' ) . '</button>';
+    echo '</span>';
+    echo '<span class="description" style="display:block;margin-top:6px;">' . esc_html__( '若上傳，Google／Meta 商品目錄同步會改用這張圖片；官網實際顯示的主圖（特色圖像）完全不受影響。留空＝兩個通路都照常使用特色圖像。', 'chao-gang-cheng' ) . '</span>';
+    echo '</p>';
+    echo '</div>';
+}
+
+add_action( 'woocommerce_admin_process_product_object', 'chao_gang_cheng_ad_review_image_save' );
+function chao_gang_cheng_ad_review_image_save( $product ) {
+    $image_id = isset( $_POST['_ckc_ad_review_image_id'] ) ? absint( $_POST['_ckc_ad_review_image_id'] ) : 0;
+    $product->update_meta_data( '_ckc_ad_review_image_id', $image_id );
+
+    if ( $image_id ) {
+        $image_url = wp_get_attachment_image_url( $image_id, 'full' );
+        if ( $image_url ) {
+            $product->update_meta_data( '_wc_facebook_product_image_source', 'custom' );
+            $product->update_meta_data( 'fb_product_image', $image_url );
+            $product->update_meta_data( '_ckc_ad_review_image_drives_fb_source', 'yes' );
+        }
+    } elseif ( 'yes' === $product->get_meta( '_ckc_ad_review_image_drives_fb_source' ) ) {
+        $product->update_meta_data( '_wc_facebook_product_image_source', 'product' );
+        $product->update_meta_data( 'fb_product_image', '' );
+        $product->update_meta_data( '_ckc_ad_review_image_drives_fb_source', '' );
+    }
+}
+
+add_filter( 'woocommerce_gla_product_attribute_values', 'chao_gang_cheng_gla_ad_review_image_override', 10, 3 );
+function chao_gang_cheng_gla_ad_review_image_override( $attributes, $wc_product, $adapter ) {
+    $image_id = $wc_product ? (int) $wc_product->get_meta( '_ckc_ad_review_image_id' ) : 0;
+    if ( $image_id ) {
+        $image_url = wp_get_attachment_image_url( $image_id, 'full' );
+        if ( $image_url ) {
+            $attributes['imageLink'] = $image_url;
+        }
+    }
+    return $attributes;
+}
+
+/**
+ * 後台 JS：「廣告審查用主圖」的媒體庫選圖／移除按鈕（wp.media）。
+ */
+add_action( 'admin_footer', 'chao_gang_cheng_ad_review_image_uploader_script' );
+function chao_gang_cheng_ad_review_image_uploader_script() {
+    global $pagenow, $typenow;
+    if ( 'product' !== $typenow || ! in_array( $pagenow, array( 'post.php', 'post-new.php' ), true ) ) {
+        return;
+    }
+    ?>
+    <script>
+    jQuery(function ($) {
+        var ckcAdReviewFrame;
+        $(document).on('click', '.ckc-ad-review-image-select', function (e) {
+            e.preventDefault();
+            var $wrap = $(this).closest('.ckc-ad-review-image-field');
+            if (ckcAdReviewFrame) {
+                ckcAdReviewFrame.open();
+                return;
+            }
+            ckcAdReviewFrame = wp.media({
+                title: '選擇廣告審查用主圖',
+                button: { text: '使用這張圖片' },
+                multiple: false
+            });
+            ckcAdReviewFrame.on('select', function () {
+                var attachment = ckcAdReviewFrame.state().get('selection').first().toJSON();
+                var previewUrl = ( attachment.sizes && attachment.sizes.thumbnail ) ? attachment.sizes.thumbnail.url : attachment.url;
+                $wrap.find('.ckc-ad-review-image-id').val(attachment.id);
+                $wrap.find('.ckc-ad-review-image-preview').attr('src', previewUrl).show();
+                $wrap.find('.ckc-ad-review-image-remove').show();
+            });
+            ckcAdReviewFrame.open();
+        });
+        $(document).on('click', '.ckc-ad-review-image-remove', function (e) {
+            e.preventDefault();
+            var $wrap = $(this).closest('.ckc-ad-review-image-field');
+            $wrap.find('.ckc-ad-review-image-id').val('');
+            $wrap.find('.ckc-ad-review-image-preview').hide();
+            $(this).hide();
+        });
+    });
+    </script>
+    <?php
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
