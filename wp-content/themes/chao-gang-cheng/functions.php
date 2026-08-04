@@ -5204,7 +5204,7 @@ function chao_gang_cheng_shipping_categories_admin_field() {
     echo '<span style="display:inline-block;vertical-align:middle;">';
     foreach ( $options as $slug => $label ) {
         $checked = in_array( $slug, $selected, true ) ? ' checked="checked"' : '';
-        echo '<label style="display:inline-block !important;float:none !important;width:auto !important;margin-right:16px !important;font-weight:normal;">';
+        echo '<label style="display:inline-block !important;float:none !important;width:auto !important;margin-left:0 !important;margin-right:16px !important;font-weight:normal;">';
         echo '<input type="checkbox" name="_ckc_shipping_categories[]" value="' . esc_attr( $slug ) . '" style="width:auto !important;float:none !important;"' . $checked . '> ' . esc_html( $label );
         echo '</label>';
     }
