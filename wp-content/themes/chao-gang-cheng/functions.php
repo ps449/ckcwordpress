@@ -5435,6 +5435,19 @@ function chao_gang_cheng_hide_jetpack_social_publish_box_row() {
 }
 
 /**
+ * 簡化「商品分類」列表頁面：移除「下限」「上限」「數量單位」三個欄位
+ * （由 WooCommerce Min/Max Quantities 外掛加到 product_cat 分類列表的
+ * 欄位，實際欄位 key 是 min／max／groupof，已從畫面上的欄位標頭
+ * id="min"／id="max"／id="groupof" 確認過，不是用猜的）。只影響列表
+ * 顯示的欄位，不影響這個外掛本身的數量限制功能或既有分類設定的資料。
+ */
+add_filter( 'manage_edit-product_cat_columns', 'chao_gang_cheng_simplify_product_cat_columns', 20 );
+function chao_gang_cheng_simplify_product_cat_columns( $columns ) {
+    unset( $columns['min'], $columns['max'], $columns['groupof'] );
+    return $columns;
+}
+
+/**
  * 把「庫存狀態」裡的「延期交貨」（WooCommerce 內建 onbackorder 狀態，
  * 核心英文原文 On backorder）改標籤為「預購商品」，比較貼近餐廳實際
  * 用法（現貨已出完、之後現做現出的商品，用這個狀態代表「開放預購」
