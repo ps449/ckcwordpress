@@ -5583,6 +5583,18 @@ function chao_gang_cheng_translate_channel_visibility_panel() {
     <?php
 }
 
+/**
+ * 「商品類型」下拉選單只保留「簡單商品」，隱藏組合商品／外部或加盟
+ * 商品／可變商品／產品搭售方案。只影響下拉選單本身可選的項目，
+ * 不會動到既有商品資料；目前商店裡的商品也都已經是簡單商品。
+ */
+add_filter( 'product_type_selector', 'chao_gang_cheng_limit_product_type_selector_to_simple' );
+function chao_gang_cheng_limit_product_type_selector_to_simple( $types ) {
+    return array(
+        'simple' => isset( $types['simple'] ) ? $types['simple'] : __( 'Simple product', 'woocommerce' ),
+    );
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
