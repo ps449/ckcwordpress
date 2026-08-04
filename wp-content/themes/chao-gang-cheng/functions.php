@@ -5419,6 +5419,22 @@ function chao_gang_cheng_hide_downloadable_giftcard_checkboxes() {
 }
 
 /**
+ * 隱藏文章／商品編輯畫面「發佈」區塊裡的「Jetpack Social：未連結」那一列
+ * （沒有連結社群帳號，這行只會一直顯示「未連結」，沒有實際用途）。
+ * 已從實際 DOM 確認過對應元素是 Jetpack 原生輸出的
+ * #publicize（misc-publishing-actions 底下），不是用猜的；只隱藏這個
+ * UI 顯示列，不影響 Jetpack Social 外掛本身或任何既有設定。
+ */
+add_action( 'admin_head', 'chao_gang_cheng_hide_jetpack_social_publish_box_row' );
+function chao_gang_cheng_hide_jetpack_social_publish_box_row() {
+    echo '<style>
+        #publicize.misc-pub-section {
+            display: none !important;
+        }
+    </style>';
+}
+
+/**
  * 把「庫存狀態」裡的「延期交貨」（WooCommerce 內建 onbackorder 狀態，
  * 核心英文原文 On backorder）改標籤為「預購商品」，比較貼近餐廳實際
  * 用法（現貨已出完、之後現做現出的商品，用這個狀態代表「開放預購」
