@@ -446,6 +446,56 @@ function chao_gang_cheng_dequeue_unused_cff_assets() {
 }
 
 /**
+ * Performance Optimization 8: 針對可快取的前台頁面（首頁／商品頁／分類頁／
+ * 一般文章頁）啟用 stale-while-revalidate，訪客可以立即看到（可能稍微過期
+ * 的）快取內容，系統同時在背景重新擷取最新版本，下一位訪客就能看到更新後
+ * 的版本；不會有人被卡著等第一手資料重新產生完成才看到畫面。
+ *
+ * 注意：
+ * 1. 這裡設定的是「頁面本身」（HTML）的 Cache-Control，跟上面
+ *    Performance Optimization 6 設定的靜態資源（CSS/JS/圖片）快取是分開的
+ *    兩件事，不會互相覆蓋。
+ * 2. 只套用在真正「大家看到內容都一樣」的頁面：首頁、商品頁、商品分類／
+ *    標籤頁、一般文章／新聞頁。購物車、結帳、會員中心這些「每個人看到的
+ *    內容都不一樣」的頁面，以及後台、已登入使用者（含管理員預覽），一律
+ *    不套用，避免快取到別人的購物車/訂單資料。
+ * 3. WordPress.com 平台本身也有自己的 Global Edge Cache／Object Cache，
+ *    這兩層是分開運作的；這裡的設定是從網站本身送出正確的
+ *    stale-while-revalidate 標頭，讓平台的邊緣快取、或未來接的任何 CDN，
+ *    只要有遵守標準 HTTP 快取規則，都能套用這個「先給快取、背景更新」的
+ *    行為。
+ */
+add_action( 'send_headers', 'chao_gang_cheng_enable_stale_while_revalidate' );
+function chao_gang_cheng_enable_stale_while_revalidate() {
+	if ( is_admin() || is_user_logged_in() ) {
+		return;
+	}
+	if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+		return;
+	}
+	if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		return;
+	}
+	if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' !== $_SERVER['REQUEST_METHOD'] ) {
+		return;
+	}
+	// 購物車／結帳／會員中心／搜尋結果：每個訪客看到的內容都不一樣或
+	// 依查詢字串而變，不能套用共用快取。
+	if ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() || is_account_page() ) ) {
+		return;
+	}
+	if ( is_search() ) {
+		return;
+	}
+	if ( headers_sent() ) {
+		return;
+	}
+	// 60 秒內視為新鮮；超過 60 秒後的 10 分鐘內，先送出快取內容給訪客，
+	// 同時在背景重新擷取最新版本，供之後的訪客使用。
+	header( 'Cache-Control: public, max-age=60, stale-while-revalidate=600' );
+}
+
+/**
  * Update WooCommerce Cart Fragment via AJAX
  */
 add_filter( 'woocommerce_add_to_cart_fragments', 'chao_gang_cheng_cart_fragments' );
@@ -4870,44 +4920,49 @@ function chao_gang_cheng_filter_by_stock_status( $meta_query, $query ) {
 
 require_once get_template_directory() . '/includes/woocommerce/shop-styles.php';
 
-// 22. Adjust shipping rates for outlying islands (澎湖, 金門, 連江, 綠島, 蘭嶼, 琉球)
-add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_adjust_shipping_rates', 10, 2 );
-function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
+/**
+ * 22a-1. 判斷一個運費 $package 的收件地址是否為離島（澎湖、金門、連江、
+ * 綠島、蘭嶼、琉球）。抽成獨立函式，讓下面 22（離島運費調整）跟 22f
+ * （商品層級的「適用運送類別」限制，離島是其中一個修飾條件）共用同一套
+ * 判斷邏輯，避免兩處各自維護一份、以後修改判斷條件時只改到一邊。
+ */
+function chao_gang_cheng_is_outlying_island_destination( $package ) {
     $destination = isset( $package['destination'] ) ? $package['destination'] : array();
     $state = isset( $destination['state'] ) ? trim( $destination['state'] ) : '';
     $city = isset( $destination['city'] ) ? trim( $destination['city'] ) : '';
     $postcode = isset( $destination['postcode'] ) ? trim( $destination['postcode'] ) : '';
-    
-    $is_outlying = false;
-    
+
     // Check postcode prefix
     $postcode_prefix = substr( $postcode, 0, 3 );
-    if ( in_array( $postcode_prefix, array( '951', '952', '929' ) ) || 
-         ( intval( $postcode_prefix ) >= 880 && intval( $postcode_prefix ) <= 885 ) || 
-         ( intval( $postcode_prefix ) >= 890 && intval( $postcode_prefix ) <= 896 ) || 
+    if ( in_array( $postcode_prefix, array( '951', '952', '929' ) ) ||
+         ( intval( $postcode_prefix ) >= 880 && intval( $postcode_prefix ) <= 885 ) ||
+         ( intval( $postcode_prefix ) >= 890 && intval( $postcode_prefix ) <= 896 ) ||
          ( intval( $postcode_prefix ) >= 209 && intval( $postcode_prefix ) <= 212 ) ) {
-        $is_outlying = true;
+        return true;
     }
-    
+
     // Check state/county name
-    if ( ! $is_outlying ) {
-        $outlying_states = array( '澎湖縣', '金門縣', '連江縣', 'PEN', 'KIN', 'LIE' );
-        if ( in_array( $state, $outlying_states ) ) {
-            $is_outlying = true;
-        }
+    $outlying_states = array( '澎湖縣', '金門縣', '連江縣', 'PEN', 'KIN', 'LIE' );
+    if ( in_array( $state, $outlying_states ) ) {
+        return true;
     }
-    
+
     // Check city name
-    if ( ! $is_outlying ) {
-        $outlying_cities = array( '綠島', '蘭嶼', '琉球' );
-        foreach ( $outlying_cities as $oc ) {
-            if ( strpos( $city, $oc ) !== false ) {
-                $is_outlying = true;
-                break;
-            }
+    $outlying_cities = array( '綠島', '蘭嶼', '琉球' );
+    foreach ( $outlying_cities as $oc ) {
+        if ( strpos( $city, $oc ) !== false ) {
+            return true;
         }
     }
-    
+
+    return false;
+}
+
+// 22. Adjust shipping rates for outlying islands (澎湖, 金門, 連江, 綠島, 蘭嶼, 琉球)
+add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_adjust_shipping_rates', 10, 2 );
+function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
+    $is_outlying = chao_gang_cheng_is_outlying_island_destination( $package );
+
     if ( $is_outlying ) {
         foreach ( $rates as $rate_key => $rate ) {
             if ( 'flat_rate' === $rate->method_id ) {
@@ -4968,13 +5023,21 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
  * 22c. 讓後台商品「運送方式」分頁裡的「運送類別」下拉選單真正對前台結帳
  * 生效，而不再只是一個沒有作用的欄位。
  *
- * 自動建立三個運送類別（如果還不存在的話）：
- *   超商自取 (cvs-pickup)    → 對應「綠界物流 超商取貨」系列
- *   宅配     (home-delivery) → 對應「免費運送 / 單一費率 / 綠界物流 宅配 黑貓」
- *   自取     (self-pickup)   → 對應「自行取貨」(local_pickup)
+ * 自動建立四個運送類別（如果還不存在的話）：
+ *   超商自取 (cvs-pickup)      → 對應「綠界物流 超商取貨」系列
+ *   宅配     (home-delivery)   → 對應「免費運送 / 單一費率 / 綠界物流 宅配 黑貓」
+ *   自取     (self-pickup)     → 對應「自行取貨」(local_pickup)
+ *   離島     (outlying-island) → 修飾條件：客人收件地址是離島時，商品要有
+ *                                 勾選這個才能用「宅配」寄過去（見下面 22f）。
  *
  * 用固定的英文代稱（slug）而非讓 WordPress 自動把中文名稱轉成
  * %e9%9b%a2...這種百分比編碼代稱，避免程式裡比對代稱時不穩定。
+ *
+ * 注意：這個原生的「運送類別」下拉選單本身只能單選，下面 22f 已經改成
+ * 用獨立的核選方塊（可複選）讓商家設定「這件商品適用哪些運送類別」，
+ * 這裡繼續建立這些 term 純粹是保留原生下拉選單可用、並讓已經用過它的
+ * 商品（單選）在還沒手動設定新版核選方塊之前，可以被 22d 的限制邏輯
+ * 當作退回預設值繼續辨識。
  */
 add_action( 'init', 'chao_gang_cheng_ensure_shipping_classes' );
 function chao_gang_cheng_ensure_shipping_classes() {
@@ -4982,9 +5045,10 @@ function chao_gang_cheng_ensure_shipping_classes() {
         return;
     }
     $classes = array(
-        'cvs-pickup'    => '超商自取',
-        'home-delivery' => '宅配',
-        'self-pickup'   => '自取',
+        'cvs-pickup'      => '超商自取',
+        'home-delivery'   => '宅配',
+        'self-pickup'     => '自取',
+        'outlying-island' => '離島',
     );
     foreach ( $classes as $slug => $name ) {
         if ( ! term_exists( $slug, 'product_shipping_class' ) && ! term_exists( $name, 'product_shipping_class' ) ) {
@@ -4994,7 +5058,8 @@ function chao_gang_cheng_ensure_shipping_classes() {
 }
 
 /**
- * 22d. 依購物車內商品的「運送類別」，過濾結帳頁可選的運送方式。
+ * 22d. 依購物車內商品的「適用運送類別」（見下面 22f 的核選方塊欄位），
+ * 過濾結帳頁可選的運送方式。
  *
  * 掛在比 chao_gang_cheng_adjust_shipping_rates()（優先權 10）更後面的
  * 優先權 20，確保離島運費調整、以及「達免運門檻時 7-11 取貨一併免運」
@@ -5002,12 +5067,18 @@ function chao_gang_cheng_ensure_shipping_classes() {
  * 類別把不符合的「方式」整個移除——這樣才不會因為這裡先把 free_shipping
  * 移除掉，反而讓前面判斷「是否達免運資格」的依據消失。
  *
- * 作法：檢查購物車每一項商品的運送類別，換算成「這件商品限定只能用
- * 哪些運送方式」，取所有商品的交集作為這張訂單最終可選方式。商品沒有
- * 設定運送類別（目前絕大多數商品都是這樣）視為不限制，維持原本行為。
- * 如果購物車內商品的運送類別彼此衝突、交集後完全沒有共同可用方式
- * （例如同時有「限自取」跟「限超商取貨」的商品），保守起見不限制、
- * 回傳原本全部方式，避免客人卡在結帳頁完全無法選擇任何運送方式。
+ * 作法：檢查購物車每一項商品「適用運送類別」（可複選：自取／超商自取／
+ * 宅配／離島），換算成「這件商品在目前這張訂單允許用哪些運送方式」，
+ * 取所有商品的交集作為這張訂單最終可選方式。商品沒有設定任何類別（多數
+ * 商品目前是這樣）視為不限制，維持原本行為。如果購物車內商品彼此衝突、
+ * 交集後完全沒有共同可用方式（例如同時有「限自取」跟「限超商取貨」的
+ * 商品），保守起見不限制、回傳原本全部方式，避免客人卡在結帳頁完全無法
+ * 選擇任何運送方式。
+ *
+ * 「離島」是修飾條件，不是獨立的運送方式：只有在客人收件地址確實是離島
+ * 時才會生效——這時商品的「宅配」資格必須同時也勾選「離島」才算數，否則
+ * 這件商品在離島訂單裡就不允許用宅配（但自取／超商自取類別不受此影響，
+ * 因為那兩種本來就跟收件地址無關）。
  */
 add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_restrict_rates_by_shipping_class', 20, 2 );
 function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
@@ -5021,31 +5092,6 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
         'self-pickup'   => array( 'exact' => array( 'local_pickup' ) ),
     );
 
-    $required_classes = array();
-
-    foreach ( $package['contents'] as $item ) {
-        if ( empty( $item['product_id'] ) ) {
-            continue;
-        }
-        $product = wc_get_product( $item['product_id'] );
-        if ( ! $product ) {
-            continue;
-        }
-        $shipping_class = $product->get_shipping_class(); // term slug，沒設定時為空字串
-
-        if ( '' === $shipping_class || ! isset( $method_groups[ $shipping_class ] ) ) {
-            // 沒設定運送類別、或用的是本功能不認識的類別（例如既有的
-            // 「離島」類別），視為不限制此商品的運送方式。
-            continue;
-        }
-
-        $required_classes[ $shipping_class ] = true;
-    }
-
-    if ( empty( $required_classes ) ) {
-        return $rates;
-    }
-
     $method_matches_group = function ( $method_id, $group ) {
         if ( isset( $group['prefix'] ) && false !== strpos( $method_id, $group['prefix'] ) ) {
             return true;
@@ -5056,26 +5102,126 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
         return false;
     };
 
-    $filtered_rates = array();
-    foreach ( $rates as $rate_key => $rate ) {
-        $keep = true;
-        foreach ( array_keys( $required_classes ) as $class_slug ) {
-            if ( ! $method_matches_group( $rate->method_id, $method_groups[ $class_slug ] ) ) {
-                $keep = false;
-                break;
+    $is_outlying        = chao_gang_cheng_is_outlying_island_destination( $package );
+    $allowed_rate_keys  = null; // null = 目前為止沒有任何商品限制過運送方式
+
+    foreach ( $package['contents'] as $item ) {
+        if ( empty( $item['product_id'] ) ) {
+            continue;
+        }
+        $product = wc_get_product( $item['product_id'] );
+        if ( ! $product ) {
+            continue;
+        }
+
+        $categories = chao_gang_cheng_get_product_shipping_categories( $product );
+        if ( empty( $categories ) ) {
+            continue; // 沒設定運送類別，不限制此商品的運送方式。
+        }
+
+        // 「離島」是修飾條件，本身不對應任何運送方式；目的地是離島時，
+        // 商品若沒有勾選「離島」，就把「宅配」從這件商品允許的類別中移除。
+        $active_groups = array_diff( $categories, array( 'outlying-island' ) );
+        if ( $is_outlying && in_array( 'home-delivery', $active_groups, true )
+            && ! in_array( 'outlying-island', $categories, true ) ) {
+            $active_groups = array_diff( $active_groups, array( 'home-delivery' ) );
+        }
+
+        if ( empty( $active_groups ) ) {
+            // 這件商品在目前收件地址下沒有任何允許的運送方式，保守起見
+            // 不限制此商品（避免整張訂單被鎖死選不了任何運送方式）。
+            continue;
+        }
+
+        $item_allowed_keys = array();
+        foreach ( $rates as $rate_key => $rate ) {
+            foreach ( $active_groups as $group_slug ) {
+                if ( isset( $method_groups[ $group_slug ] ) && $method_matches_group( $rate->method_id, $method_groups[ $group_slug ] ) ) {
+                    $item_allowed_keys[ $rate_key ] = true;
+                    break;
+                }
             }
         }
-        if ( $keep ) {
-            $filtered_rates[ $rate_key ] = $rate;
+
+        if ( null === $allowed_rate_keys ) {
+            $allowed_rate_keys = $item_allowed_keys;
+        } else {
+            $allowed_rate_keys = array_intersect_key( $allowed_rate_keys, $item_allowed_keys );
         }
     }
 
-    if ( empty( $filtered_rates ) ) {
-        // 交集為空（購物車內商品的運送類別彼此衝突），保守起見不限制。
+    if ( null === $allowed_rate_keys || empty( $allowed_rate_keys ) ) {
+        // 沒有任何商品限制過運送方式，或購物車內商品彼此衝突、交集為空
+        // ——兩種情況都保守起見不限制，回傳原本全部方式。
         return $rates;
     }
 
-    return $filtered_rates;
+    return array_intersect_key( $rates, $allowed_rate_keys );
+}
+
+/**
+ * 22f. 商品「運送方式」分頁：新增「適用運送類別」核選方塊（可複選），
+ * 取代原生「運送類別」下拉選單只能單選的限制。
+ *
+ * 儲存成獨立的 _ckc_shipping_categories 商品 meta（字串陣列），跟原生的
+ * shipping_class 分類法分開存放，兩者互不影響：
+ *   - 原生「運送類別」下拉選單繼續保留（給需要依類別設定運費的其他外掛/
+ *     邏輯使用），但不再是這裡限制運送方式的依據。
+ *   - 這裡的核選方塊才是 22d 用來判斷「這件商品適用哪些運送方式」的
+ *     依據；全部不勾選＝不限制（維持目前多數商品的預設行為）。
+ *
+ * 讀取時如果商品從來沒有存過這個 meta（_ckc_shipping_categories 不是
+ * 陣列），退回讀取原生單選 shipping_class 當作預設值，讓已經用舊版
+ * 下拉選單設定過的商品行為不會被這次改版打斷；一旦商家在這個新欄位按過
+ * 一次「更新」，就一律以這個欄位（可能是空陣列＝不限制）為準。
+ */
+function chao_gang_cheng_get_product_shipping_categories( $product ) {
+    $meta = $product->get_meta( '_ckc_shipping_categories' );
+    if ( is_array( $meta ) ) {
+        return $meta;
+    }
+    $legacy_class = $product->get_shipping_class(); // term slug，沒設定時為空字串
+    $legacy_valid = array( 'cvs-pickup', 'home-delivery', 'self-pickup', 'outlying-island' );
+    if ( '' !== $legacy_class && in_array( $legacy_class, $legacy_valid, true ) ) {
+        return array( $legacy_class );
+    }
+    return array();
+}
+
+add_action( 'woocommerce_product_options_shipping', 'chao_gang_cheng_shipping_categories_admin_field' );
+function chao_gang_cheng_shipping_categories_admin_field() {
+    global $product_object;
+    $selected = $product_object ? chao_gang_cheng_get_product_shipping_categories( $product_object ) : array();
+    $options  = array(
+        'self-pickup'     => '自取',
+        'cvs-pickup'      => '超商自取',
+        'home-delivery'   => '宅配',
+        'outlying-island' => '離島（此商品可寄送到離島）',
+    );
+    echo '<div class="options_group ckc-shipping-categories">';
+    echo '<p class="form-field">';
+    echo '<label>' . esc_html__( '適用運送類別', 'chao-gang-cheng' ) . '</label>';
+    echo '<span style="display:inline-block;vertical-align:middle;">';
+    foreach ( $options as $slug => $label ) {
+        $checked = in_array( $slug, $selected, true ) ? ' checked="checked"' : '';
+        echo '<label style="display:inline-block;margin-right:16px;font-weight:normal;">';
+        echo '<input type="checkbox" name="_ckc_shipping_categories[]" value="' . esc_attr( $slug ) . '"' . $checked . '> ' . esc_html( $label );
+        echo '</label>';
+    }
+    echo '</span>';
+    echo '<span class="description" style="display:block;margin-top:6px;">' . esc_html__( '可複選；全部不勾選＝不限制運送方式（結帳頁照常顯示所有運送方式）。勾選後，前台結帳只會顯示符合這些類別的運送方式。「離島」只有在客人收件地址確實是離島時才會被檢查：這時「宅配」要同時也勾選「離島」才能用宅配寄送。', 'chao-gang-cheng' ) . '</span>';
+    echo '</p>';
+    echo '</div>';
+}
+
+add_action( 'woocommerce_admin_process_product_object', 'chao_gang_cheng_shipping_categories_save' );
+function chao_gang_cheng_shipping_categories_save( $product ) {
+    $valid = array( 'self-pickup', 'cvs-pickup', 'home-delivery', 'outlying-island' );
+    $raw   = isset( $_POST['_ckc_shipping_categories'] ) && is_array( $_POST['_ckc_shipping_categories'] )
+        ? wp_unslash( $_POST['_ckc_shipping_categories'] )
+        : array();
+    $sanitized = array_values( array_intersect( $valid, array_map( 'sanitize_text_field', $raw ) ) );
+    $product->update_meta_data( '_ckc_shipping_categories', $sanitized );
 }
 
 /**
