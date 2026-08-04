@@ -1674,18 +1674,21 @@ function chao_gang_cheng_product_social_proof() {
         $badge_text = '潮港城 30 年辦桌口碑'; // Default when the field is left empty
     }
 
-    // 溫層徽章（常溫／冷藏／冷凍），只在單一商品頁顯示，跟其他徽章
+    // 溫層徽章（常溫／冷藏／冷凍，可複選），只在單一商品頁顯示，跟其他徽章
     // 共用同一列、同一種樣式，只是各溫層配色不同，方便一眼辨識。
-    $temperature_zone = chao_gang_cheng_get_temperature_zone_info( $product->get_meta( '_ckc_temperature_zone' ) );
+    $temperature_zones = chao_gang_cheng_get_product_temperature_zones( $product );
 
-    if ( ! $show_sold && $hide_heritage && ! $temperature_zone ) {
+    if ( ! $show_sold && $hide_heritage && empty( $temperature_zones ) ) {
         return; // Nothing to show for this product
     }
     ?>
     <div class="chao-social-proof" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px;">
-        <?php if ( $temperature_zone ) : ?>
-            <span style="display: inline-flex; align-items: center; gap: 4px; background: <?php echo esc_attr( $temperature_zone['bg'] ); ?>; color: <?php echo esc_attr( $temperature_zone['color'] ); ?>; border: 1px solid <?php echo esc_attr( $temperature_zone['border'] ); ?>; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;"><?php echo esc_html( $temperature_zone['icon'] . ' ' . $temperature_zone['label'] ); ?></span>
-        <?php endif; ?>
+        <?php foreach ( $temperature_zones as $tz_slug ) : ?>
+            <?php $tz_info = chao_gang_cheng_get_temperature_zone_info( $tz_slug ); ?>
+            <?php if ( $tz_info ) : ?>
+                <span style="display: inline-flex; align-items: center; gap: 4px; background: <?php echo esc_attr( $tz_info['bg'] ); ?>; color: <?php echo esc_attr( $tz_info['color'] ); ?>; border: 1px solid <?php echo esc_attr( $tz_info['border'] ); ?>; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;"><?php echo esc_html( $tz_info['icon'] . ' ' . $tz_info['label'] ); ?></span>
+            <?php endif; ?>
+        <?php endforeach; ?>
         <?php if ( $show_sold ) : ?>
             <span style="display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;">🔥 已售出 <?php echo esc_html( number_format( $sold ) ); ?> 件</span>
         <?php endif; ?>
@@ -1732,38 +1735,125 @@ function chao_gang_cheng_get_temperature_zone_info( $zone ) {
 }
 
 /**
- * 後台：商品編輯畫面「商品資料 > 一般」新增「溫層」下拉選單
- * （常溫／冷藏／冷凍），對應前台 chao_gang_cheng_product_social_proof()
- * 顯示的徽章。存成 post meta _ckc_temperature_zone，留空（預設「未設定」）
- * 時前台不顯示這個徽章，不影響既有商品。
+ * 讀取商品「可用溫層」清單（可複選）。優先讀新的複選欄位
+ * _ckc_temperature_zones（陣列），沒有設定時回退到舊的單選欄位
+ * _ckc_temperature_zone，確保既有商品資料不會因為升級而消失。
+ * 回傳空陣列 = 未設定／不限制（前台不顯示徽章，購物車溫層檢查也略過）。
+ *
+ * @param WC_Product $product
+ * @return array
+ */
+function chao_gang_cheng_get_product_temperature_zones( $product ) {
+    if ( ! $product ) {
+        return array();
+    }
+    $meta = $product->get_meta( '_ckc_temperature_zones' );
+    if ( is_array( $meta ) && ! empty( $meta ) ) {
+        return $meta;
+    }
+    $legacy = $product->get_meta( '_ckc_temperature_zone' );
+    if ( is_string( $legacy ) && in_array( $legacy, array( 'ambient', 'chilled', 'frozen' ), true ) ) {
+        return array( $legacy );
+    }
+    return array();
+}
+
+/**
+ * 後台：商品編輯畫面「商品資料 > 一般」新增「溫層」複選核取方塊
+ * （常溫／冷藏／冷凍，可複選），對應前台 chao_gang_cheng_product_social_proof()
+ * 顯示的徽章，也是購物車溫層衝突檢查的依據。存成 post meta
+ * _ckc_temperature_zones（陣列），全部不勾選＝未設定，不影響既有商品。
+ *
+ * 注意：checkbox 的 label 樣式一定要用 !important 覆蓋
+ * WooCommerce 預設 .form-field label 的 float:left / width:150px /
+ * margin-left:-150px，不然多個 label 會互相重疊、外層 span 寬度塌陷成 0
+ * （運送類別欄位第一版就是踩了這個坑）。
  */
 add_action( 'woocommerce_product_options_general_product_data', 'chao_gang_cheng_temperature_zone_admin_field' );
 function chao_gang_cheng_temperature_zone_admin_field() {
-    echo '<div class="options_group">';
-    woocommerce_wp_select(
-        array(
-            'id'          => '_ckc_temperature_zone',
-            'label'       => '溫層',
-            'options'     => array(
-                ''        => '未設定（前台不顯示徽章）',
-                'ambient' => '常溫',
-                'chilled' => '冷藏',
-                'frozen'  => '冷凍',
-            ),
-            'description' => '設定後會在前台商品頁標題附近顯示對應的溫層徽章。',
-            'desc_tip'    => true,
-        )
+    global $product_object;
+    $selected = $product_object ? chao_gang_cheng_get_product_temperature_zones( $product_object ) : array();
+    $options  = array(
+        'ambient' => '常溫',
+        'chilled' => '冷藏',
+        'frozen'  => '冷凍',
     );
+    echo '<div class="options_group ckc-temperature-zones">';
+    echo '<p class="form-field">';
+    echo '<label>' . esc_html__( '溫層', 'chao-gang-cheng' ) . '</label>';
+    echo '<span style="display:inline-block;vertical-align:middle;">';
+    foreach ( $options as $slug => $label ) {
+        $checked = in_array( $slug, $selected, true ) ? ' checked="checked"' : '';
+        echo '<label style="display:inline-block !important;float:none !important;width:auto !important;margin-left:0 !important;margin-right:16px !important;font-weight:normal;">';
+        echo '<input type="checkbox" name="_ckc_temperature_zones[]" value="' . esc_attr( $slug ) . '" style="width:auto !important;float:none !important;"' . $checked . '> ' . esc_html( $label );
+        echo '</label>';
+    }
+    echo '</span>';
+    echo '<span class="description" style="display:block;margin-top:6px;">' . esc_html__( '可複選；全部不勾選＝不限制（前台不顯示溫層徽章）。同一張訂單裡的商品若沒有共同溫層（例如一個只標常溫、一個只標冷凍），結帳時會被擋下並提示客人分開下單。', 'chao-gang-cheng' ) . '</span>';
+    echo '</p>';
     echo '</div>';
 }
 
 add_action( 'woocommerce_admin_process_product_object', 'chao_gang_cheng_temperature_zone_save' );
 function chao_gang_cheng_temperature_zone_save( $product ) {
-    $zone = isset( $_POST['_ckc_temperature_zone'] ) ? sanitize_text_field( wp_unslash( $_POST['_ckc_temperature_zone'] ) ) : '';
-    if ( ! in_array( $zone, array( '', 'ambient', 'chilled', 'frozen' ), true ) ) {
-        $zone = '';
+    $valid = array( 'ambient', 'chilled', 'frozen' );
+    $raw   = isset( $_POST['_ckc_temperature_zones'] ) && is_array( $_POST['_ckc_temperature_zones'] )
+        ? wp_unslash( $_POST['_ckc_temperature_zones'] )
+        : array();
+    $sanitized = array_values( array_intersect( $valid, array_map( 'sanitize_text_field', $raw ) ) );
+    $product->update_meta_data( '_ckc_temperature_zones', $sanitized );
+}
+
+/**
+ * 購物車溫層衝突檢查：同一張訂單裡的商品，若各自標注的溫層彼此沒有
+ * 交集（例如一個只標常溫、一個只標冷凍），視為衝突，需請客人分開下單。
+ * 沒有標注溫層（回傳空陣列）的商品視為不限制，不會縮小交集範圍。
+ *
+ * @return bool true = 有衝突
+ */
+function chao_gang_cheng_get_cart_temperature_conflict() {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        return false;
     }
-    $product->update_meta_data( '_ckc_temperature_zone', $zone );
+    $common      = null;
+    $constrained = false;
+    foreach ( WC()->cart->get_cart() as $cart_item ) {
+        if ( empty( $cart_item['product_id'] ) ) {
+            continue;
+        }
+        $product = wc_get_product( $cart_item['product_id'] );
+        if ( ! $product ) {
+            continue;
+        }
+        $zones = chao_gang_cheng_get_product_temperature_zones( $product );
+        if ( empty( $zones ) ) {
+            continue; // 未設定溫層＝不限制，不參與交集運算
+        }
+        $constrained = true;
+        $common      = ( null === $common ) ? $zones : array_intersect( $common, $zones );
+    }
+    return ( $constrained && null !== $common && empty( $common ) );
+}
+
+/**
+ * 購物車／結帳頁面提示：溫層衝突時顯示錯誤訊息（不會擋下，只是提醒，
+ * 實際擋下是靠 woocommerce_after_checkout_validation）。
+ */
+add_action( 'woocommerce_check_cart_items', 'chao_gang_cheng_notice_temperature_zone_conflict' );
+function chao_gang_cheng_notice_temperature_zone_conflict() {
+    if ( chao_gang_cheng_get_cart_temperature_conflict() ) {
+        wc_add_notice( '購物車內的商品溫層不同（例如常溫與冷凍無法同時出貨），請分開下單。', 'error' );
+    }
+}
+
+/**
+ * 結帳送出時強制擋下：溫層衝突就不允許送出訂單。
+ */
+add_action( 'woocommerce_after_checkout_validation', 'chao_gang_cheng_validate_temperature_zone_checkout', 10, 2 );
+function chao_gang_cheng_validate_temperature_zone_checkout( $data, $errors ) {
+    if ( chao_gang_cheng_get_cart_temperature_conflict() ) {
+        $errors->add( 'validation', '購物車內的商品溫層不同（例如常溫與冷凍無法同時出貨），請分開下單。' );
+    }
 }
 
 /**
