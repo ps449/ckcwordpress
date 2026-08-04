@@ -53,9 +53,9 @@ function chao_gang_cheng_setup() {
 
 	// Register Navigation Menus.
 	register_nav_menus( array(
-		'primary'             => esc_html__( 'Primary Menu', 'chao-gang-cheng' ),
-		'footer'              => esc_html__( 'Footer Menu', 'chao-gang-cheng' ),
-		'homepage-categories' => esc_html__( 'Homepage Category Showcase', 'chao-gang-cheng' ),
+		'primary'             => esc_html__( '主選單', 'chao-gang-cheng' ),
+		'footer'              => esc_html__( '頁尾選單', 'chao-gang-cheng' ),
+		'homepage-categories' => esc_html__( '首頁/分類管理/商品分類', 'chao-gang-cheng' ),
 	) );
 
 	// Switch default core markup for search form, comment form, and comments to output valid HTML5.
@@ -5649,6 +5649,38 @@ function chao_gang_cheng_limit_product_type_selector_to_simple( $types ) {
 }
 
 /**
+ * 副作用修復：上面把「商品類型」下拉選單只留下「簡單商品」之後，
+ * WooCommerce Product Bundles 外掛自己的顯示/隱藏切換邏輯抓不到
+ * 「搭售方案」這個選項，導致它專屬（只給搭售方案用）的幾個欄位
+ * 沒被正確隱藏，在簡單商品編輯畫面裡跟簡單商品自己的欄位重複出現
+ * （最明顯的是「虛擬」核取方塊出現兩次）。
+ *
+ * 已從實際 DOM 逐一確認過，以下這幾個都是「只給搭售方案用、不含
+ * show_if_simple」的欄位，不是簡單商品也會用到的共用欄位（例如
+ * 「庫存」分頁本身是兩種類型共用，不在這個清單裡，不會被誤隱藏）：
+ * label[for="_virtual_bundle"]（虛擬，重複的那個）、
+ * .bundled_products_tab（搭售產品分頁）、.bundle_stock_msg、
+ * ._wc_pb_sold_individually_field（限購一件）、
+ * .options_group.bundle_type（搭售方案類型）、
+ * ._wc_pb_aggregate_weight_field（組裝後重量）。
+ * 既然這個商店已經不能建立搭售方案商品了，這些欄位永遠用不到，
+ * 直接隱藏是安全的。
+ */
+add_action( 'admin_head', 'chao_gang_cheng_hide_orphaned_bundle_only_fields' );
+function chao_gang_cheng_hide_orphaned_bundle_only_fields() {
+    echo '<style>
+        label[for="_virtual_bundle"],
+        .bundled_products_tab,
+        .bundle_stock_msg,
+        ._wc_pb_sold_individually_field,
+        .options_group.bundle_type,
+        ._wc_pb_aggregate_weight_field {
+            display: none !important;
+        }
+    </style>';
+}
+
+/**
  * 「廣告審查用主圖」：跟官網真正顯示的主圖（特色圖像 Featured Image，
  * 可能含優惠標籤／文字疊圖）分開，讓 Google／Meta 商品目錄同步／廣告
  * 審查改用這張「乾淨」的圖，官網實際顯示的特色圖像完全不受影響。
@@ -9991,3 +10023,5 @@ function chao_gang_cheng_conditional_product_addons_assets() {
     wp_dequeue_script( 'woocommerce-addons-validation' );
     wp_dequeue_script( 'jquery-ui-datepicker' );
 }
+// 載入 Facebook for WooCommerce / Google 商品分類中文化腳本
+require_once get_template_directory() . '/includes/ckc-google-category-translation.php';
