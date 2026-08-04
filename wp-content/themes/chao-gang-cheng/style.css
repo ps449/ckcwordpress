@@ -3600,68 +3600,23 @@ body.show-register-form .u-column1.col-1 {
   width: 100% !important;
 }
 
-/* --- Category Hero Banner styling --- */
+/* --- Category Hero Banner styling ---
+ * 純圖片橫幅：不疊加深色圖層、不疊加文字（分類標題/說明已經在
+ * banner 下方的頁面標題重複顯示過，這裡不用再疊字），後台可從
+ * 「編輯分類」頁面設定專屬橫幅圖片（見 includes/admin/category-banner.php）。
+ */
 .category-hero-banner {
   background-size: cover;
   background-position: center;
   height: 300px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--white);
+  width: 100%;
   margin-bottom: 40px;
-  position: relative;
-  width: 100%;
-}
-
-.category-hero-banner::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.45); /* Dark overlay for readability */
-  z-index: 1;
-}
-
-.category-hero-banner .banner-content {
-  max-width: 800px;
-  padding: 0 20px;
-  position: relative;
-  z-index: 2;
-}
-
-.category-hero-banner .banner-title {
-  font-size: 38px;
-  font-weight: 700;
-  color: var(--white) !important;
-  margin-top: 0;
-  margin-bottom: 12px;
-  letter-spacing: 2px;
-  text-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
-
-.category-hero-banner .banner-desc {
-  font-size: 16px;
-  color: rgba(255,255,255,0.9);
-  margin: 0;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  line-height: 1.6;
 }
 
 @media (max-width: 768px) {
   .category-hero-banner {
     height: 200px;
     margin-bottom: 25px;
-  }
-  .category-hero-banner .banner-title {
-    font-size: 26px;
-    margin-bottom: 8px;
-  }
-  .category-hero-banner .banner-desc {
-    font-size: 13px;
   }
 }
 
@@ -5753,17 +5708,6 @@ ul.products.list-view li.product a.add_to_cart_button {
   .category-hero-banner {
     height: 240px !important;
     margin-bottom: 20px !important;
-  }
-
-  .category-hero-banner .banner-title {
-    font-size: 30px !important;
-    letter-spacing: 1.5px !important;
-    margin-bottom: 8px !important;
-  }
-
-  .category-hero-banner .banner-desc {
-    font-size: 14px !important;
-    line-height: 1.5 !important;
   }
 
   /* --- Shop Archive Page Wrapper --- */

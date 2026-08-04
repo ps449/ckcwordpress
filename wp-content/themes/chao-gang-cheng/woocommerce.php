@@ -66,15 +66,9 @@ get_header(); ?>
     }
     ?>
 
+    <?php // 純 Banner 圖片，不疊加深色圖層也不疊加文字（標題/說明已經在下方 woocommerce_content() 的頁面標題重複顯示過一次，這裡不用再疊一次）。 ?>
     <?php if ( $banner_image_url ) : ?>
-        <div class="category-hero-banner" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('<?php echo esc_url( $banner_image_url ); ?>');">
-            <div class="banner-content">
-                <h1 class="banner-title"><?php echo esc_html( $banner_title ); ?></h1>
-                <?php if ( $banner_desc ) : ?>
-                    <p class="banner-desc"><?php echo esc_html( $banner_desc ); ?></p>
-                <?php endif; ?>
-            </div>
-        </div>
+        <div class="category-hero-banner" style="background-image: url('<?php echo esc_url( $banner_image_url ); ?>');"></div>
     <?php endif; ?>
 
     <div class="woocommerce-page-wrapper archive-layout">
