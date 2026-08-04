@@ -5520,6 +5520,69 @@ function chao_gang_cheng_preorder_note_toggle_script() {
     <?php
 }
 
+/**
+ * 「Google Listings & Ads」外掛的「Channel visibility」面板是獨立的
+ * React 元件（#channel_visibility .gla_meta_box），文字是外掛自己的
+ * JS 語言包，不是我們主題可以直接用 gettext filter 攔截的 PHP 字串，
+ * 所以改用 MutationObserver 在文字實際渲染出來後就地替換成中文。
+ * 只掃描這個面板本身（#channel_visibility），不影響頁面其他地方；
+ * 使用者切換下拉選單時 React 會重新渲染，observer 會自動再翻譯一次。
+ */
+add_action( 'admin_footer', 'chao_gang_cheng_translate_channel_visibility_panel' );
+function chao_gang_cheng_translate_channel_visibility_panel() {
+    global $pagenow, $typenow;
+    if ( 'product' !== $typenow || ! in_array( $pagenow, array( 'post.php', 'post-new.php' ), true ) ) {
+        return;
+    }
+    ?>
+    <script>
+    (function () {
+        var map = {
+            'Channel visibility':      '頻道顯示狀態',
+            'Sync and show':           '同步並顯示',
+            "Don't Sync and show":     '不同步也不顯示'
+        };
+        function translateWithin( root ) {
+            if ( ! root ) { return; }
+            var walker = document.createTreeWalker( root, NodeFilter.SHOW_TEXT, null );
+            var node;
+            while ( ( node = walker.nextNode() ) ) {
+                var text = node.nodeValue.trim();
+                if ( map[ text ] ) {
+                    node.nodeValue = map[ text ];
+                }
+            }
+            root.querySelectorAll( 'option' ).forEach( function ( opt ) {
+                var t = opt.textContent.trim();
+                if ( map[ t ] ) {
+                    opt.textContent = map[ t ];
+                }
+            } );
+        }
+        function init() {
+            var panel = document.getElementById( 'channel_visibility' );
+            if ( ! panel ) {
+                return false;
+            }
+            translateWithin( panel );
+            new MutationObserver( function () {
+                translateWithin( panel );
+            } ).observe( panel, { childList: true, subtree: true, characterData: true } );
+            return true;
+        }
+        if ( ! init() ) {
+            var bodyObserver = new MutationObserver( function () {
+                if ( init() ) {
+                    bodyObserver.disconnect();
+                }
+            } );
+            bodyObserver.observe( document.body, { childList: true, subtree: true } );
+        }
+    })();
+    </script>
+    <?php
+}
+
 // 23. Guest checkout by default: "Create an account" checkbox unchecked (Baymard: forced account creation causes ~25% checkout abandonment)
 add_filter( 'woocommerce_create_account_default_checked', '__return_false' );
 
