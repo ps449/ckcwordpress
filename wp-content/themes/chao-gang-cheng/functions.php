@@ -6027,7 +6027,19 @@ function chao_gang_cheng_rename_woocommerce_home_submenu() {
  */
 add_action( 'admin_menu', 'chao_gang_cheng_remove_product_attributes_submenu', 9999 );
 function chao_gang_cheng_remove_product_attributes_submenu() {
-    remove_submenu_page( 'edit.php?post_type=product', 'edit.php?post_type=product&page=product_attributes' );
+    global $submenu;
+    $parent_slug = 'edit.php?post_type=product';
+    if ( empty( $submenu[ $parent_slug ] ) || ! is_array( $submenu[ $parent_slug ] ) ) {
+        return;
+    }
+    foreach ( $submenu[ $parent_slug ] as $key => $item ) {
+        // $item[2] 是這個子選單自己的 slug；WooCommerce 註冊「屬性」頁面時
+        // 用的是 product_attributes，用 strpos 比對比較保險，避免因為完整
+        // 網址格式（有沒有帶 post_type 參數）不一致而比對不到。
+        if ( isset( $item[2] ) && false !== strpos( $item[2], 'product_attributes' ) ) {
+            unset( $submenu[ $parent_slug ][ $key ] );
+        }
+    }
 }
 
 /**
