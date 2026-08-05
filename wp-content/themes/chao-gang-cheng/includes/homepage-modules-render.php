@@ -115,10 +115,15 @@ function ckc_render_module_hero_slider( $settings ) {
 
     $featured_products = array();
     if ( class_exists( 'WooCommerce' ) ) {
+        // 跟分類展示區一樣，明確指定 orderby/order，讓「精選商品」輪播也
+        // 套用「商品 > 顯示排序」工具設定的同一套順序，不要用預設的
+        // 上架日期新到舊排序。
         $featured_products = wc_get_products( array(
             'featured' => true,
             'status'   => 'publish',
             'limit'    => $count,
+            'orderby'  => 'menu_order',
+            'order'    => 'ASC',
         ) );
     }
     ?>
