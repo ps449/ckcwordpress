@@ -6737,6 +6737,116 @@ function ckc_addon_zone_page_html() {
     <?php
 }
 
+/**
+ * 頂端公告列設定：原本這條網站最上方的公告文字（含優惠訊息）是寫死在
+ * header.php 裡，改為在後台「首頁」頂層選單下新增「公告列設定」子選單，
+ * 讓操作者可以自行開關、修改文字，不用改程式碼。跟「加價專區設定」
+ * 用同一套 WordPress Settings API 做法，優先權 17，緊接在它（16）之後。
+ */
+add_action( 'admin_menu', 'ckc_announcement_bar_add_menu', 17 );
+function ckc_announcement_bar_add_menu() {
+    add_submenu_page(
+        'ckc-homepage-builder',
+        '公告列設定',
+        '公告列設定',
+        'manage_options',
+        'ckc-announcement-bar',
+        'ckc_announcement_bar_page_html'
+    );
+}
+
+add_action( 'admin_init', 'ckc_announcement_bar_register_settings' );
+function ckc_announcement_bar_register_settings() {
+    register_setting(
+        'ckc_announcement_bar_group',
+        'chao_gang_cheng_announcement_bar_settings',
+        array(
+            'sanitize_callback' => 'ckc_announcement_bar_sanitize',
+        )
+    );
+}
+
+/**
+ * 讀取設定，帶預設值（預設值＝原本寫死在 header.php 裡的文字，確保
+ * 還沒存過設定的情況下，前台顯示內容跟改版前完全一樣，不會突然消失
+ * 或變成空白）。
+ */
+function chao_gang_cheng_get_announcement_bar_settings() {
+    return wp_parse_args(
+        get_option( 'chao_gang_cheng_announcement_bar_settings', array() ),
+        array(
+            'enabled' => true,
+            'text'    => '📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。',
+        )
+    );
+}
+
+/**
+ * 文字允許基本排版標籤（例如 <strong> 強調金額），但不允許 script／
+ * style 等危險標籤，用 wp_kses_post 處理，跟商品說明欄位的清理方式
+ * 一致。
+ */
+function ckc_announcement_bar_sanitize( $input ) {
+    return array(
+        'enabled' => ! empty( $input['enabled'] ),
+        'text'    => isset( $input['text'] ) ? wp_kses_post( wp_unslash( $input['text'] ) ) : '',
+    );
+}
+
+function ckc_announcement_bar_page_html() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( '您沒有權限存取此頁面。' );
+    }
+
+    $opts = chao_gang_cheng_get_announcement_bar_settings();
+    ?>
+    <div class="wrap" id="ckc-announcement-bar-settings">
+        <h1 style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:24px;">📣</span>
+            公告列設定
+        </h1>
+        <p style="color:#666;margin-top:4px;">控制網站最上方（Logo 上面那一條）的公告文字要顯示什麼、要不要顯示。設定儲存後立即在前台生效。</p>
+        <hr style="margin:20px 0;">
+
+        <?php if ( isset( $_GET['settings-updated'] ) ) : ?>
+        <div id="setting-error-settings_updated" class="notice notice-success settings-error is-dismissible">
+            <p><strong>✅ 設定已成功儲存！</strong></p>
+        </div>
+        <?php endif; ?>
+
+        <form method="post" action="options.php" style="max-width:680px;">
+            <?php settings_fields( 'ckc_announcement_bar_group' ); ?>
+
+            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:24px 28px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;margin-bottom:18px;">
+                    <input type="checkbox"
+                           name="chao_gang_cheng_announcement_bar_settings[enabled]"
+                           value="1"
+                           <?php checked( $opts['enabled'] ); ?>
+                           style="width:16px;height:16px;cursor:pointer;">
+                    顯示公告列
+                </label>
+                <p style="margin:0 0 6px;color:#888;font-size:13px;">取消勾選就會整條隱藏，不會佔用版面。</p>
+                <hr style="margin:16px 0;border-color:#f0f0f0;">
+                <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">公告文字</label>
+                <textarea name="chao_gang_cheng_announcement_bar_settings[text]"
+                          rows="3"
+                          style="width:100%;max-width:640px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;"><?php echo esc_textarea( $opts['text'] ); ?></textarea>
+                <p style="margin:6px 0 0;font-size:12px;color:#aaa;">可以用 &lt;strong&gt;文字&lt;/strong&gt; 讓部分文字加粗；不需要自己加表情符號前綴，想留就留、不想留可以刪掉。</p>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+                <?php submit_button( '💾 儲存設定', 'primary large', 'submit', false, array( 'style' => 'height:44px;padding:0 28px;font-size:15px;font-weight:600;border-radius:8px;' ) ); ?>
+                <span style="font-size:13px;color:#aaa;">設定儲存後即時生效，無需清除快取</span>
+            </div>
+        </form>
+
+        <hr style="margin:32px 0 20px;">
+        <p style="font-size:12px;color:#bbb;">潮港城客製電商主題 · 公告列設定 · 由 Antigravity AI 建置</p>
+    </div>
+    <?php
+}
+
 
 // =============================================================================
 require_once get_template_directory() . '/includes/core/popup.php';
