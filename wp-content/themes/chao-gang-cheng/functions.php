@@ -6017,6 +6017,20 @@ function chao_gang_cheng_rename_woocommerce_home_submenu() {
 }
 
 /**
+ * 移除後台「商品」選單底下的「屬性」子選單（product_attributes，
+ * 已從實際選單連結確認過 page slug 是 product_attributes，不是用猜
+ * 的）。這個商店已經把商品類型限制為只有「簡單商品」（見上面
+ * chao_gang_cheng_limit_product_type_selector_to_simple），不會用到
+ * 可變商品／規格屬性，這個選單留著也用不到。用 remove_submenu_page
+ * 移除，只影響選單顯示，不會刪除任何既有屬性資料，之後真的需要
+ * 還是可以直接輸入網址回到這個頁面。
+ */
+add_action( 'admin_menu', 'chao_gang_cheng_remove_product_attributes_submenu', 9999 );
+function chao_gang_cheng_remove_product_attributes_submenu() {
+    remove_submenu_page( 'edit.php?post_type=product', 'edit.php?post_type=product&page=product_attributes' );
+}
+
+/**
  * Discount badge on product cards & product page (category page optimization):
  * shows「-XX%」for sale items so discounts are scannable in the product grid.
  * (Replaces the previous behaviour of hiding the sale flash entirely.)
