@@ -269,10 +269,16 @@ function ckc_render_module_category_showcase( $settings ) {
             </div>
             <div class="products-grid">
                 <?php
+                // 明確指定 orderby/order：wc_get_products() 沒指定的話預設是
+                // 依上架日期新到舊排序，跟「商品 > 顯示排序」工具（後台拖曳
+                // 調整的 menu_order）以及分類頁本身的排序方式會兜不起來，
+                // 造成首頁這個分類展示區跟分類頁看到的商品順序不一致。
                 $products = wc_get_products( array(
                     'limit'    => $count,
                     'status'   => 'publish',
                     'category' => array( $cat_slug ),
+                    'orderby'  => 'menu_order',
+                    'order'    => 'ASC',
                 ) );
                 if ( ! empty( $products ) ) {
                     chao_gang_cheng_render_products( $products );
