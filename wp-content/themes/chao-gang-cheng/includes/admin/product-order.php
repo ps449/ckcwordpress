@@ -62,6 +62,12 @@ function ckc_product_order_enqueue_assets( $hook ) {
 
 /**
  * 「顯示排序」頁面內容。
+ *
+ * 商品依分類分區顯示（分類的排列順序沿用 WooCommerce 內建的分類拖曳排序，
+ * 也就是「商品 > 分類」頁面設定的順序）。分區只是方便尋找商品的視覺分組，
+ * 底層仍然是同一份全站共用的 menu_order 排序：同一個商品若掛了多個分類，
+ * 只會歸類顯示在第一個分類底下、不會重複出現；拖曳調整順序時也只在同一個
+ * 分區內移動，不會把商品拖到別的分類分區去（不會影響商品的分類設定）。
  */
 function ckc_product_order_page_html() {
 	if ( ! current_user_can( 'edit_products' ) ) {
@@ -77,6 +83,45 @@ function ckc_product_order_page_html() {
 			'order'          => 'ASC',
 		)
 	);
+
+	// 分類順序沿用 WooCommerce 內建的分類拖曳排序（get_terms() 對 product_cat
+	// 預設就是照這個順序，跟「商品 > 分類」頁面看到的順序一致）。
+	$categories = get_terms(
+		array(
+			'taxonomy'   => 'product_cat',
+			'hide_empty' => false,
+		)
+	);
+	if ( is_wp_error( $categories ) ) {
+		$categories = array();
+	}
+
+	$valid_cat_ids = wp_list_pluck( $categories, 'term_id' );
+	$groups        = array(); // term_id => array of WP_Post
+	$uncategorized = array();
+
+	foreach ( $products as $product_post ) {
+		$terms   = get_the_terms( $product_post->ID, 'product_cat' );
+		$primary = null;
+
+		if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term ) {
+				if ( in_array( $term->term_id, $valid_cat_ids, true ) ) {
+					$primary = $term;
+					break;
+				}
+			}
+		}
+
+		if ( $primary ) {
+			if ( ! isset( $groups[ $primary->term_id ] ) ) {
+				$groups[ $primary->term_id ] = array();
+			}
+			$groups[ $primary->term_id ][] = $product_post;
+		} else {
+			$uncategorized[] = $product_post;
+		}
+	}
 	?>
 	<div class="wrap" id="ckc-product-order-page">
 		<h1 style="display:flex;align-items:center;gap:10px;">
@@ -84,7 +129,9 @@ function ckc_product_order_page_html() {
 			顯示排序
 		</h1>
 		<p style="color:#666;margin-top:4px;">
-			用滑鼠拖曳調整商品順序，放開滑鼠後會立即儲存。這個順序就是前台商店頁／分類頁選擇「預設排序」時的商品顯示順序（WooCommerce 內建機制，跟商品編輯頁「發佈」欄位裡看到的順序共用）。
+			用滑鼠拖曳調整商品順序，放開滑鼠後會立即儲存。這個順序就是前台商店頁／分類頁選擇「預設排序」時的商品顯示順序（WooCommerce 內建機制，跟商品編輯頁「發佈」欄位裡看到的順序共用），全站只有一份，不分類各自獨立。
+			<br>
+			下面依商品分類分區顯示，方便尋找；分區順序跟「商品 &gt; 分類」頁面設定的順序一致，同一個商品只會出現在其中一個分類底下。
 			<br>
 			若顧客在前台手動切換成「熱銷度」「最新上架」「價格」等其他排序方式，則不受這裡的設定影響。
 		</p>
@@ -95,35 +142,38 @@ function ckc_product_order_page_html() {
 				<p style="margin:0;color:#888;">目前沒有已發佈的商品可以排序。</p>
 			</div>
 		<?php else : ?>
-			<div id="ckc-product-order-status" style="display:none;margin-bottom:14px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;"></div>
+			<div id="ckc-product-order-status" style="display:none;margin-bottom:14px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;max-width:640px;"></div>
 
-			<ul id="ckc-product-order-list" style="list-style:none;margin:0;padding:0;max-width:640px;">
-				<?php foreach ( $products as $product_post ) :
-					$thumb_url = get_the_post_thumbnail_url( $product_post->ID, 'thumbnail' );
-					?>
-					<li data-id="<?php echo esc_attr( $product_post->ID ); ?>"
-						style="display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px 16px;margin-bottom:8px;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);">
-						<span class="dashicons dashicons-menu" style="color:#bbb;"></span>
-						<span style="width:44px;height:44px;flex-shrink:0;border-radius:6px;overflow:hidden;background:#f4f4f4;display:flex;align-items:center;justify-content:center;">
-							<?php if ( $thumb_url ) : ?>
-								<img src="<?php echo esc_url( $thumb_url ); ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
-							<?php else : ?>
-								<span class="dashicons dashicons-format-image" style="color:#ccc;"></span>
-							<?php endif; ?>
-						</span>
-						<span style="font-size:14px;color:#333;"><?php echo esc_html( $product_post->post_title ); ?></span>
-					</li>
-				<?php endforeach; ?>
-			</ul>
+			<?php
+			foreach ( $categories as $cat ) :
+				if ( empty( $groups[ $cat->term_id ] ) ) {
+					continue;
+				}
+				?>
+				<h2 style="font-size:15px;margin:26px 0 10px;color:#333;"><?php echo esc_html( $cat->name ); ?></h2>
+				<ul class="ckc-product-order-list" style="list-style:none;margin:0;padding:0;max-width:640px;">
+					<?php foreach ( $groups[ $cat->term_id ] as $product_post ) : ?>
+						<?php ckc_product_order_render_item( $product_post ); ?>
+					<?php endforeach; ?>
+				</ul>
+			<?php endforeach; ?>
+
+			<?php if ( ! empty( $uncategorized ) ) : ?>
+				<h2 style="font-size:15px;margin:26px 0 10px;color:#333;">未分類</h2>
+				<ul class="ckc-product-order-list" style="list-style:none;margin:0;padding:0;max-width:640px;">
+					<?php foreach ( $uncategorized as $product_post ) : ?>
+						<?php ckc_product_order_render_item( $product_post ); ?>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
 		<?php endif; ?>
 	</div>
 
 	<script>
 	jQuery( function ( $ ) {
-		var $list   = $( '#ckc-product-order-list' );
 		var $status = $( '#ckc-product-order-status' );
 
-		if ( ! $list.length || typeof ckcProductOrderParams === 'undefined' ) {
+		if ( typeof ckcProductOrderParams === 'undefined' ) {
 			return;
 		}
 
@@ -137,41 +187,70 @@ function ckc_product_order_page_html() {
 				} );
 		}
 
-		$list.sortable( {
-			items: '> li',
-			cursor: 'move',
-			axis: 'y',
-			update: function ( event, ui ) {
-				var $item     = ui.item;
-				var id        = $item.data( 'id' );
-				var $prev     = $item.prev();
-				var $next     = $item.next();
-				var previd    = $prev.length ? $prev.data( 'id' ) : 0;
-				var nextid    = $next.length ? $next.data( 'id' ) : 0;
+		// 每個分類分區各自獨立一個 sortable 清單，只能在同一個分區內拖曳，
+		// 不會拖到別的分類分區（分區只是顯示分組，不影響商品分類設定）。
+		$( '.ckc-product-order-list' ).each( function () {
+			var $list = $( this );
 
-				$list.sortable( 'disable' );
-				$item.css( 'opacity', '0.5' );
+			$list.sortable( {
+				items: '> li',
+				cursor: 'move',
+				axis: 'y',
+				update: function ( event, ui ) {
+					var $item  = ui.item;
+					var id     = $item.data( 'id' );
+					var $prev  = $item.prev();
+					var $next  = $item.next();
+					var previd = $prev.length ? $prev.data( 'id' ) : 0;
+					var nextid = $next.length ? $next.data( 'id' ) : 0;
 
-				$.post(
-					ckcProductOrderParams.ajaxUrl,
-					{
-						action: 'woocommerce_product_ordering',
-						security: ckcProductOrderParams.nonce,
-						id: id,
-						previd: previd,
-						nextid: nextid
-					}
-				).done( function () {
-					showStatus( '✅ 已儲存新順序', false );
-				} ).fail( function () {
-					showStatus( '⚠️ 儲存失敗，請重新整理頁面後再試一次', true );
-				} ).always( function () {
-					$item.css( 'opacity', '1' );
-					$list.sortable( 'enable' );
-				} );
-			}
+					$list.sortable( 'disable' );
+					$item.css( 'opacity', '0.5' );
+
+					$.post(
+						ckcProductOrderParams.ajaxUrl,
+						{
+							action: 'woocommerce_product_ordering',
+							security: ckcProductOrderParams.nonce,
+							id: id,
+							previd: previd,
+							nextid: nextid
+						}
+					).done( function () {
+						showStatus( '✅ 已儲存新順序', false );
+					} ).fail( function () {
+						showStatus( '⚠️ 儲存失敗，請重新整理頁面後再試一次', true );
+					} ).always( function () {
+						$item.css( 'opacity', '1' );
+						$list.sortable( 'enable' );
+					} );
+				}
+			} );
 		} );
 	} );
 	</script>
+	<?php
+}
+
+/**
+ * 輸出單一商品在拖曳清單裡的一列（縮圖＋名稱）。
+ *
+ * @param WP_Post $product_post 商品文章物件。
+ */
+function ckc_product_order_render_item( $product_post ) {
+	$thumb_url = get_the_post_thumbnail_url( $product_post->ID, 'thumbnail' );
+	?>
+	<li data-id="<?php echo esc_attr( $product_post->ID ); ?>"
+		style="display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px 16px;margin-bottom:8px;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);">
+		<span class="dashicons dashicons-menu" style="color:#bbb;"></span>
+		<span style="width:44px;height:44px;flex-shrink:0;border-radius:6px;overflow:hidden;background:#f4f4f4;display:flex;align-items:center;justify-content:center;">
+			<?php if ( $thumb_url ) : ?>
+				<img src="<?php echo esc_url( $thumb_url ); ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+			<?php else : ?>
+				<span class="dashicons dashicons-format-image" style="color:#ccc;"></span>
+			<?php endif; ?>
+		</span>
+		<span style="font-size:14px;color:#333;"><?php echo esc_html( $product_post->post_title ); ?></span>
+	</li>
 	<?php
 }
