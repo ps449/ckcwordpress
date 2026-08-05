@@ -3063,7 +3063,7 @@ function ckc_register_coupon_admin_menu() {
     add_submenu_page(
         'ckc-referral-admin',
         '所有折價券',
-        '📋 所有折價券',
+        '所有折價券',
         'manage_woocommerce',
         'ckc-coupon-center',
         'ckc_coupon_center_admin_page'
@@ -3073,7 +3073,7 @@ function ckc_register_coupon_admin_menu() {
     add_submenu_page(
         'ckc-referral-admin',
         '新增折價券',
-        '➕ 新增折價券',
+        '新增折價券',
         'manage_woocommerce',
         'post-new.php?post_type=shop_coupon'
     );
@@ -3082,7 +3082,7 @@ function ckc_register_coupon_admin_menu() {
     add_submenu_page(
         'ckc-referral-admin',
         '查看前台領券中心',
-        '🔗 前台領券中心',
+        '前台領券中心',
         'manage_woocommerce',
         'ckc-coupon-frontend',
         'ckc_coupon_frontend_redirect'
