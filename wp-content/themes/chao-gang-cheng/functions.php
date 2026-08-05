@@ -5812,13 +5812,14 @@ function chao_gang_cheng_fill_related_products( $related_posts, $product_id, $ar
         $exclude_ids = array_merge( array( $product_id ), $related_posts );
         
         $filler_products = wc_get_products( array(
-            'limit'   => $needed,
-            'status'  => 'publish',
-            'exclude' => $exclude_ids,
-            'orderby' => 'date',
-            'order'   => 'DESC',
+            'limit'        => $needed,
+            'status'       => 'publish',
+            'stock_status' => 'instock',
+            'exclude'      => $exclude_ids,
+            'orderby'      => 'date',
+            'order'        => 'DESC',
         ) );
-        
+
         foreach ( $filler_products as $filler ) {
             $related_posts[] = $filler->get_id();
         }
@@ -9186,16 +9187,67 @@ add_filter( 'woocommerce_related_products', 'ckc_ai_automated_related_products',
 function ckc_ai_automated_related_products( $related_posts, $product_id, $args ) {
     $cached = get_post_meta( $product_id, '_ckc_ai_recommendations', true );
     if ( is_array( $cached ) && ! empty( $cached ) ) {
-        return $cached;
+        $result = $cached;
+    } else {
+        $recommended_ids = ckc_generate_ai_recommendations( $product_id );
+        if ( ! empty( $recommended_ids ) ) {
+            update_post_meta( $product_id, '_ckc_ai_recommendations', $recommended_ids );
+            $result = $recommended_ids;
+        } else {
+            $result = $related_posts;
+        }
     }
 
-    $recommended_ids = ckc_generate_ai_recommendations( $product_id );
-    if ( ! empty( $recommended_ids ) ) {
-        update_post_meta( $product_id, '_ckc_ai_recommendations', $recommended_ids );
-        return $recommended_ids;
+    // 快取的推薦名單是產生當下的結果，商品之後可能會售完；每次顯示都即時
+    // 過濾掉目前已售完／缺貨中的商品，避免推薦顧客買不到的東西（不用清快取，
+    // 商品之後補貨回來也會自動再次出現）。
+    $result = ckc_filter_instock_product_ids( $result );
+
+    // 過濾後可能不足 4 個，用其他還有庫存的商品遞補，維持區塊固定顯示 4 個商品。
+    $result = ckc_top_up_related_product_ids( $result, $product_id, 4 );
+
+    return $result;
+}
+
+/**
+ * 32d-1. 篩選商品 ID 陣列，只保留目前「尚有庫存」的商品（排除已售完／缺貨中）。
+ */
+function ckc_filter_instock_product_ids( $product_ids ) {
+    $instock_ids = array();
+    foreach ( (array) $product_ids as $id ) {
+        $product = wc_get_product( $id );
+        if ( $product && $product->is_in_stock() ) {
+            $instock_ids[] = intval( $id );
+        }
+    }
+    return $instock_ids;
+}
+
+/**
+ * 32d-2. 補齊商品 ID 陣列到指定數量，只用還有庫存的商品遞補（依上架日期新到舊排序）。
+ */
+function ckc_top_up_related_product_ids( $product_ids, $exclude_product_id, $desired_count = 4 ) {
+    if ( count( $product_ids ) >= $desired_count ) {
+        return array_slice( $product_ids, 0, $desired_count );
     }
 
-    return $related_posts;
+    $needed      = $desired_count - count( $product_ids );
+    $exclude_ids = array_merge( array( $exclude_product_id ), $product_ids );
+
+    $filler_products = wc_get_products( array(
+        'limit'        => $needed,
+        'status'       => 'publish',
+        'stock_status' => 'instock',
+        'exclude'      => $exclude_ids,
+        'orderby'      => 'date',
+        'order'        => 'DESC',
+    ) );
+
+    foreach ( $filler_products as $filler ) {
+        $product_ids[] = $filler->get_id();
+    }
+
+    return $product_ids;
 }
 
 /**
@@ -9203,7 +9255,7 @@ function ckc_ai_automated_related_products( $related_posts, $product_id, $args )
  */
 add_filter( 'woocommerce_product_related_products_heading', 'ckc_ai_related_products_heading' );
 function ckc_ai_related_products_heading( $heading ) {
-    return '✨ AI 智慧推薦商品';
+    return '推薦商品';
 }
 
 /**
