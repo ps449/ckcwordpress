@@ -20,6 +20,23 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * 修正前後台排序顯示不一致的問題：這個商店儲存的
+ * woocommerce_default_catalog_orderby 選項值其實是 'popularity'
+ * （依熱銷度排序），不是 'menu_order'（預設排序）。也就是說，顧客一開始
+ * 打開商店頁／分類頁時，實際套用的排序方式跟這裡「顯示排序」工具拖曳
+ * 調整的順序是兩回事——除非顧客自己手動把排序切換成「預設排序」。
+ *
+ * 這個 WooCommerce 版本（11.0.0）的後台「WooCommerce > 設定 > 商品」頁面
+ * 已經不再提供「預設商品排序」欄位可以直接改，只能用這個 filter 蓋掉
+ * 已儲存的選項值，強制全站預設排序方式固定為「預設排序」（menu_order），
+ * 「顯示排序」工具調整的順序才會真正是顧客一開始看到的順序。
+ */
+add_filter( 'woocommerce_default_catalog_orderby', 'ckc_force_default_catalog_orderby_menu_order' );
+function ckc_force_default_catalog_orderby_menu_order( $orderby ) {
+	return 'menu_order';
+}
+
 add_action( 'admin_menu', 'ckc_product_order_add_menu', 12 );
 /**
  * 在「商品」選單下新增「顯示排序」子選單。

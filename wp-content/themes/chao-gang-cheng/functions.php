@@ -4775,8 +4775,12 @@ function chao_gang_cheng_mobile_shop_scripts() {
         return;
     }
     // Default sort label should reflect the actual WooCommerce default catalog
-    // ordering (e.g.「依熱銷度排序」), not a hard-coded「預設排序」.
-    $default_orderby = get_option( 'woocommerce_default_catalog_orderby', 'menu_order' );
+    // ordering (e.g.「依熱銷度排序」), not a hard-coded「預設排序」. 要透過
+    // 'woocommerce_default_catalog_orderby' 這個 filter 讀（不能只讀
+    // get_option() 的原始值），因為 includes/admin/product-order.php 掛了
+    // 一個 filter 把實際排序方式強制蓋成 menu_order，這裡的顯示文字也要
+    // 跟著反映真正生效的排序方式，兩邊才不會兜不起來。
+    $default_orderby = apply_filters( 'woocommerce_default_catalog_orderby', get_option( 'woocommerce_default_catalog_orderby', 'menu_order' ) );
     $orderby_labels  = array(
         'menu_order' => '預設排序',
         'popularity' => '依熱銷度排序',
