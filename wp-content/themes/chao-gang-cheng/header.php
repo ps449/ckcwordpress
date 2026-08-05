@@ -39,10 +39,19 @@
 </div>
 
 <div id="page" class="site">
-    <!-- Announcement Bar -->
+    <!-- Announcement Bar：文字與開關改由後台「首頁 > 公告列設定」控制
+         （見 functions.php 的 chao_gang_cheng_get_announcement_bar_settings()），
+         不設定時的預設值就是原本這裡寫死的文字，不影響既有顯示內容。 -->
+    <?php
+    $ckc_announcement_bar = function_exists( 'chao_gang_cheng_get_announcement_bar_settings' )
+        ? chao_gang_cheng_get_announcement_bar_settings()
+        : array( 'enabled' => true, 'text' => '📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。' );
+    ?>
+    <?php if ( ! empty( $ckc_announcement_bar['enabled'] ) && '' !== trim( $ckc_announcement_bar['text'] ) ) : ?>
     <div class="announcement-bar">
-        <span>📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。</span>
+        <span><?php echo wp_kses_post( $ckc_announcement_bar['text'] ); ?></span>
     </div>
+    <?php endif; ?>
 
     <header id="masthead" class="main-header" style="background-color: var(--white); box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
         <!-- Desktop Header Layout -->
