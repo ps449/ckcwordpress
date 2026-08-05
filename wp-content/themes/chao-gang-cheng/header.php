@@ -48,8 +48,17 @@
         : array( 'enabled' => true, 'text' => '📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。' );
     ?>
     <?php if ( ! empty( $ckc_announcement_bar['enabled'] ) && '' !== trim( $ckc_announcement_bar['text'] ) ) : ?>
+    <?php $ckc_announcement_link = ! empty( $ckc_announcement_bar['link_url'] ) ? esc_url( $ckc_announcement_bar['link_url'] ) : ''; ?>
     <div class="announcement-bar">
-        <span><?php echo wp_kses_post( $ckc_announcement_bar['text'] ); ?></span>
+        <?php if ( $ckc_announcement_link ) : ?>
+            <a href="<?php echo $ckc_announcement_link; ?>"
+               <?php echo ! empty( $ckc_announcement_bar['link_blank'] ) ? 'target="_blank" rel="noopener noreferrer"' : ''; ?>
+               style="color:inherit;text-decoration:none;display:inline-block;">
+                <span><?php echo wp_kses_post( $ckc_announcement_bar['text'] ); ?></span>
+            </a>
+        <?php else : ?>
+            <span><?php echo wp_kses_post( $ckc_announcement_bar['text'] ); ?></span>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 

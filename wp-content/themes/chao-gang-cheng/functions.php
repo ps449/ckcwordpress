@@ -6775,8 +6775,10 @@ function chao_gang_cheng_get_announcement_bar_settings() {
     return wp_parse_args(
         get_option( 'chao_gang_cheng_announcement_bar_settings', array() ),
         array(
-            'enabled' => true,
-            'text'    => '📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。',
+            'enabled'    => true,
+            'text'       => '📣📣📣運費算我的！！！/全館消費滿 $2,000！冷凍宅配、超商取貨免運費。下單後依訂單順序，現貨商品 5 個工作天內出貨。',
+            'link_url'   => '',
+            'link_blank' => false,
         )
     );
 }
@@ -6784,12 +6786,14 @@ function chao_gang_cheng_get_announcement_bar_settings() {
 /**
  * 文字允許基本排版標籤（例如 <strong> 強調金額），但不允許 script／
  * style 等危險標籤，用 wp_kses_post 處理，跟商品說明欄位的清理方式
- * 一致。
+ * 一致。連結網址留空＝整條公告列不加超連結（跟改版前一樣，純文字）。
  */
 function ckc_announcement_bar_sanitize( $input ) {
     return array(
-        'enabled' => ! empty( $input['enabled'] ),
-        'text'    => isset( $input['text'] ) ? wp_kses_post( wp_unslash( $input['text'] ) ) : '',
+        'enabled'    => ! empty( $input['enabled'] ),
+        'text'       => isset( $input['text'] ) ? wp_kses_post( wp_unslash( $input['text'] ) ) : '',
+        'link_url'   => isset( $input['link_url'] ) ? esc_url_raw( wp_unslash( $input['link_url'] ) ) : '',
+        'link_blank' => ! empty( $input['link_blank'] ),
     );
 }
 
@@ -6833,6 +6837,23 @@ function ckc_announcement_bar_page_html() {
                           rows="3"
                           style="width:100%;max-width:640px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;"><?php echo esc_textarea( $opts['text'] ); ?></textarea>
                 <p style="margin:6px 0 0;font-size:12px;color:#aaa;">可以用 &lt;strong&gt;文字&lt;/strong&gt; 讓部分文字加粗；不需要自己加表情符號前綴，想留就留、不想留可以刪掉。</p>
+
+                <hr style="margin:16px 0;border-color:#f0f0f0;">
+                <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">超連結網址（選填）</label>
+                <input type="url"
+                       name="chao_gang_cheng_announcement_bar_settings[link_url]"
+                       value="<?php echo esc_attr( $opts['link_url'] ); ?>"
+                       placeholder="https://eshopckc.com/product-category/xxx/"
+                       style="width:100%;max-width:640px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <p style="margin:6px 0 10px;font-size:12px;color:#aaa;">填了網址，整條公告列就會變成可以點擊的連結（例如導去優惠券頁面或特定分類）；留空就是純文字，不能點擊，跟改版前一樣。</p>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                    <input type="checkbox"
+                           name="chao_gang_cheng_announcement_bar_settings[link_blank]"
+                           value="1"
+                           <?php checked( $opts['link_blank'] ); ?>
+                           style="width:16px;height:16px;cursor:pointer;">
+                    在新分頁開啟連結
+                </label>
             </div>
 
             <div style="display:flex;align-items:center;gap:12px;">
