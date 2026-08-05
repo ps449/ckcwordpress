@@ -9683,6 +9683,9 @@ require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
 // 網站 Logo 後台替換功能（「首頁」子選單，顯示尺寸統一 240×80）
 require_once get_template_directory() . '/includes/admin/site-logo.php';
 
+// 商品「顯示排序」管理頁（「商品」子選單，拖曳調整前台預設排序用的 menu_order）
+require_once get_template_directory() . '/includes/admin/product-order.php';
+
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
  */
