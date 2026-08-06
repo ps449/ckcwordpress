@@ -237,6 +237,27 @@ function chao_cart_totals_subtotal_add_regular( $subtotal_html, $compound, $cart
  */
 function chao_render_order_savings_row( $cart = null ) {
     $savings = chao_calc_cart_total_savings( $cart );
+
+    // TEMP DEBUG（驗收用，之後會移除）：把運費判斷的中間值印成 HTML
+    // 註解，方便直接在瀏覽器檢視原始碼／DOM 確認每個數值。
+    if ( ! $cart ) {
+        $cart = function_exists( 'WC' ) && WC()->cart ? WC()->cart : null;
+    }
+    if ( $cart instanceof WC_Cart ) {
+        $dbg_needs_shipping = $cart->needs_shipping() ? 'yes' : 'no';
+        $dbg_threshold      = function_exists( 'chao_get_free_shipping_threshold' ) ? chao_get_free_shipping_threshold() : 'N/A';
+        $dbg_progress       = function_exists( 'chao_get_free_shipping_progress_amount' ) ? chao_get_free_shipping_progress_amount() : 'N/A';
+        $dbg_coupon_free    = 'no';
+        foreach ( $cart->get_applied_coupons() as $dbg_code ) {
+            $dbg_c = new WC_Coupon( $dbg_code );
+            if ( $dbg_c->get_id() && $dbg_c->get_free_shipping() ) {
+                $dbg_coupon_free = 'yes';
+                break;
+            }
+        }
+        echo "<!-- CKC-DEBUG savings={$savings} needs_shipping={$dbg_needs_shipping} threshold={$dbg_threshold} progress={$dbg_progress} coupon_free={$dbg_coupon_free} zone_flat_rate=" . chao_get_zone_flat_rate_cost() . " -->\n";
+    }
+
     if ( $savings <= 0 ) {
         return;
     }
