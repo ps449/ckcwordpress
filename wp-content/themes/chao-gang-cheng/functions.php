@@ -3217,6 +3217,20 @@ function chao_gang_cheng_global_header_script() {
                         formData += '&add-to-cart=' + encodeURIComponent(productId);
                     }
 
+                    // Include selected 加價購 add-on items. The addon checkboxes live in
+                    // .product-addons-section, which is rendered via woocommerce_after_single_product_summary
+                    // — i.e. OUTSIDE the <form class="cart"> element — so $form.serialize()
+                    // above never picks them up. Without this, clicking this AJAX-intercepted
+                    // "加入購物車"/"同時加購" button silently drops any checked add-on items
+                    // (the separate "立即購買" buy-now flow isn't affected because it bypasses
+                    // this AJAX handler and does a native form submit instead).
+                    $('.product-addons-section .addon-checkbox:checked').each(function() {
+                        var val = $(this).val();
+                        var qty = $(this).closest('.addon-card').find('.addon-qty-input').val();
+                        formData += '&' + encodeURIComponent('addon_products[]') + '=' + encodeURIComponent(val);
+                        formData += '&' + encodeURIComponent('addon_qty[' + val + ']') + '=' + encodeURIComponent(qty);
+                    });
+
                     // POST to current page URL (WC handles add-to-cart via $_GET and $_POST)
                     $.ajax({
                         type: 'POST',
