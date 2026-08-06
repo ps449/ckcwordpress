@@ -144,13 +144,37 @@ function chao_calc_cart_total_savings( $cart = null ) {
     }
 
     if ( $coupon_free_shipping || $progress_amount >= $threshold ) {
-        // 保底運費金額 250，若運送區域有設定「固定費率」方式，
-        // 優先採用該方式實際設定的費用（比較貼近真實運費）。
+        // 保底運費金額 250，優先改用「電商營運 > 運費管理」後台設定
+        // （見 includes/admin/shipping-management.php）算出的宅配實際運費，
+        // 跟結帳頁 chao_gang_cheng_apply_shipping_management_rates() 用
+        // 同一套 lookup 邏輯（地區固定本島、溫層依購物車商品交集、件數
+        // 用購物車總件數），確保「省下的運費」跟結帳頁實際運費金額一致，
+        // 不再顯示舊的、跟結帳頁對不上的固定值／WC_Shipping_Zones 費率。
         $dynamic_base_cost = 250.0;
-        $zone_cost         = chao_get_zone_flat_rate_cost();
-        if ( $zone_cost > 0 ) {
-            $dynamic_base_cost = $zone_cost;
+
+        if ( function_exists( 'chao_gang_cheng_lookup_shipping_fee' ) && function_exists( 'chao_gang_cheng_determine_package_temperature_zone' ) ) {
+            $zone_for_savings = chao_gang_cheng_determine_package_temperature_zone( array( 'contents' => $cart->get_cart() ) );
+            $qty_for_savings  = 0;
+            foreach ( $cart->get_cart() as $savings_cart_item ) {
+                $qty_for_savings += isset( $savings_cart_item['quantity'] ) ? (int) $savings_cart_item['quantity'] : 0;
+            }
+            $home_delivery_fee = chao_gang_cheng_lookup_shipping_fee( 'home_delivery', 'main_island', $zone_for_savings, $qty_for_savings );
+            if ( null !== $home_delivery_fee && $home_delivery_fee > 0 ) {
+                $dynamic_base_cost = $home_delivery_fee;
+            } else {
+                $zone_cost = chao_get_zone_flat_rate_cost();
+                if ( $zone_cost > 0 ) {
+                    $dynamic_base_cost = $zone_cost;
+                }
+            }
+        } else {
+            // 後備：運費管理設定尚未載入時，退回舊的 WC_Shipping_Zones 讀法。
+            $zone_cost = chao_get_zone_flat_rate_cost();
+            if ( $zone_cost > 0 ) {
+                $dynamic_base_cost = $zone_cost;
+            }
         }
+
         $shipping_savings = $dynamic_base_cost;
     }
 

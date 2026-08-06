@@ -432,34 +432,50 @@ function chao_get_cvs_shipping_cost() {
     return $cached;
 }
 
-// 32a-helper. Collect enabled paid shipping methods (title => cost) for the estimate display
+// 32a-helper. Collect estimated shipping costs (label => cost) for the cart-page estimate display.
+//
+// 改讀「電商營運 > 運費管理」後台設定（見 includes/admin/shipping-management.php），
+// 取代原本直接讀 WC_Shipping_Zones 方式設定成本的做法——後者只是各運送方式
+// 自己的固定成本，跟結帳頁實際套用 chao_gang_cheng_apply_shipping_management_rates()
+// 算出來的金額（依地區×溫層×件數分級距）已經對不起來，會出現購物車頁「預估運費」
+// 跟結帳頁實收運費不一致的情況。這裡改成用同一套 lookup 邏輯計算，確保兩邊金額一致。
+//
+// 地區固定用本島（跟原本邏輯一樣，只反映常見情況，離島實際運費以結帳頁為準）；
+// 溫層則依購物車目前商品的溫層交集判斷，件數用購物車商品總件數。
 function chao_get_estimated_shipping_rates() {
     $rates = array();
-    if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
+
+    if ( ! function_exists( 'chao_gang_cheng_get_shipping_settings' ) || ! function_exists( 'chao_gang_cheng_lookup_shipping_fee' ) ) {
+        return $rates; // 後台運費管理尚未載入，不顯示（避免顯示錯誤/過時金額）。
+    }
+    if ( ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
         return $rates;
     }
-    foreach ( WC_Shipping_Zones::get_zones() as $zone ) {
-        // Skip outlying-island zones so the estimate reflects the common case
-        if ( isset( $zone['zone_name'] ) && preg_match( '/離島|澎湖|金門|馬祖/u', $zone['zone_name'] ) ) {
-            continue;
-        }
-        foreach ( $zone['shipping_methods'] as $method ) {
-            if ( 'yes' !== $method->enabled || 'free_shipping' === $method->id ) {
-                continue;
-            }
-            $cost = $method->get_option( 'cost' );
-            if ( '' === $cost || null === $cost || ! is_numeric( $cost ) ) {
-                continue;
-            }
-            $title = $method->get_title();
-            if ( $title && ! isset( $rates[ $title ] ) ) {
-                $rates[ $title ] = floatval( $cost );
-            }
-        }
-        if ( count( $rates ) >= 3 ) {
-            break;
-        }
+
+    $settings = chao_gang_cheng_get_shipping_settings();
+
+    $zone = 'ambient';
+    if ( function_exists( 'chao_gang_cheng_determine_package_temperature_zone' ) ) {
+        $zone = chao_gang_cheng_determine_package_temperature_zone( array( 'contents' => WC()->cart->get_cart() ) );
     }
+
+    $qty = 0;
+    foreach ( WC()->cart->get_cart() as $cart_item ) {
+        $qty += isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 0;
+    }
+
+    $labels = array(
+        'home_delivery' => '宅配',
+        'cvs'           => '超商',
+    );
+    foreach ( $labels as $method_key => $label ) {
+        $fee = chao_gang_cheng_lookup_shipping_fee( $method_key, 'main_island', $zone, $qty, $settings );
+        if ( null === $fee ) {
+            continue; // 這個組合後台還沒設定資料，不顯示，避免誤導。
+        }
+        $rates[ $label ] = $fee;
+    }
+
     return $rates;
 }
 
