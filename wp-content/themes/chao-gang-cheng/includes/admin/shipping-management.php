@@ -629,6 +629,18 @@ function chao_gang_cheng_apply_shipping_management_rates( $rates, $package ) {
         ? chao_get_free_shipping_progress_amount()
         : ( function_exists( 'WC' ) && WC()->cart ? (float) WC()->cart->get_cart_contents_total() : 0 );
 
+    // 宅配的原生方式名稱（單一費率 / flat_rate）只是 WooCommerce 內建的
+    // 泛用方式名稱，跟「這筆是不是免運費」完全無關，客人在結帳頁只會看到
+    // 「單一費率」四個字，看不出來是宅配運費、也看不出來 NT$0 是不是故意
+    // 免運（WooCommerce 費用為 0 時預設不會顯示金額，畫面上就只剩方式
+    // 名稱，容易讓人誤以為系統壞掉、金額沒同步）。這裡把方式名稱改成
+    // 更明確的「宅配運費」，並在確定免運時加註文字，讓 NT$0 是否為刻意
+    // 免運一目了然。超商／門市自取的名稱本身已經夠明確（例如「超商取貨
+    // 7-ELEVEN」、「門市自取」），不需要另外改名。
+    $rate_label_overrides = array(
+        'home_delivery' => '宅配運費',
+    );
+
     foreach ( $rates as $rate_key => $rate ) {
         $method_key = null;
         foreach ( $method_groups as $key => $group ) {
@@ -646,26 +658,42 @@ function chao_gang_cheng_apply_shipping_management_rates( $rates, $package ) {
             continue; // 不認得的方式，維持原本費用不動。
         }
 
+        if ( isset( $rate_label_overrides[ $method_key ] ) ) {
+            $rates[ $rate_key ]->label = $rate_label_overrides[ $method_key ];
+        }
+
+        $is_free = false;
+
         // 免運門檻只有宅配／超商有設定（見 chao_gang_cheng_shipping_free_shipping_methods()）。
         if ( isset( $settings['free_shipping'][ $method_key ] ) ) {
             $threshold = (float) $settings['free_shipping'][ $method_key ];
             if ( $threshold > 0 && $order_amount >= $threshold ) {
                 $rates[ $rate_key ]->cost  = 0;
                 $rates[ $rate_key ]->taxes = array();
-                continue;
+                $is_free                   = true;
             }
         }
 
-        $fee = chao_gang_cheng_lookup_shipping_fee( $method_key, $region_key, $zone, $qty, $settings );
-        if ( null === $fee ) {
-            continue; // 這個組合還沒有設定資料，保留原本費用，不覆蓋成 0。
+        if ( ! $is_free ) {
+            $fee = chao_gang_cheng_lookup_shipping_fee( $method_key, $region_key, $zone, $qty, $settings );
+            if ( null === $fee ) {
+                continue; // 這個組合還沒有設定資料，保留原本費用，不覆蓋成 0。
+            }
+
+            $rates[ $rate_key ]->cost = $fee;
+            if ( wc_tax_enabled() && 'taxable' === $rates[ $rate_key ]->tax_status ) {
+                $rates[ $rate_key ]->taxes = WC_Tax::calc_shipping_tax( $fee, WC_Tax::get_shipping_tax_rates() );
+            } else {
+                $rates[ $rate_key ]->taxes = array();
+            }
+
+            if ( $fee <= 0 ) {
+                $is_free = true;
+            }
         }
 
-        $rates[ $rate_key ]->cost = $fee;
-        if ( wc_tax_enabled() && 'taxable' === $rates[ $rate_key ]->tax_status ) {
-            $rates[ $rate_key ]->taxes = WC_Tax::calc_shipping_tax( $fee, WC_Tax::get_shipping_tax_rates() );
-        } else {
-            $rates[ $rate_key ]->taxes = array();
+        if ( $is_free ) {
+            $rates[ $rate_key ]->label = trim( $rates[ $rate_key ]->label ) . '（免運費）';
         }
     }
 
