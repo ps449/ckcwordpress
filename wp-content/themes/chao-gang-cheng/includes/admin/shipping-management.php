@@ -11,8 +11,9 @@
  * - 超商（cvs）：台灣本島／離島，各自常溫／冷藏／冷凍
  * - 門市自取（store_pickup）：常溫／冷藏／冷凍（不分地區）
  *
- * 本次只先建立這個後台設定頁面（儲存與讀取設定值），前台結帳實際套用
- * 這裡設定的運費，之後確認需求後再另外串接。
+ * 前台結帳頁的實際運費已改讀這裡的設定（見檔案下半段「前台套用」區塊的
+ * chao_gang_cheng_apply_shipping_management_rates()），取代原本寫死／
+ * 散落在 WC_Shipping_Zones 各運送方式設定裡的費率。
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -481,4 +482,192 @@ function ckc_shipping_management_render_page() {
     })();
     </script>
     <?php
+}
+
+/* =========================================================================
+ * 前台套用：結帳頁實際運費改讀這個後台設定，取代原本寫死／散落在
+ * WC_Shipping_Zones 各方式設定裡的費率。
+ *
+ * 對應現有結帳頁「宅配／超商／門市自取」三張卡片，各自綁定的 WooCommerce
+ * 運送方式 method_id（沿用 chao_gang_cheng_restrict_rates_by_shipping_class()
+ * 已經在用的同一套分類，見 functions.php 22d）：
+ * - 宅配（home_delivery）  → free_shipping／flat_rate／Wooecpay_Logistic_Home_Tcat
+ * - 超商（cvs）            → 開頭是 Wooecpay_Logistic_CVS 的方式
+ * - 門市自取（store_pickup）→ local_pickup
+ *
+ * 地區（本島／離島）沿用既有的 chao_gang_cheng_is_outlying_island_destination()
+ * 判斷（functions.php 22），溫層則沿用商品「溫層」欄位跟購物車衝突判斷
+ * 同一套 chao_gang_cheng_get_product_temperature_zones()。
+ * ========================================================================= */
+
+/**
+ * 依「配送方式 × 地區 × 溫層 × 件數」查出應收運費。
+ *
+ * @param string     $method_key  home_delivery｜cvs｜store_pickup
+ * @param string     $region_key  main_island｜outlying_island（store_pickup 不分地區，帶什麼值都會被忽略）
+ * @param string     $zone        ambient｜chilled｜frozen
+ * @param int        $qty         這個配送包裹裡的商品總件數
+ * @param array|null $settings    可選，避免重複讀取 option
+ * @return float|null 找不到對應設定時回傳 null，呼叫端應保留原本費用不覆蓋
+ */
+function chao_gang_cheng_lookup_shipping_fee( $method_key, $region_key, $zone, $qty, $settings = null ) {
+    if ( null === $settings ) {
+        $settings = chao_gang_cheng_get_shipping_settings();
+    }
+
+    // 門市自取不分地區，設定裡固定用空字串當 region key（見
+    // chao_gang_cheng_shipping_methods_structure()）。
+    $lookup_region = ( 'store_pickup' === $method_key ) ? '' : $region_key;
+
+    $tiers = isset( $settings[ $method_key ][ $lookup_region ][ $zone ] ) ? $settings[ $method_key ][ $lookup_region ][ $zone ] : null;
+    if ( empty( $tiers ) || ! is_array( $tiers ) ) {
+        return null;
+    }
+
+    foreach ( $tiers as $tier ) {
+        $max_qty = isset( $tier['max_qty'] ) ? $tier['max_qty'] : '';
+        if ( '' === $max_qty || $qty <= (int) $max_qty ) {
+            return (float) $tier['fee'];
+        }
+    }
+
+    // 理論上不會走到這裡（後台一定會保留至少一列「不限」當保底），
+    // 保險起見還是回傳最後一列的運費，而不是完全不覆蓋。
+    $last_tier = end( $tiers );
+    return $last_tier ? (float) $last_tier['fee'] : null;
+}
+
+/**
+ * 判斷這個配送包裹（購物車／訂單的商品內容）適用哪一種溫層運費。
+ *
+ * 沿用 chao_gang_cheng_get_cart_temperature_conflict() 同一套「取所有
+ * 有標注溫層的商品的交集」邏輯——結帳頁已經會擋下溫層衝突的訂單（見
+ * chao_gang_cheng_validate_temperature_zone_checkout()），所以正常情況
+ * 這裡交集後只會剩 0 或 1 個溫層。沒有任何商品標注溫層（交集為 null）
+ * 時，預設當「常溫」處理。
+ *
+ * @param array $package WooCommerce shipping package（含 'contents'）
+ * @return string ambient｜chilled｜frozen
+ */
+function chao_gang_cheng_determine_package_temperature_zone( $package ) {
+    $common = null;
+
+    if ( ! empty( $package['contents'] ) && is_array( $package['contents'] ) ) {
+        foreach ( $package['contents'] as $item ) {
+            if ( empty( $item['product_id'] ) ) {
+                continue;
+            }
+            $product = wc_get_product( $item['product_id'] );
+            if ( ! $product ) {
+                continue;
+            }
+            $zones = chao_gang_cheng_get_product_temperature_zones( $product );
+            if ( empty( $zones ) ) {
+                continue; // 未設定溫層＝不限制，不參與交集運算
+            }
+            $common = ( null === $common ) ? $zones : array_intersect( $common, $zones );
+        }
+    }
+
+    if ( ! empty( $common ) ) {
+        return reset( $common );
+    }
+
+    return 'ambient';
+}
+
+/**
+ * 實際覆蓋結帳頁運費金額。掛在比既有的離島費率調整（優先權 10）、
+ * 運送類別限制（優先權 20）都更後面的優先權 30，確保這裡算出來的
+ * 金額才是最終顯示／收取的金額，不會被前面兩個既有的 filter 蓋掉。
+ *
+ * 「免運費」這個原生 WooCommerce 方式（free_shipping）改成完全不用：
+ * 宅配／超商是否免運，現在由下面的免運門檻設定各自獨立判斷，不再依賴
+ * WooCommerce 原生 free_shipping 方式自己的達成條件；這裡直接把它從
+ * $rates 移除，避免同時出現一個名字叫「免運費」但實際運費不是 0 的
+ * 選項，造成客人混淆。
+ */
+add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_apply_shipping_management_rates', 30, 2 );
+function chao_gang_cheng_apply_shipping_management_rates( $rates, $package ) {
+    if ( ! function_exists( 'chao_gang_cheng_get_shipping_settings' ) ) {
+        return $rates;
+    }
+
+    $method_groups = array(
+        'cvs'           => array( 'prefix' => 'Wooecpay_Logistic_CVS' ),
+        'home_delivery' => array( 'exact' => array( 'free_shipping', 'flat_rate', 'Wooecpay_Logistic_Home_Tcat' ) ),
+        'store_pickup'  => array( 'exact' => array( 'local_pickup' ) ),
+    );
+
+    // 移除原生「免運費」方式，改由下面的門檻邏輯統一決定宅配／超商是否免運。
+    foreach ( $rates as $rate_key => $rate ) {
+        if ( 'free_shipping' === $rate->method_id ) {
+            unset( $rates[ $rate_key ] );
+        }
+    }
+
+    if ( empty( $rates ) ) {
+        return $rates;
+    }
+
+    $settings    = chao_gang_cheng_get_shipping_settings();
+    $is_outlying = function_exists( 'chao_gang_cheng_is_outlying_island_destination' ) && chao_gang_cheng_is_outlying_island_destination( $package );
+    $region_key  = $is_outlying ? 'outlying_island' : 'main_island';
+    $zone        = chao_gang_cheng_determine_package_temperature_zone( $package );
+
+    $qty = 0;
+    if ( ! empty( $package['contents'] ) && is_array( $package['contents'] ) ) {
+        foreach ( $package['contents'] as $item ) {
+            $qty += isset( $item['quantity'] ) ? (int) $item['quantity'] : 0;
+        }
+    }
+
+    // 免運門檻判斷用的訂單金額，沿用購物車頁「已為您省下」／預估運費列
+    // 已經在用的同一個金額基準，確保三個地方（購物車預估、已省下、結帳
+    // 實收）判斷「有沒有達免運」用的是同一個數字，不會各算各的兜不起來。
+    $order_amount = function_exists( 'chao_get_free_shipping_progress_amount' )
+        ? chao_get_free_shipping_progress_amount()
+        : ( function_exists( 'WC' ) && WC()->cart ? (float) WC()->cart->get_cart_contents_total() : 0 );
+
+    foreach ( $rates as $rate_key => $rate ) {
+        $method_key = null;
+        foreach ( $method_groups as $key => $group ) {
+            if ( isset( $group['prefix'] ) && false !== strpos( $rate->method_id, $group['prefix'] ) ) {
+                $method_key = $key;
+                break;
+            }
+            if ( isset( $group['exact'] ) && in_array( $rate->method_id, $group['exact'], true ) ) {
+                $method_key = $key;
+                break;
+            }
+        }
+
+        if ( ! $method_key ) {
+            continue; // 不認得的方式，維持原本費用不動。
+        }
+
+        // 免運門檻只有宅配／超商有設定（見 chao_gang_cheng_shipping_free_shipping_methods()）。
+        if ( isset( $settings['free_shipping'][ $method_key ] ) ) {
+            $threshold = (float) $settings['free_shipping'][ $method_key ];
+            if ( $threshold > 0 && $order_amount >= $threshold ) {
+                $rates[ $rate_key ]->cost  = 0;
+                $rates[ $rate_key ]->taxes = array();
+                continue;
+            }
+        }
+
+        $fee = chao_gang_cheng_lookup_shipping_fee( $method_key, $region_key, $zone, $qty, $settings );
+        if ( null === $fee ) {
+            continue; // 這個組合還沒有設定資料，保留原本費用，不覆蓋成 0。
+        }
+
+        $rates[ $rate_key ]->cost = $fee;
+        if ( wc_tax_enabled() && 'taxable' === $rates[ $rate_key ]->tax_status ) {
+            $rates[ $rate_key ]->taxes = WC_Tax::calc_shipping_tax( $fee, WC_Tax::get_shipping_tax_rates() );
+        } else {
+            $rates[ $rate_key ]->taxes = array();
+        }
+    }
+
+    return $rates;
 }
