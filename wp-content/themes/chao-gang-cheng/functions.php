@@ -2319,19 +2319,45 @@ function chao_gang_cheng_add_addons_to_cart_handler( $cart_item_key, $product_id
     if ( isset( $_POST['addon_products'] ) && is_array( $_POST['addon_products'] ) ) {
         // Unhook to prevent recursion
         remove_action( 'woocommerce_add_to_cart', 'chao_gang_cheng_add_addons_to_cart_handler', 10, 6 );
-        
+
+        // 加價購優惠金額改讀後台「加價專區設定」，跟商品頁 chao_gang_cheng_addon_purchase_section()
+        // 顯示加價購價格用的是同一份設定 —— 修正前這裡的實際結算價格是另外
+        // 寫死扣 NT$20，跟後台可調整、商品頁實際顯示的優惠金額不同步，
+        // 導致顧客在商品頁看到的加價購價（例如優惠設定改成 70 元後顯示的
+        // NT$180）跟加入購物車後真正結帳的金額（寫死算出來的 NT$230）對不上。
+        $addon_settings = chao_gang_cheng_get_addon_zone_settings();
+        $discount        = (float) $addon_settings['discount'];
+
         foreach ( $_POST['addon_products'] as $addon_id ) {
             $addon_id = absint( $addon_id );
             $addon_qty = 1;
             if ( isset( $_POST['addon_qty'][$addon_id] ) ) {
                 $addon_qty = absint( $_POST['addon_qty'][$addon_id] );
             }
-            WC()->cart->add_to_cart( $addon_id, $addon_qty, 0, array(), array( 'is_addon_purchase' => true ) );
+            // 把「當下顯示給顧客看的加價購價格」直接存進這個購物車項目，
+            // 之後結算（woocommerce_before_calculate_totals）就直接用這個
+            // 存好的值，不用再另外重算一次、也不會因為兩處邏輯各自維護
+            // 而兜不起來；即使之後有人改了後台的優惠金額設定，已經在
+            // 顧客購物車裡的品項金額也不會因此無預警被改變。
+            $addon_product = wc_get_product( $addon_id );
+            $regular_price = $addon_product ? (float) $addon_product->get_regular_price() : 0;
+            $addon_price   = max( 10, $regular_price - $discount );
+
+            WC()->cart->add_to_cart(
+                $addon_id,
+                $addon_qty,
+                0,
+                array(),
+                array(
+                    'is_addon_purchase' => true,
+                    'addon_price'       => $addon_price,
+                )
+            );
         }
-        
+
         // Re-hook
         add_action( 'woocommerce_add_to_cart', 'chao_gang_cheng_add_addons_to_cart_handler', 10, 6 );
-        
+
         // Clear POST to avoid duplicate runs on the same request
         unset( $_POST['addon_products'] );
     }
@@ -2347,9 +2373,17 @@ function chao_gang_cheng_adjust_addon_cart_prices( $cart ) {
     }
     foreach ( $cart->get_cart() as $cart_item ) {
         if ( isset( $cart_item['is_addon_purchase'] ) ) {
-            $original_price = $cart_item['data']->get_regular_price();
-            $discount = 20; // 20 TWD discount for addons
-            $addon_price = max( 10, $original_price - $discount );
+            if ( isset( $cart_item['addon_price'] ) ) {
+                // 正常情況：用加入購物車當下就存好的價格，跟商品頁顯示的一致。
+                $addon_price = (float) $cart_item['addon_price'];
+            } else {
+                // 相容舊資料：修正前就已經在顧客購物車裡的加購項目沒有
+                // 'addon_price' 這個欄位，退回用目前後台設定即時計算。
+                $original_price = $cart_item['data']->get_regular_price();
+                $addon_settings = chao_gang_cheng_get_addon_zone_settings();
+                $discount       = (float) $addon_settings['discount'];
+                $addon_price    = max( 10, $original_price - $discount );
+            }
             $cart_item['data']->set_price( $addon_price );
         }
     }
