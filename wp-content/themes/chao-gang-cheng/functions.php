@@ -6496,7 +6496,12 @@ function ckc_reorganize_admin_menu_groups() {
                     $key = strval( floatval( $key ) + 0.0001 );
                 }
                 if ( 'header' === $row['type'] ) {
-                    $new_menu[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
+                    // 注意：每個分類標題的 slug（$item[2]）一定要不一樣，不能
+                    // 大家都共用 '#'。實測發現如果 slug 相同，WordPress 會把
+                    // 這些項目當成同一個選單的重複註冊，全部擠在一起顯示，
+                    // 導致分類標題全部跑到選單最後面（做法比照 WP 核心自己的
+                    // 選單分隔線 'separator1'、'separator2' 每條都用不同 slug）。
+                    $new_menu[ $key ] = array( $row['label'], 'read', '#ckc-header-' . sanitize_title( $row['label'] ), '', 'menu-section-header ckc-menu-section-header' );
                 } else {
                     $row_item = $captured[ $row['slug'] ];
                     if ( null !== $row['label'] ) {
@@ -6515,7 +6520,7 @@ function ckc_reorganize_admin_menu_groups() {
         foreach ( $rows as $n => $row ) {
             $key = strval( 1 + 0.001 * ( $n + 1 ) );
             if ( 'header' === $row['type'] ) {
-                $prefix[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
+                $prefix[ $key ] = array( $row['label'], 'read', '#ckc-header-' . sanitize_title( $row['label'] ), '', 'menu-section-header ckc-menu-section-header' );
             } else {
                 $row_item = $captured[ $row['slug'] ];
                 if ( null !== $row['label'] ) {
