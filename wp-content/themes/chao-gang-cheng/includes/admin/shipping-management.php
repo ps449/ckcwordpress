@@ -59,6 +59,20 @@ function chao_gang_cheng_shipping_zone_slugs() {
 }
 
 /**
+ * 免運設定適用的配送方式：只有宅配／超商需要「滿額免運」門檻，
+ * 門市自取本身不收運費，不需要另外設定免運條件。
+ *
+ * 門檻不分本島／離島、不分溫層，宅配、超商各自一個固定金額（跟目前
+ * 全站既有的滿額免運判斷邏輯一致：只看訂單金額）。
+ */
+function chao_gang_cheng_shipping_free_shipping_methods() {
+    return array(
+        'home_delivery' => '宅配',
+        'cvs'           => '超商',
+    );
+}
+
+/**
  * 單一「配送方式 × 地區 × 溫層」組合底下，件數運費級距的預設值：
  * 只有一級「不限件數」，運費 0 元，讓表格一開始至少有一列可以編輯，
  * 而不是空白表格。
@@ -114,6 +128,13 @@ function chao_gang_cheng_get_shipping_settings() {
                 $settings[ $method_key ][ $region_key ][ $zone ] = $tiers;
             }
         }
+    }
+
+    // 免運門檻（宅配／超商各一個，金額 0 或未設定＝不啟用免運）。
+    $settings['free_shipping'] = array();
+    $saved_free_shipping = isset( $saved['free_shipping'] ) && is_array( $saved['free_shipping'] ) ? $saved['free_shipping'] : array();
+    foreach ( chao_gang_cheng_shipping_free_shipping_methods() as $method_key => $method_label ) {
+        $settings['free_shipping'][ $method_key ] = isset( $saved_free_shipping[ $method_key ] ) ? (float) $saved_free_shipping[ $method_key ] : 0;
     }
 
     return $settings;
@@ -188,6 +209,17 @@ function ckc_shipping_management_handle_save() {
                 $new_settings[ $method_key ][ $region_key ][ $zone ] = $tiers;
             }
         }
+    }
+
+    // 免運門檻（獨立的 ckc_shipping_free[method] 欄位，不掛在 ckc_shipping[] 底下，
+    // 避免跟上面「配送方式 × 地區 × 溫層」的巢狀迴圈邏輯混在一起）。
+    $raw_free_shipping = isset( $_POST['ckc_shipping_free'] ) && is_array( $_POST['ckc_shipping_free'] )
+        ? wp_unslash( $_POST['ckc_shipping_free'] )
+        : array();
+    $new_settings['free_shipping'] = array();
+    foreach ( chao_gang_cheng_shipping_free_shipping_methods() as $method_key => $method_label ) {
+        $threshold_raw = isset( $raw_free_shipping[ $method_key ] ) ? trim( (string) $raw_free_shipping[ $method_key ] ) : '';
+        $new_settings['free_shipping'][ $method_key ] = ( '' === $threshold_raw ) ? 0 : max( 0, (float) $threshold_raw );
     }
 
     update_option( 'chao_gang_cheng_shipping_settings', $new_settings, false );
@@ -332,6 +364,29 @@ function ckc_shipping_management_render_page() {
 
         <form method="post">
             <?php wp_nonce_field( 'ckc_shipping_management_save', 'ckc_shipping_management_nonce' ); ?>
+
+            <div class="ckc-method-section">
+                <div style="padding:16px 20px;font-size:16px;font-weight:700;background:#f6f7f7;border-bottom:1px solid #dcdcde;">免運設定</div>
+                <div class="ckc-method-body">
+                    <p class="ckc-hint">訂單金額達到門檻時，該配送方式的運費以「免運費」計算；金額設為 0 或留空＝不啟用免運。目前免運門檻只依「消費金額」判斷，不分本島／離島、不分溫層；門市自取本身不收運費，不需要另外設定。</p>
+                    <table class="ckc-tier-table" style="max-width:420px;">
+                        <thead>
+                            <tr>
+                                <th style="width:50%;">配送方式</th>
+                                <th style="width:50%;">免運門檻 (NT$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( chao_gang_cheng_shipping_free_shipping_methods() as $method_key => $method_label ) : ?>
+                                <tr>
+                                    <td><?php echo esc_html( $method_label ); ?></td>
+                                    <td><input type="number" min="0" step="1" name="ckc_shipping_free[<?php echo esc_attr( $method_key ); ?>]" value="<?php echo esc_attr( $settings['free_shipping'][ $method_key ] ); ?>" placeholder="0 = 不啟用"></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <?php foreach ( $structure as $method_key => $method ) : ?>
                 <details class="ckc-method-section" <?php echo ( 'home_delivery' === $method_key ) ? 'open' : ''; ?>>
