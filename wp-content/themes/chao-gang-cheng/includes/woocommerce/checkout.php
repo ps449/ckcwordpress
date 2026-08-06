@@ -113,6 +113,20 @@ function chao_checkout_custom_js_css() {
         background: #fff;
         box-shadow: 0 2px 8px rgba(201,151,74,0.15);
     }
+    /* 目前收件地址／購物車商品組合下，這個配送方式沒有對應的運費資料
+       （例如商品沒有勾選「離島」運送類別、但收件地址是離島，宅配就會
+       整個不可用）。用灰階＋不可點游標明確表示「這個選項現在不能選」，
+       並用 title 顯示原因，取代原本點了完全沒反應、看起來像當機的狀況。 */
+    .chao-card.chao-shipping-card.chao-card-disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        background: #f2ece0;
+    }
+    .chao-card.chao-shipping-card.chao-card-disabled:hover {
+        border-color: #e2d2b3;
+        transform: none;
+        box-shadow: none;
+    }
 
     /* Circle Checkmark Icon */
     .chao-card-check {
@@ -527,7 +541,27 @@ function chao_checkout_custom_js_css() {
 
             // --- SHIPPING ---
             var activeShipping = $('input[name^="shipping_method"]:checked').val() || '';
-            
+
+            // 依目前收件地址／購物車商品實際算出來的可選運送方式（後端
+            // chao_gang_cheng_restrict_rates_by_shipping_class() 依商品「適用
+            // 運送類別」交集出來的結果），把沒有對應方式的卡片標成不可點選。
+            // 修正：先前三張卡片永遠都是可點的樣子，但如果收件地址是離島、
+            // 而購物車裡的商品沒有勾選「離島」，後端會把宅配整組方式都拿掉，
+            // 這時點「宅配」卡片其實找不到對應的 radio 可以勾，畫面上完全
+            // 沒有任何反應，客人會以為當機、卡住。
+            var hasDeliveryRate = $('input[name^="shipping_method"][value^="free_shipping"], input[name^="shipping_method"][value^="flat_rate"], input[name^="shipping_method"][value^="Wooecpay_Logistic_Home_Tcat"]').length > 0;
+            var hasCvsRate      = $('input[name^="shipping_method"][value^="Wooecpay_Logistic_CVS_711"]').length > 0;
+            var hasPickupRate   = $('input[name^="shipping_method"][value^="local_pickup"]').length > 0;
+
+            function chaoSetShippingCardAvailability(method, available, unavailableHint) {
+                $('.chao-shipping-card[data-method="' + method + '"]')
+                    .toggleClass('chao-card-disabled', !available)
+                    .attr('title', available ? '' : unavailableHint);
+            }
+            chaoSetShippingCardAvailability('delivery', hasDeliveryRate, '此收件地址目前不提供宅配，請改選其他配送方式');
+            chaoSetShippingCardAvailability('cvs', hasCvsRate, '此收件地址目前不提供超商取貨，請改選其他配送方式');
+            chaoSetShippingCardAvailability('pickup', hasPickupRate, '目前不提供門市自取，請改選其他配送方式');
+
             // 7-11 CVS -> Wooecpay_Logistic_CVS_711
             if (activeShipping.indexOf('Wooecpay_Logistic_CVS_711') !== -1) {
                 $('.chao-shipping-card[data-method="cvs"]').addClass('active').siblings().removeClass('active');
@@ -625,6 +659,13 @@ function chao_checkout_custom_js_css() {
         
         // Handle custom card click events
         $(document.body).on('click', '.chao-shipping-card', function() {
+            // 這個配送方式在目前收件地址／購物車商品組合下沒有對應的運費資料
+            // （見 syncUIStates() 的 chaoSetShippingCardAvailability()），
+            // 直接擋掉點擊，避免使用者以為系統卡住——卡片本身也會顯示灰階
+            // 樣式跟滑鼠移上去的提示文字說明原因。
+            if ($(this).hasClass('chao-card-disabled')) {
+                return;
+            }
             var method = $(this).data('method');
             var targetVal = '';
             
