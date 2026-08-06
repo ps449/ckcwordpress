@@ -6454,24 +6454,7 @@ function ckc_reorganize_admin_menu_groups() {
         return; // 一個都沒抓到，代表結構已經跟預期差很多，直接跳過避免誤動作
     }
 
-    // 3. 找出插入基準點：緊接在「控制台」（index.php）之後的下一個項目，
-    //    通常是「我的首頁」。把整組搬移項目插在它前面，這樣搬移後
-    //    「控制台」後面馬上接著這一整組，其餘沒被搬移的項目自然被推到
-    //    這一整組之後。
-    $insert_before_pos = null;
-    foreach ( $menu as $pos => $item ) {
-        $slug = isset( $item[2] ) ? $item[2] : '';
-        if ( 'index.php' === $slug ) {
-            continue; // 跳過控制台本身
-        }
-        $insert_before_pos = floatval( $pos );
-        break;
-    }
-    if ( null === $insert_before_pos ) {
-        $insert_before_pos = 4; // 保底：理論上一定找得到，這只是防呆
-    }
-
-    // 4. 依目標順序組出要插入的列（分類標題 + 項目）
+    // 3. 依目標順序組出要插入的列（分類標題 + 項目）
     $rows = array();
     foreach ( $groups as $header_label => $items ) {
         $group_rows = array();
@@ -6492,24 +6475,59 @@ function ckc_reorganize_admin_menu_groups() {
         }
     }
 
-    // 5. 由後往前分配位置 key，確保整組都排在「控制台」之後、
-    //    原本第二個項目之前，且彼此之間 key 不衝突。
-    $count = count( $rows );
-    foreach ( $rows as $i => $row ) {
-        $key = strval( $insert_before_pos - ( $count - $i ) * 0.0001 );
-        while ( isset( $menu[ $key ] ) ) {
-            $key = strval( floatval( $key ) - 0.00001 );
-        }
-        if ( 'header' === $row['type'] ) {
-            $menu[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
-        } else {
-            $item = $captured[ $row['slug'] ];
-            if ( null !== $row['label'] ) {
-                $item[0] = $row['label'];
+    // 4. 重建 $menu：依序走訪「移除搬移項目後」剩下的 $menu（保留其原本
+    //    的走訪順序，不動到任何其他項目），走到「控制台」（index.php）
+    //    時，直接把整組 $rows（分類標題＋項目，順序已經照 3. 排好）
+    //    原封不動地接在它後面插入。這裡刻意採用跟既有 ckc_setup_website_
+    //    features_menu()（見上方 26g）同一套「重新走訪、原地插入」的
+    //    做法，而不是憑位置數字去猜插入點——避免多個項目/標題彼此之間
+    //    的浮點數位置值太接近，导致最終排序跟走訪順序對不上的問題。
+    $new_menu = array();
+    $inserted = false;
+    foreach ( $menu as $pos => $item ) {
+        $new_menu[ $pos ] = $item;
+
+        $slug = isset( $item[2] ) ? $item[2] : '';
+        if ( ! $inserted && 'index.php' === $slug ) {
+            $base_pos = floatval( $pos );
+            foreach ( $rows as $n => $row ) {
+                $key = strval( $base_pos + 0.001 * ( $n + 1 ) );
+                while ( isset( $new_menu[ $key ] ) || isset( $menu[ $key ] ) ) {
+                    $key = strval( floatval( $key ) + 0.0001 );
+                }
+                if ( 'header' === $row['type'] ) {
+                    $new_menu[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
+                } else {
+                    $row_item = $captured[ $row['slug'] ];
+                    if ( null !== $row['label'] ) {
+                        $row_item[0] = $row['label'];
+                    }
+                    $new_menu[ $key ] = $row_item;
+                }
             }
-            $menu[ $key ] = $item;
+            $inserted = true;
         }
     }
+
+    if ( ! $inserted ) {
+        // 保底：理論上一定找得到「控制台」，這只是防呆，找不到就整組放最前面
+        $prefix = array();
+        foreach ( $rows as $n => $row ) {
+            $key = strval( 1 + 0.001 * ( $n + 1 ) );
+            if ( 'header' === $row['type'] ) {
+                $prefix[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
+            } else {
+                $row_item = $captured[ $row['slug'] ];
+                if ( null !== $row['label'] ) {
+                    $row_item[0] = $row['label'];
+                }
+                $prefix[ $key ] = $row_item;
+            }
+        }
+        $new_menu = $prefix + $new_menu;
+    }
+
+    $menu = $new_menu;
 }
 
 // =============================================================================
