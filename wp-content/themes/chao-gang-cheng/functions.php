@@ -7667,10 +7667,22 @@ function chao_gang_cheng_fix_allitem_result_count() {
 
     // TEMP DEBUG — remove after diagnosing empty allitem loop.
     global $wp_query;
+    $dump = array();
+    foreach ( array_slice( $wp_query->posts, 0, 12 ) as $p ) {
+        $is_prod  = ( 'product' === $p->post_type );
+        $product  = $is_prod ? wc_get_product( $p->ID ) : null;
+        $dump[]   = array(
+            'ID'        => $p->ID,
+            'type'      => $p->post_type,
+            'status'    => $p->post_status,
+            'title'     => mb_substr( $p->post_title, 0, 10 ),
+            'is_visible'=> $product ? ( $product->is_visible() ? 'y' : 'n' ) : 'n/a',
+        );
+    }
     echo '<!-- CKC-DEBUG-ALLITEM post_count=' . esc_html( $wp_query->post_count )
         . ' found_posts=' . esc_html( $wp_query->found_posts )
-        . ' tax_query=' . esc_html( wp_json_encode( $wp_query->get( 'tax_query' ) ) )
-        . ' product_cat=' . esc_html( $wp_query->get( 'product_cat' ) )
+        . ' post_type=' . esc_html( wp_json_encode( $wp_query->get( 'post_type' ) ) )
+        . ' posts=' . esc_html( wp_json_encode( $dump ) )
         . ' -->';
 
     $sql = "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p WHERE p.post_type = 'product' AND p.post_status = 'publish'";
