@@ -108,71 +108,44 @@ function chao_calc_cart_total_savings( $cart = null ) {
     }
 
     // 4. 判斷是否享有免運，若有免運則加上省下的運費 (隨系統真實運費變化)
+    //
+    // 注意：這裡原本是靠 WC()->shipping()->get_packages() 去讀「目前選擇的
+    // 運送方式」，但實測發現這條路走不通——購物車頁的「預估運費」列
+    // （chao_cart_estimated_shipping_row()，見 checkout-ux.php）其實根本
+    // 不是用 WooCommerce 原生的運費試算流程，而是直接拿「小計是否達免運
+    // 門檻」＋「是否套用免運優惠券」來判斷、顯示靜態文字，從來不會觸發
+    // WC()->shipping()->calculate_shipping()，所以 get_packages() 在這個
+    // 流程裡常常是空的或還沒算過，導致這裡永遠偵測不到免運、省下的運費
+    // 也就一直算成 0。改成比照「預估運費」列同一套判斷方式（門檻＋免運
+    // 優惠券），兩邊基準完全一致，也不再依賴可能還沒算好的 shipping
+    // package 資料。
     $shipping_savings = 0.0;
-    if ( $cart->needs_shipping() && $cart->show_shipping() ) {
-        $packages = WC()->shipping()->get_packages();
-        if ( ! empty( $packages ) && isset( $packages[0]['rates'] ) ) {
-            $rates = $packages[0]['rates'];
-            $chosen_method_id = isset( WC()->session->chosen_shipping_methods[0] ) ? WC()->session->chosen_shipping_methods[0] : '';
-            // 保底：購物車頁一開始載入、使用者還沒手動點選過運送方式時，
-            // session 的 chosen_shipping_methods 可能還沒寫入（要等使用者
-            // 互動或 update_checkout AJAX 才會設定），導致這裡誤判成「沒有
-            // 選運送方式」而漏算免運省下的運費。這種情況下 WooCommerce
-            // 實際上是採用可用選項中的第一個當作預設，所以這裡也比照辦理。
-            if ( ! $chosen_method_id || ! isset( $rates[ $chosen_method_id ] ) ) {
-                $rate_ids = array_keys( $rates );
-                $chosen_method_id = isset( $rate_ids[0] ) ? $rate_ids[0] : '';
+    if ( $cart->needs_shipping() ) {
+        $threshold        = function_exists( 'chao_get_free_shipping_threshold' )
+            ? chao_get_free_shipping_threshold()
+            : 2000;
+        $progress_amount  = function_exists( 'chao_get_free_shipping_progress_amount' )
+            ? chao_get_free_shipping_progress_amount()
+            : (float) $cart->get_cart_contents_total();
+
+        $coupon_free_shipping = false;
+        foreach ( $cart->get_applied_coupons() as $coupon_code ) {
+            $applied_coupon = new WC_Coupon( $coupon_code );
+            if ( $applied_coupon->get_id() && $applied_coupon->get_free_shipping() ) {
+                $coupon_free_shipping = true;
+                break;
             }
-            if ( $chosen_method_id && isset( $rates[ $chosen_method_id ] ) ) {
-                $rate = $rates[ $chosen_method_id ];
-                // 如果目前運送方式為免運，或運費為 0
-                if ( 'free_shipping' === $rate->method_id || (float) $rate->cost == 0 ) {
-                    $dynamic_base_cost = 250.0; // 保底運費金額
+        }
 
-                    // 從系統計算出的其他運費選項中，找出真實的運費。放寬比對
-                    // 條件為「slug 或方式 id 含有 flat_rate／Tcat」而非只比對
-                    // 開頭，因為 chao_gang_cheng_restrict_rates_by_shipping_class()
-                    // 或方式本身的「若有更低費率則隱藏」設定，都可能讓這個
-                    // package 目前的 $rates 裡根本沒有 flat_rate 選項殘留。
-                    $found_base = false;
-                    foreach ( $rates as $r_id => $r ) {
-                        $is_flat_like = ( false !== stripos( $r_id, 'flat_rate' ) )
-                            || ( false !== stripos( $r_id, 'Tcat' ) )
-                            || ( isset( $r->method_id ) && false !== stripos( $r->method_id, 'flat_rate' ) );
-                        if ( $is_flat_like && (float) $r->cost > 0 ) {
-                            $dynamic_base_cost = (float) $r->cost;
-                            $found_base = true;
-                            break;
-                        }
-                    }
-
-                    // 若目前 $rates 裡完全沒有非零費率殘留，直接去運送區域設定
-                    // 讀「固定費率」方式本身設定的費用（不受目前 package 篩選
-                    // 結果影響），比取「可用運費中的最大值」更準確可靠。
-                    if ( ! $found_base ) {
-                        $zone_cost = chao_get_zone_flat_rate_cost();
-                        if ( $zone_cost > 0 ) {
-                            $dynamic_base_cost = $zone_cost;
-                            $found_base = true;
-                        }
-                    }
-
-                    // 最後保底：取目前可用運費中的最大值
-                    if ( ! $found_base ) {
-                        $max_cost = 0.0;
-                        foreach ( $rates as $r ) {
-                            if ( (float) $r->cost > $max_cost ) {
-                                $max_cost = (float) $r->cost;
-                            }
-                        }
-                        if ( $max_cost > 0 ) {
-                            $dynamic_base_cost = $max_cost;
-                        }
-                    }
-
-                    $shipping_savings = $dynamic_base_cost;
-                }
+        if ( $coupon_free_shipping || $progress_amount >= $threshold ) {
+            // 保底運費金額 250，若運送區域有設定「固定費率」方式，
+            // 優先採用該方式實際設定的費用（比較貼近真實運費）。
+            $dynamic_base_cost = 250.0;
+            $zone_cost         = chao_get_zone_flat_rate_cost();
+            if ( $zone_cost > 0 ) {
+                $dynamic_base_cost = $zone_cost;
             }
+            $shipping_savings = $dynamic_base_cost;
         }
     }
 
