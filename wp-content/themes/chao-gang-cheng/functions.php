@@ -7638,6 +7638,12 @@ function chao_gang_cheng_allitem_category_shows_all_products( $query ) {
         $query->set( 'tax_query', array_values( $tax_query ) );
     }
     $query->set( 'product_cat', '' );
+
+    // 保底：確保只查詢商品（post_type=product），避免因為分類條件被清空後
+    // post_type 也連帶被重置成空字串，導致撈到頁面／文章等非商品內容，
+    // 使得 content-product.php 的 wc_get_product()/is_visible() 判斷失敗、
+    // 商品卡片整批不顯示（畫面上「共 N 項」數字正確、但清單是空的）。
+    $query->set( 'post_type', 'product' );
 }
 
 /**
@@ -7664,26 +7670,6 @@ function chao_gang_cheng_fix_allitem_result_count() {
         return;
     }
     global $wpdb;
-
-    // TEMP DEBUG — remove after diagnosing empty allitem loop.
-    global $wp_query;
-    $dump = array();
-    foreach ( array_slice( $wp_query->posts, 0, 12 ) as $p ) {
-        $is_prod  = ( 'product' === $p->post_type );
-        $product  = $is_prod ? wc_get_product( $p->ID ) : null;
-        $dump[]   = array(
-            'ID'        => $p->ID,
-            'type'      => $p->post_type,
-            'status'    => $p->post_status,
-            'title'     => mb_substr( $p->post_title, 0, 10 ),
-            'is_visible'=> $product ? ( $product->is_visible() ? 'y' : 'n' ) : 'n/a',
-        );
-    }
-    echo '<!-- CKC-DEBUG-ALLITEM post_count=' . esc_html( $wp_query->post_count )
-        . ' found_posts=' . esc_html( $wp_query->found_posts )
-        . ' post_type=' . esc_html( wp_json_encode( $wp_query->get( 'post_type' ) ) )
-        . ' posts=' . esc_html( wp_json_encode( $dump ) )
-        . ' -->';
 
     $sql = "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p WHERE p.post_type = 'product' AND p.post_status = 'publish'";
 
