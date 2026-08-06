@@ -119,34 +119,39 @@ function chao_calc_cart_total_savings( $cart = null ) {
     // 也就一直算成 0。改成比照「預估運費」列同一套判斷方式（門檻＋免運
     // 優惠券），兩邊基準完全一致，也不再依賴可能還沒算好的 shipping
     // package 資料。
+    //
+    // 再修正一次：也不能用 $cart->needs_shipping() 當守門條件——這個網站
+    // 特地掛了 woocommerce_cart_needs_shipping 這個 filter，在購物車頁
+    // （is_cart()）強制回傳 false（只在結帳頁才顯示運費相關資訊，見
+    // chao_gang_cheng_hide_shipping_on_cart()），導致這裡在購物車頁必定
+    // 誤判成「不需要運費」而完全跳過整段免運判斷。跟「預估運費」列一樣
+    // 乾脆不檢查 needs_shipping()，純粹用門檻／優惠券判斷。
     $shipping_savings = 0.0;
-    if ( $cart->needs_shipping() ) {
-        $threshold        = function_exists( 'chao_get_free_shipping_threshold' )
-            ? chao_get_free_shipping_threshold()
-            : 2000;
-        $progress_amount  = function_exists( 'chao_get_free_shipping_progress_amount' )
-            ? chao_get_free_shipping_progress_amount()
-            : (float) $cart->get_cart_contents_total();
+    $threshold        = function_exists( 'chao_get_free_shipping_threshold' )
+        ? chao_get_free_shipping_threshold()
+        : 2000;
+    $progress_amount  = function_exists( 'chao_get_free_shipping_progress_amount' )
+        ? chao_get_free_shipping_progress_amount()
+        : (float) $cart->get_cart_contents_total();
 
-        $coupon_free_shipping = false;
-        foreach ( $cart->get_applied_coupons() as $coupon_code ) {
-            $applied_coupon = new WC_Coupon( $coupon_code );
-            if ( $applied_coupon->get_id() && $applied_coupon->get_free_shipping() ) {
-                $coupon_free_shipping = true;
-                break;
-            }
+    $coupon_free_shipping = false;
+    foreach ( $cart->get_applied_coupons() as $coupon_code ) {
+        $applied_coupon = new WC_Coupon( $coupon_code );
+        if ( $applied_coupon->get_id() && $applied_coupon->get_free_shipping() ) {
+            $coupon_free_shipping = true;
+            break;
         }
+    }
 
-        if ( $coupon_free_shipping || $progress_amount >= $threshold ) {
-            // 保底運費金額 250，若運送區域有設定「固定費率」方式，
-            // 優先採用該方式實際設定的費用（比較貼近真實運費）。
-            $dynamic_base_cost = 250.0;
-            $zone_cost         = chao_get_zone_flat_rate_cost();
-            if ( $zone_cost > 0 ) {
-                $dynamic_base_cost = $zone_cost;
-            }
-            $shipping_savings = $dynamic_base_cost;
+    if ( $coupon_free_shipping || $progress_amount >= $threshold ) {
+        // 保底運費金額 250，若運送區域有設定「固定費率」方式，
+        // 優先採用該方式實際設定的費用（比較貼近真實運費）。
+        $dynamic_base_cost = 250.0;
+        $zone_cost         = chao_get_zone_flat_rate_cost();
+        if ( $zone_cost > 0 ) {
+            $dynamic_base_cost = $zone_cost;
         }
+        $shipping_savings = $dynamic_base_cost;
     }
 
     $savings = $original_sum - $subtotal + $coupon_discount + $shipping_savings;
@@ -237,27 +242,6 @@ function chao_cart_totals_subtotal_add_regular( $subtotal_html, $compound, $cart
  */
 function chao_render_order_savings_row( $cart = null ) {
     $savings = chao_calc_cart_total_savings( $cart );
-
-    // TEMP DEBUG（驗收用，之後會移除）：把運費判斷的中間值印成 HTML
-    // 註解，方便直接在瀏覽器檢視原始碼／DOM 確認每個數值。
-    if ( ! $cart ) {
-        $cart = function_exists( 'WC' ) && WC()->cart ? WC()->cart : null;
-    }
-    if ( $cart instanceof WC_Cart ) {
-        $dbg_needs_shipping = $cart->needs_shipping() ? 'yes' : 'no';
-        $dbg_threshold      = function_exists( 'chao_get_free_shipping_threshold' ) ? chao_get_free_shipping_threshold() : 'N/A';
-        $dbg_progress       = function_exists( 'chao_get_free_shipping_progress_amount' ) ? chao_get_free_shipping_progress_amount() : 'N/A';
-        $dbg_coupon_free    = 'no';
-        foreach ( $cart->get_applied_coupons() as $dbg_code ) {
-            $dbg_c = new WC_Coupon( $dbg_code );
-            if ( $dbg_c->get_id() && $dbg_c->get_free_shipping() ) {
-                $dbg_coupon_free = 'yes';
-                break;
-            }
-        }
-        echo "<!-- CKC-DEBUG savings={$savings} needs_shipping={$dbg_needs_shipping} threshold={$dbg_threshold} progress={$dbg_progress} coupon_free={$dbg_coupon_free} zone_flat_rate=" . chao_get_zone_flat_rate_cost() . " -->\n";
-    }
-
     if ( $savings <= 0 ) {
         return;
     }
