@@ -2253,17 +2253,17 @@ function ckc_purge_all_coupon_menu_entries() {
     );
 
     // 也從 $menu 動態蒐集所有頂層選單的 slug
-    // 注意：排除 ckc-referral-admin（「會員與行銷」頂層選單，折價券管理
-    // 收整後的新掛載父選單，見 ckc-coupons.php 的 ckc_register_coupon_admin_menu()）。
-    // 這個父選單底下本來就合法掛了一個指向
-    // post-new.php?post_type=shop_coupon 的「新增折價券」子選單，不能被
-    // 下面 1c 的清除邏輯誤刪——這裡原本排除的是舊版直接掛載的頂層 slug
-    // ckc-coupon-center，收整後這筆合法連結搬到 ckc-referral-admin
-    // 底下，排除清單也要跟著改，否則自己剛註冊的「新增折價券」會被
-    // 這個掃描迴圈當成別人的殘留連結清掉。
+    // 注意：排除 ckc-coupon-center（「折價券點數」頂層選單，見
+    // ckc-coupons.php 的 ckc_register_coupon_admin_menu()）。這個父選單
+    // 底下本來就合法掛了一個指向 post-new.php?post_type=shop_coupon 的
+    // 「新增折價券」子選單，不能被下面 1c 的清除邏輯誤刪（下面用
+    // strpos() 比對 post_type=shop_coupon，會連 post-new.php 版本的
+    // 合法連結也一起比對到）——排除清單要跟著這個父選單的 slug 走，
+    // 否則自己剛註冊的「新增折價券」會被這個掃描迴圈當成別人的殘留
+    // 連結清掉。
     if ( is_array( $menu ) ) {
         foreach ( $menu as $item ) {
-            if ( isset( $item[2] ) && $item[2] !== 'ckc-referral-admin' ) {
+            if ( isset( $item[2] ) && $item[2] !== 'ckc-coupon-center' ) {
                 $known_parents[] = $item[2];
             }
         }
@@ -3053,15 +3053,30 @@ function ckc_checkout_points_panel() {
 }
 
 
-// 後台選單整理：原本是獨立頂層選單，收整到「會員與行銷」頂層選單
-// （ckc-referral-admin.php 註冊，slug ckc-referral-admin）底下，
-// 優先權 22（緊接在分潤夥伴相關的 20、21 之後）。
-// 三個子選單各自的 slug、渲染回呼都不變，只改掛載的父選單。
+// 後台選單整理：獨立成自己的頂層選單「折價券點數」（slug 沿用原本子選單
+// 的 ckc-coupon-center，不影響任何既有連結），優先權 22。
+// 「所有折價券」原本是子選單，現在改成頂層選單自己的索引頁（做法跟
+// ckc-referral-admin.php 的「分潤夥伴」索引子選單一致：slug 與頂層選單
+// 相同時，WordPress 預設會自動產生一個跟頂層選單同名的子選單項目，這裡
+// 明確呼叫 add_submenu_page() 覆寫顯示文字）。
+// 「新增折價券」「前台領券中心」「紅利點數」（見 ckc-points-admin.php）
+// 全部掛在這個新頂層選單底下。
 add_action( 'admin_menu', 'ckc_register_coupon_admin_menu', 22 );
 function ckc_register_coupon_admin_menu() {
-    // ── 子選單 A：折價券列表
+    // ── 頂層選單：折價券點數（沿用「所有折價券」原本的 slug）
+    add_menu_page(
+        '折價券點數',
+        '折價券點數',
+        'manage_woocommerce',
+        'ckc-coupon-center',
+        'ckc_coupon_center_admin_page',
+        'dashicons-tickets-alt',
+        56.1
+    );
+
+    // slug 與頂層選單相同時，明確覆寫第一個子選單的顯示文字為「所有折價券」
     add_submenu_page(
-        'ckc-referral-admin',
+        'ckc-coupon-center',
         '所有折價券',
         '所有折價券',
         'manage_woocommerce',
@@ -3071,7 +3086,7 @@ function ckc_register_coupon_admin_menu() {
 
     // ── 子選單 B：新增折價券（WooCommerce 新增頁）
     add_submenu_page(
-        'ckc-referral-admin',
+        'ckc-coupon-center',
         '新增折價券',
         '新增折價券',
         'manage_woocommerce',
@@ -3080,7 +3095,7 @@ function ckc_register_coupon_admin_menu() {
 
     // ── 子選單 C：前往前台領券中心（外部連結）
     add_submenu_page(
-        'ckc-referral-admin',
+        'ckc-coupon-center',
         '查看前台領券中心',
         '前台領券中心',
         'manage_woocommerce',

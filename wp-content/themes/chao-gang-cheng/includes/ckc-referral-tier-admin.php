@@ -7,18 +7,20 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// 1. 註冊子選單
-// 優先權 21：緊接在「分潤夥伴」（優先權 20）之後，確保收整進「會員與
-// 行銷」頂層選單後的子選單順序穩定（見 ckc-referral-admin.php 說明）。
+// 1. 註冊為獨立頂層選單
+// 優先權 21：緊接在「分潤夥伴」（優先權 20）之後註冊，確保後台側邊欄
+// 選單順序穩定。slug 沿用原本當子選單時的 ckc-referral-product-tier，
+// 不影響任何既有連結。
 add_action( 'admin_menu', 'ckc_reftier_register_menu', 21 );
 function ckc_reftier_register_menu() {
-    add_submenu_page(
-        'ckc-referral-admin',
+    add_menu_page(
         '商品分潤分類',
         '商品分潤分類',
         'manage_woocommerce',
         'ckc-referral-product-tier',
-        'ckc_reftier_render_page'
+        'ckc_reftier_render_page',
+        'dashicons-category',
+        56.05
     );
 }
 

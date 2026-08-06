@@ -14,26 +14,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 後台選單整理：原本「分潤夥伴」「折價券管理」「紅利點數」是三個各自
- * 獨立的頂層選單（位置 56、56.5、57），都是給客戶回饋／獎勵用的機制
- * （分潤佣金、折價券、點數），性質相近但各自佔一整排。收整成一個
- * 頂層選單「會員與行銷」，三套系統原本各自的子選單全部收整進來，
- * 側邊欄從 3 排縮成 1 排。「出貨AI助理」性質是出貨作業工具，跟這三套
- * 客戶回饋機制不是同一類，維持獨立頂層選單不動。
- *
- * 沿用「分潤夥伴管理」原本的 slug（ckc-referral-admin）當作新頂層選單
- * 的 slug，這樣 ckc-referral-tier-admin.php 既有的
- * add_submenu_page('ckc-referral-admin', ...) 呼叫完全不用改。
- *
- * 子選單顯示順序：用遞增的 admin_menu 優先權（20～29）依序註冊
- * 分潤夥伴、折價券管理、紅利點數三套系統的選單，確保順序穩定、
- * 不受各檔案載入先後順序影響（做法跟「首頁」子選單整併時一致）。
+ * 後台選單整理：「分潤夥伴」是獨立的頂層選單（slug ckc-referral-admin）。
+ * 「商品分潤分類」（ckc-referral-tier-admin.php）已改為自己獨立的頂層
+ * 選單；「折價券管理」「紅利點數」也已改掛到獨立的「折價券點數」頂層
+ * 選單（ckc-coupons.php，slug ckc-coupon-center）底下，三者不再收整
+ * 在這個選單裡（後台側邊欄改用「會員管理」「行銷相關」等分類標題分組
+ * 顯示，見 functions.php 的 ckc_reorganize_admin_menu_groups()）。
  */
 add_action( 'admin_menu', 'ckc_refadm_register_menu', 20 );
 function ckc_refadm_register_menu() {
     add_menu_page(
-        '會員與行銷',
-        '會員與行銷',
+        '分潤夥伴管理',
+        '分潤夥伴',
         'manage_woocommerce',
         'ckc-referral-admin',
         'ckc_refadm_render_page',

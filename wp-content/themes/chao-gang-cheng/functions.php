@@ -5943,31 +5943,16 @@ function chao_gang_cheng_admin_menu_styling() {
     </style>
     <script type="text/javascript">
         jQuery(document).ready(function($) {
-            // Insert Section Headers
-            $('#menu-dashboard').before('<li class="menu-section-header">網站內容</li>');
-            
-            var $storeStart = $('#toplevel_page_ckc-gemini-agent');
-            if (!$storeStart.length) $storeStart = $('#toplevel_page_woocommerce');
-            if (!$storeStart.length) $storeStart = $('#menu-posts-product');
-            
-            // Move AutomateWoo to 網站內容 (right before 電商營運 starts)
+            // 注意：後台選單分類標題（網站內容／電商營運／行銷相關／會員管理／
+            // 系統配置）已經改用 PHP 端的 ckc_reorganize_admin_menu_groups()
+            // 直接寫進 $menu 全域陣列一次到位處理（含真正的項目搬移排序），
+            // 不再用這裡的 jQuery 插入 <li> 的做法。原本這裡把 AutomateWoo
+            // 移到「電商營運」前面的邏輯，維持在這裡用 jQuery 處理即可
+            // （AutomateWoo 不是每次都有安裝，用 jQuery 偵測比較彈性）。
             var $aw = $('#toplevel_page_automatewoo');
+            var $storeStart = $('#toplevel_page_ckc-homepage-builder');
             if ($aw.length && $storeStart.length) {
                 $aw.insertBefore($storeStart);
-            }
-
-            if ($storeStart.length) {
-                $storeStart.before('<li class="menu-section-header">電商營運</li>');
-            }
-            
-            // 注意：原本錨點是 #menu-appearance（外觀選單），但「外觀」早就被
-            // ckc_setup_website_features_menu() 收進「網站功能」子選單，
-            // #menu-appearance 這個元素已經不存在，導致這個標題從來沒有
-            //顯示出來過。改成錨定在「使用者」（#menu-users，目前系統配置
-            // 分類下唯一還留在頂層的項目）前面。
-            var $sysConfigStart = $('#menu-users');
-            if ($sysConfigStart.length) {
-                $sysConfigStart.before('<li class="menu-section-header">系統配置</li>');
             }
 
             // Translate MonsterInsights English admin notice to Traditional Chinese
@@ -6384,6 +6369,145 @@ function ckc_reorganize_plugin_menus() {
             );
 
             break;
+        }
+    }
+}
+
+// =============================================================================
+// 後台選單分類重組
+// 把左側選單依「控制台／總覽」獨立列 + 五大分類（網站內容、電商營運、
+// 行銷相關、會員管理、系統配置）重新分組排序，並在每組最前面插入分類
+// 標題（沿用既有 .menu-section-header 樣式）。
+//
+// 做法：從 $menu 全域陣列中，用「slug 完全比對」抓出所有要搬移的既有
+// 項目（抓到就從原本位置移除），然後依照下面 $groups 定義的順序，
+// 緊接在「控制台」後面重新插入一次，順便套用需要改的顯示名稱
+// （Stats→總覽、行銷→外部行銷、分析→數據分析）。沒被抓到的項目
+// （例如「我的首頁」、選單分隔線，或未來新安裝的外掛選單）完全不動，
+// 只是被整組往後推，不會被移除或遺失。
+//
+// 用「slug 比對」而不是直接對著文字改標籤，是因為這樣即使日後
+// WooCommerce／Jetpack 更新調整了顯示文字，只要 slug 沒變，這裡的
+// 分組邏輯還是能正確運作。
+//
+// 優先權用 999999，確保排在所有其他選單註冊、搬移邏輯（包含上面的
+// ckc_setup_website_features_menu 優先權 99999）都執行完之後才跑，
+// 這樣才能抓到每個項目「最終」的註冊資料。
+// =============================================================================
+add_action( 'admin_menu', 'ckc_reorganize_admin_menu_groups', 999999 );
+function ckc_reorganize_admin_menu_groups() {
+    global $menu;
+
+    if ( ! is_array( $menu ) ) {
+        return;
+    }
+
+    // 目標分組與新顯示名稱（value 為 null 代表沿用原本註冊時的文字）。
+    // key 為分類標題文字，null 代表「不加分類標題」的獨立項目。
+    $groups = array(
+        null => array(
+            'stats' => '總覽',
+        ),
+        '網站內容' => array(
+            'ckc-homepage-builder' => null, // 首頁
+            'ckc-website-features' => null, // 網站功能
+        ),
+        '電商營運' => array(
+            'edit.php?post_type=product' => null, // 商品
+            'woocommerce'                => null, // 商店設定
+            'ckc-gemini-agent'           => null, // 出貨AI助理
+        ),
+        '行銷相關' => array(
+            'ckc-coupon-center'                 => null, // 折價券點數
+            'woocommerce-marketing'             => '外部行銷',
+            'wc-admin&path=/analytics/overview' => '數據分析',
+        ),
+        '會員管理' => array(
+            'users.php'                 => null, // 使用者
+            'ckc-referral-admin'        => null, // 分潤夥伴
+            'ckc-referral-product-tier' => null, // 商品分潤分類
+        ),
+        '系統配置' => array(
+            'https://wordpress.com/overview/eshopckc.com' => null, // 主機服務
+            'paid-upgrades'                                => null, // 升級方案
+        ),
+    );
+
+    // 1. 建立「要搬移的 slug」查詢表
+    $wanted_slugs = array();
+    foreach ( $groups as $items ) {
+        foreach ( $items as $slug => $label ) {
+            $wanted_slugs[ $slug ] = true;
+        }
+    }
+
+    // 2. 從現有 $menu 抓出要搬移的項目，並從原位置移除
+    $captured = array();
+    foreach ( $menu as $pos => $item ) {
+        if ( ! empty( $item[2] ) && isset( $wanted_slugs[ $item[2] ] ) ) {
+            $captured[ $item[2] ] = $item;
+            unset( $menu[ $pos ] );
+        }
+    }
+
+    if ( empty( $captured ) ) {
+        return; // 一個都沒抓到，代表結構已經跟預期差很多，直接跳過避免誤動作
+    }
+
+    // 3. 找出插入基準點：緊接在「控制台」（index.php）之後的下一個項目，
+    //    通常是「我的首頁」。把整組搬移項目插在它前面，這樣搬移後
+    //    「控制台」後面馬上接著這一整組，其餘沒被搬移的項目自然被推到
+    //    這一整組之後。
+    $insert_before_pos = null;
+    foreach ( $menu as $pos => $item ) {
+        $slug = isset( $item[2] ) ? $item[2] : '';
+        if ( 'index.php' === $slug ) {
+            continue; // 跳過控制台本身
+        }
+        $insert_before_pos = floatval( $pos );
+        break;
+    }
+    if ( null === $insert_before_pos ) {
+        $insert_before_pos = 4; // 保底：理論上一定找得到，這只是防呆
+    }
+
+    // 4. 依目標順序組出要插入的列（分類標題 + 項目）
+    $rows = array();
+    foreach ( $groups as $header_label => $items ) {
+        $group_rows = array();
+        foreach ( $items as $slug => $new_label ) {
+            if ( ! isset( $captured[ $slug ] ) ) {
+                continue; // 這次沒抓到（例如外掛未啟用），跳過避免整組報錯
+            }
+            $group_rows[] = array( 'type' => 'item', 'slug' => $slug, 'label' => $new_label );
+        }
+        if ( empty( $group_rows ) ) {
+            continue; // 整組都沒抓到就不插入空的分類標題
+        }
+        if ( $header_label ) {
+            $rows[] = array( 'type' => 'header', 'label' => $header_label );
+        }
+        foreach ( $group_rows as $row ) {
+            $rows[] = $row;
+        }
+    }
+
+    // 5. 由後往前分配位置 key，確保整組都排在「控制台」之後、
+    //    原本第二個項目之前，且彼此之間 key 不衝突。
+    $count = count( $rows );
+    foreach ( $rows as $i => $row ) {
+        $key = strval( $insert_before_pos - ( $count - $i ) * 0.0001 );
+        while ( isset( $menu[ $key ] ) ) {
+            $key = strval( floatval( $key ) - 0.00001 );
+        }
+        if ( 'header' === $row['type'] ) {
+            $menu[ $key ] = array( $row['label'], 'read', '#', '', 'menu-section-header ckc-menu-section-header' );
+        } else {
+            $item = $captured[ $row['slug'] ];
+            if ( null !== $row['label'] ) {
+                $item[0] = $row['label'];
+            }
+            $menu[ $key ] = $item;
         }
     }
 }
