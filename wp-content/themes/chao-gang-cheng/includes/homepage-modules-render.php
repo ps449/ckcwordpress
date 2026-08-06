@@ -134,8 +134,28 @@ function ckc_render_module_hero_slider( $settings ) {
             foreach ( $featured_products as $product ) :
                 $image_id      = $product->get_image_id();
                 $image_url     = $image_id ? wp_get_attachment_url( $image_id ) : wc_placeholder_img_src();
-                $categories    = wp_get_post_terms( $product->get_id(), 'product_cat', array( 'fields' => 'names' ) );
-                $category_name = ! empty( $categories ) ? $categories[0] : '精選商品';
+
+                // 左上角徽章改讀商品「溫層」設定（常溫／冷藏／冷凍，可複選則
+                // 用頓號連接），取代原本讀商品分類名稱——分類名稱在商品被歸到
+                // 「全部商品」（allitem，其實是 WooCommerce 預設的「未分類」）
+                // 時會直接顯示「全部商品」這種沒意義的字樣，溫層才是這裡真正
+                // 想呈現的資訊。商品沒設定溫層時，沿用原本「精選商品」的預設
+                // 文字，行為不變。
+                $zone_slugs = function_exists( 'chao_gang_cheng_get_product_temperature_zones' )
+                    ? chao_gang_cheng_get_product_temperature_zones( $product )
+                    : array();
+                if ( ! empty( $zone_slugs ) && function_exists( 'chao_gang_cheng_get_temperature_zone_info' ) ) {
+                    $zone_labels = array();
+                    foreach ( $zone_slugs as $zone_slug ) {
+                        $zone_info = chao_gang_cheng_get_temperature_zone_info( $zone_slug );
+                        if ( $zone_info ) {
+                            $zone_labels[] = $zone_info['label'];
+                        }
+                    }
+                    $category_name = ! empty( $zone_labels ) ? implode( '、', $zone_labels ) : '精選商品';
+                } else {
+                    $category_name = '精選商品';
+                }
                 $short_desc    = $product->get_short_description();
                 if ( empty( $short_desc ) ) {
                     $short_desc = wp_strip_all_tags( $product->get_description() );
