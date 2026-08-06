@@ -6584,6 +6584,7 @@ function ckc_reorganize_admin_menu_groups() {
             'edit.php?post_type=product' => null, // 商品
             'woocommerce'                => null, // 商店設定
             'ckc-gemini-agent'           => null, // 出貨AI助理
+            'ckc-shipping-management'    => null, // 運費管理
         ),
         '行銷相關' => array(
             'ckc-coupon-center'                 => null, // 折價券點數
@@ -10053,6 +10054,9 @@ require_once get_template_directory() . '/includes/homepage-modules-render.php';
 
 // 分類頁／商店主頁 Banner 圖片管理（掛在 WooCommerce 編輯分類頁、商店頁編輯畫面）
 require_once get_template_directory() . '/includes/admin/category-banner.php';
+
+// 電商營運 > 運費管理（依配送方式 × 地區 × 溫層 × 件數級距設定運費）
+require_once get_template_directory() . '/includes/admin/shipping-management.php';
 
 // 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
 require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';

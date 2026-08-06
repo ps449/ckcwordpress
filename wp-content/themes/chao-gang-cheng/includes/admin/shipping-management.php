@@ -1,0 +1,429 @@
+<?php
+/**
+ * 電商營運 > 運費管理
+ *
+ * 後台設定頁面：依「配送方式 × 地區 × 溫層」分別設定運費，且每個組合底下
+ * 可以再依購買件數分級距各自設定固定運費（例如 1-5 件 NT$150、6-10 件
+ * NT$250、11 件以上 NT$350）。
+ *
+ * 配送方式：
+ * - 宅配（home_delivery）：台灣本島／離島，各自常溫／冷藏／冷凍
+ * - 超商（cvs）：台灣本島／離島，各自常溫／冷藏／冷凍
+ * - 門市自取（store_pickup）：常溫／冷藏／冷凍（不分地區）
+ *
+ * 本次只先建立這個後台設定頁面（儲存與讀取設定值），前台結帳實際套用
+ * 這裡設定的運費，之後確認需求後再另外串接。
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * 配送方式／地區的結構定義。門市自取沒有地區區分，用一個空字串 key
+ * 代表「不分地區」，讓後面所有迴圈都可以共用同一套寫法，不用另外
+ * 為門市自取寫特殊分支。
+ */
+function chao_gang_cheng_shipping_methods_structure() {
+    return array(
+        'home_delivery' => array(
+            'label'   => '宅配',
+            'regions' => array(
+                'main_island'     => '台灣本島',
+                'outlying_island' => '離島',
+            ),
+        ),
+        'cvs' => array(
+            'label'   => '超商',
+            'regions' => array(
+                'main_island'     => '台灣本島',
+                'outlying_island' => '離島',
+            ),
+        ),
+        'store_pickup' => array(
+            'label'   => '門市自取',
+            'regions' => array(
+                '' => '',
+            ),
+        ),
+    );
+}
+
+/**
+ * 溫層清單，沿用商品「溫層」欄位（_ckc_temperature_zones）已經在用的
+ * slug／標籤對照表（chao_gang_cheng_get_temperature_zone_info()），
+ * 確保用詞跟商品編輯頁、前台徽章完全一致。
+ */
+function chao_gang_cheng_shipping_zone_slugs() {
+    return array( 'ambient', 'chilled', 'frozen' );
+}
+
+/**
+ * 單一「配送方式 × 地區 × 溫層」組合底下，件數運費級距的預設值：
+ * 只有一級「不限件數」，運費 0 元，讓表格一開始至少有一列可以編輯，
+ * 而不是空白表格。
+ */
+function chao_gang_cheng_shipping_default_tiers() {
+    return array(
+        array(
+            'max_qty' => '',
+            'fee'     => 0,
+        ),
+    );
+}
+
+/**
+ * 讀取目前已儲存的運費設定，並跟預設結構做深層合併：只要有任何一個
+ * 「配送方式 × 地區 × 溫層」組合還沒存過資料，就自動補上預設的單一
+ * 級距，避免新增組合（例如以後新增溫層）時後台頁面顯示不完整或報錯。
+ *
+ * @return array
+ */
+function chao_gang_cheng_get_shipping_settings() {
+    $saved = get_option( 'chao_gang_cheng_shipping_settings', array() );
+    if ( ! is_array( $saved ) ) {
+        $saved = array();
+    }
+
+    $settings = array();
+    foreach ( chao_gang_cheng_shipping_methods_structure() as $method_key => $method ) {
+        foreach ( $method['regions'] as $region_key => $region_label ) {
+            foreach ( chao_gang_cheng_shipping_zone_slugs() as $zone ) {
+                $tiers = chao_gang_cheng_shipping_default_tiers();
+
+                $saved_tiers = isset( $saved[ $method_key ][ $region_key ][ $zone ] )
+                    ? $saved[ $method_key ][ $region_key ][ $zone ]
+                    : null;
+
+                if ( is_array( $saved_tiers ) && ! empty( $saved_tiers ) ) {
+                    $clean_tiers = array();
+                    foreach ( $saved_tiers as $tier ) {
+                        if ( ! is_array( $tier ) || ! isset( $tier['fee'] ) ) {
+                            continue;
+                        }
+                        $clean_tiers[] = array(
+                            'max_qty' => isset( $tier['max_qty'] ) ? $tier['max_qty'] : '',
+                            'fee'     => $tier['fee'],
+                        );
+                    }
+                    if ( ! empty( $clean_tiers ) ) {
+                        $tiers = $clean_tiers;
+                    }
+                }
+
+                $settings[ $method_key ][ $region_key ][ $zone ] = $tiers;
+            }
+        }
+    }
+
+    return $settings;
+}
+
+/**
+ * 後台選單：掛在「電商營運」分組底下（見 functions.php 的
+ * ckc_reorganize_admin_menu_groups()，把這個 slug 加進『電商營運』
+ * 分組陣列，才會排在正確位置、有正確的分類標題）。
+ */
+add_action( 'admin_menu', 'ckc_shipping_management_menu' );
+function ckc_shipping_management_menu() {
+    add_menu_page(
+        '運費管理',
+        '運費管理',
+        'manage_woocommerce',
+        'ckc-shipping-management',
+        'ckc_shipping_management_render_page',
+        'dashicons-car',
+        54.6
+    );
+}
+
+/**
+ * 表單送出處理：儲存運費設定。
+ */
+function ckc_shipping_management_handle_save() {
+    if ( ! isset( $_POST['ckc_shipping_management_nonce'] ) ) {
+        return null;
+    }
+    if ( ! wp_verify_nonce( $_POST['ckc_shipping_management_nonce'], 'ckc_shipping_management_save' ) ) {
+        return false;
+    }
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        return false;
+    }
+
+    $raw = isset( $_POST['ckc_shipping'] ) && is_array( $_POST['ckc_shipping'] ) ? wp_unslash( $_POST['ckc_shipping'] ) : array();
+
+    $new_settings = array();
+    foreach ( chao_gang_cheng_shipping_methods_structure() as $method_key => $method ) {
+        foreach ( $method['regions'] as $region_key => $region_label ) {
+            foreach ( chao_gang_cheng_shipping_zone_slugs() as $zone ) {
+                $max_qty_list = isset( $raw[ $method_key ][ $region_key ][ $zone ]['max_qty'] ) && is_array( $raw[ $method_key ][ $region_key ][ $zone ]['max_qty'] )
+                    ? $raw[ $method_key ][ $region_key ][ $zone ]['max_qty']
+                    : array();
+                $fee_list = isset( $raw[ $method_key ][ $region_key ][ $zone ]['fee'] ) && is_array( $raw[ $method_key ][ $region_key ][ $zone ]['fee'] )
+                    ? $raw[ $method_key ][ $region_key ][ $zone ]['fee']
+                    : array();
+
+                $tiers = array();
+                $count = max( count( $max_qty_list ), count( $fee_list ) );
+                for ( $i = 0; $i < $count; $i++ ) {
+                    $max_qty_raw = isset( $max_qty_list[ $i ] ) ? trim( (string) $max_qty_list[ $i ] ) : '';
+                    $fee_raw     = isset( $fee_list[ $i ] ) ? trim( (string) $fee_list[ $i ] ) : '';
+
+                    // 兩個欄位都留空的列直接跳過（例如使用者按了新增列但沒填）。
+                    if ( '' === $max_qty_raw && '' === $fee_raw ) {
+                        continue;
+                    }
+
+                    $tiers[] = array(
+                        'max_qty' => ( '' === $max_qty_raw ) ? '' : max( 0, absint( $max_qty_raw ) ),
+                        'fee'     => max( 0, (float) $fee_raw ),
+                    );
+                }
+
+                if ( empty( $tiers ) ) {
+                    $tiers = chao_gang_cheng_shipping_default_tiers();
+                }
+
+                $new_settings[ $method_key ][ $region_key ][ $zone ] = $tiers;
+            }
+        }
+    }
+
+    update_option( 'chao_gang_cheng_shipping_settings', $new_settings, false );
+
+    return true;
+}
+
+/**
+ * 後台頁面渲染。
+ */
+function ckc_shipping_management_render_page() {
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        wp_die( esc_html__( '您沒有權限存取此頁面。', 'chao-gang-cheng' ) );
+    }
+
+    $save_result = null;
+    if ( isset( $_POST['ckc_shipping_management_submit'] ) ) {
+        $save_result = ckc_shipping_management_handle_save();
+    }
+
+    $settings   = chao_gang_cheng_get_shipping_settings();
+    $structure  = chao_gang_cheng_shipping_methods_structure();
+    $zone_slugs = chao_gang_cheng_shipping_zone_slugs();
+    $method_keys = array_keys( $structure );
+    ?>
+    <div class="wrap ckc-shipping-management-wrap">
+        <h1 class="wp-heading-inline">運費管理</h1>
+        <hr class="wp-header-end">
+        <p style="max-width:760px;color:#555;">
+            依「配送方式 × 地區 × 溫層」分別設定運費；每個組合底下可以再依購買件數分級距，設定不同的固定運費（例如 1-5 件 NT$150、6-10 件 NT$250，11 件以上再另外設一列並把「件數上限」留空，代表「以上皆同」）。
+        </p>
+
+        <?php if ( true === $save_result ) : ?>
+            <div class="notice notice-success is-dismissible"><p>運費設定已儲存。</p></div>
+        <?php elseif ( false === $save_result ) : ?>
+            <div class="notice notice-error is-dismissible"><p>儲存失敗，請重新整理頁面後再試一次。</p></div>
+        <?php endif; ?>
+
+        <style>
+            .ckc-shipping-management-wrap .ckc-method-section {
+                background: #fff;
+                border: 1px solid #dcdcde;
+                border-radius: 8px;
+                margin: 20px 0;
+                overflow: hidden;
+            }
+            .ckc-shipping-management-wrap .ckc-method-section > summary {
+                cursor: pointer;
+                list-style: none;
+                padding: 16px 20px;
+                font-size: 16px;
+                font-weight: 700;
+                background: #f6f7f7;
+                border-bottom: 1px solid #dcdcde;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .ckc-shipping-management-wrap .ckc-method-section > summary::-webkit-details-marker { display: none; }
+            .ckc-shipping-management-wrap .ckc-method-section > summary::before {
+                content: "▶";
+                font-size: 11px;
+                color: #787c82;
+                transition: transform 0.15s;
+            }
+            .ckc-shipping-management-wrap .ckc-method-section[open] > summary::before {
+                transform: rotate(90deg);
+            }
+            .ckc-shipping-management-wrap .ckc-method-body {
+                padding: 20px;
+            }
+            .ckc-shipping-management-wrap .ckc-region-block {
+                margin-bottom: 24px;
+                padding-bottom: 20px;
+                border-bottom: 1px dashed #dcdcde;
+            }
+            .ckc-shipping-management-wrap .ckc-region-block:last-child {
+                margin-bottom: 0;
+                padding-bottom: 0;
+                border-bottom: none;
+            }
+            .ckc-shipping-management-wrap .ckc-region-title {
+                font-size: 14px;
+                font-weight: 700;
+                color: #1d2327;
+                margin: 0 0 12px 0;
+            }
+            .ckc-shipping-management-wrap .ckc-zone-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 16px;
+            }
+            .ckc-shipping-management-wrap .ckc-zone-card {
+                border: 1px solid #e2e4e7;
+                border-radius: 6px;
+                padding: 14px;
+                background: #fbfbfc;
+            }
+            .ckc-shipping-management-wrap .ckc-zone-card-title {
+                font-weight: 700;
+                font-size: 13px;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .ckc-shipping-management-wrap table.ckc-tier-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 8px;
+            }
+            .ckc-shipping-management-wrap table.ckc-tier-table th {
+                text-align: left;
+                font-size: 12px;
+                font-weight: 600;
+                color: #646970;
+                padding: 4px 6px;
+            }
+            .ckc-shipping-management-wrap table.ckc-tier-table td {
+                padding: 4px 6px;
+            }
+            .ckc-shipping-management-wrap table.ckc-tier-table input[type="number"] {
+                width: 100%;
+                min-width: 0;
+            }
+            .ckc-shipping-management-wrap .ckc-tier-remove {
+                color: #b32d2e;
+                text-decoration: none;
+                font-size: 18px;
+                line-height: 1;
+                padding: 2px 6px;
+            }
+            .ckc-shipping-management-wrap .ckc-tier-add {
+                font-size: 12px;
+            }
+            .ckc-shipping-management-wrap .ckc-hint {
+                font-size: 12px;
+                color: #787c82;
+                margin: 0 0 8px 0;
+            }
+        </style>
+
+        <form method="post">
+            <?php wp_nonce_field( 'ckc_shipping_management_save', 'ckc_shipping_management_nonce' ); ?>
+
+            <?php foreach ( $structure as $method_key => $method ) : ?>
+                <details class="ckc-method-section" <?php echo ( 'home_delivery' === $method_key ) ? 'open' : ''; ?>>
+                    <summary><?php echo esc_html( $method['label'] ); ?></summary>
+                    <div class="ckc-method-body">
+                        <?php foreach ( $method['regions'] as $region_key => $region_label ) : ?>
+                            <div class="ckc-region-block">
+                                <?php if ( '' !== $region_key ) : ?>
+                                    <p class="ckc-region-title"><?php echo esc_html( $region_label ); ?></p>
+                                <?php endif; ?>
+
+                                <div class="ckc-zone-grid">
+                                    <?php foreach ( $zone_slugs as $zone ) :
+                                        $zone_info  = chao_gang_cheng_get_temperature_zone_info( $zone );
+                                        $zone_label = $zone_info ? $zone_info['label'] : $zone;
+                                        $zone_icon  = $zone_info ? $zone_info['icon'] : '';
+                                        $tiers      = isset( $settings[ $method_key ][ $region_key ][ $zone ] ) ? $settings[ $method_key ][ $region_key ][ $zone ] : chao_gang_cheng_shipping_default_tiers();
+                                        $field_base = 'ckc_shipping[' . esc_attr( $method_key ) . '][' . esc_attr( $region_key ) . '][' . esc_attr( $zone ) . ']';
+                                        ?>
+                                        <div class="ckc-zone-card">
+                                            <div class="ckc-zone-card-title"><span aria-hidden="true"><?php echo esc_html( $zone_icon ); ?></span> <?php echo esc_html( $zone_label ); ?></div>
+                                            <p class="ckc-hint">件數上限留空＝該列以上（含）皆套用此運費。</p>
+
+                                            <table class="ckc-tier-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width:46%;">件數上限</th>
+                                                        <th style="width:44%;">運費 (NT$)</th>
+                                                        <th style="width:10%;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php foreach ( $tiers as $tier ) : ?>
+                                                        <tr>
+                                                            <td><input type="number" min="1" step="1" name="<?php echo $field_base; ?>[max_qty][]" value="<?php echo esc_attr( $tier['max_qty'] ); ?>" placeholder="不限"></td>
+                                                            <td><input type="number" min="0" step="1" name="<?php echo $field_base; ?>[fee][]" value="<?php echo esc_attr( $tier['fee'] ); ?>"></td>
+                                                            <td><a href="#" class="ckc-tier-remove" title="刪除此列">&times;</a></td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="button button-small ckc-tier-add">＋ 新增級距</button>
+
+                                            <template class="ckc-tier-row-template">
+                                                <tr>
+                                                    <td><input type="number" min="1" step="1" name="<?php echo $field_base; ?>[max_qty][]" value="" placeholder="不限"></td>
+                                                    <td><input type="number" min="0" step="1" name="<?php echo $field_base; ?>[fee][]" value="0"></td>
+                                                    <td><a href="#" class="ckc-tier-remove" title="刪除此列">&times;</a></td>
+                                                </tr>
+                                            </template>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+            <?php endforeach; ?>
+
+            <p class="submit">
+                <button type="submit" name="ckc_shipping_management_submit" value="1" class="button button-primary button-large">儲存運費設定</button>
+            </p>
+        </form>
+    </div>
+
+    <script>
+    (function () {
+        document.addEventListener('click', function (e) {
+            var addBtn = e.target.closest('.ckc-tier-add');
+            if (addBtn) {
+                e.preventDefault();
+                var card = addBtn.closest('.ckc-zone-card');
+                var template = card.querySelector('.ckc-tier-row-template');
+                var tbody = card.querySelector('table.ckc-tier-table tbody');
+                if (template && tbody) {
+                    var clone = template.content.cloneNode(true);
+                    tbody.appendChild(clone);
+                }
+                return;
+            }
+            var removeBtn = e.target.closest('.ckc-tier-remove');
+            if (removeBtn) {
+                e.preventDefault();
+                var row = removeBtn.closest('tr');
+                var tbody = removeBtn.closest('tbody');
+                if (row && tbody && tbody.querySelectorAll('tr').length > 1) {
+                    row.parentNode.removeChild(row);
+                }
+                return;
+            }
+        });
+    })();
+    </script>
+    <?php
+}
