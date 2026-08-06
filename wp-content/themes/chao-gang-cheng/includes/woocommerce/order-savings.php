@@ -4,6 +4,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * 直接從運送區域設定讀取「固定費率」(flat_rate) 方式本身設定的費用，
+ * 不受目前購物車 package 篩選結果（例如達免運門檻、離島限制、依運送
+ * 類別限制可用方式等）影響，用來當「免運省下多少運費」計算的可靠保底
+ * 來源。做法比照既有的 chao_gang_cheng_get_free_shipping_threshold()
+ * （同樣走「先找命名區域、找不到再退回預設區域 0」的順序）。
+ *
+ * 固定費率的費用欄位在 WooCommerce 後台可以填公式（例如
+ * "10 + ( 2 * [qty] )"），這裡只取數字開頭部分，公式類的複雜運費不會
+ * 完全精準，但作為「你省下了多少」的行銷提示文字已經足夠準確。
+ */
+function chao_get_zone_flat_rate_cost() {
+    if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
+        return 0.0;
+    }
+    $zones = WC_Shipping_Zones::get_zones();
+    $zones[] = array( 'zone_id' => 0 ); // 附加預設區域，稍後統一處理
+    foreach ( $zones as $zone_data ) {
+        $zone = isset( $zone_data['zone_id'] )
+            ? WC_Shipping_Zones::get_zone_by( 'zone_id', $zone_data['zone_id'] )
+            : null;
+        if ( ! $zone ) {
+            continue;
+        }
+        foreach ( $zone->get_shipping_methods( true ) as $method ) {
+            if ( 'flat_rate' !== $method->id || 'yes' !== $method->enabled ) {
+                continue;
+            }
+            $cost = method_exists( $method, 'get_option' ) ? $method->get_option( 'cost' ) : ( isset( $method->cost ) ? $method->cost : '' );
+            $cost = (float) $cost; // 只取數字開頭，公式類費用不精算
+            if ( $cost > 0 ) {
+                return $cost;
+            }
+        }
+    }
+    return 0.0;
+}
+
+/**
  * 「此訂單總共省了多少？」— 購物車頁與結帳頁共用同一套計算與渲染。
  *
  * 省下金額 = Σ(商品原價 × 數量，以「小計」相同的含稅／未稅基準換算)
@@ -89,19 +127,37 @@ function chao_calc_cart_total_savings( $cart = null ) {
                 $rate = $rates[ $chosen_method_id ];
                 // 如果目前運送方式為免運，或運費為 0
                 if ( 'free_shipping' === $rate->method_id || (float) $rate->cost == 0 ) {
-                    $dynamic_base_cost = 250.0; // 預設 250 保底
-                    
-                    // 從系統計算出的其他運費選項中，找出真實的運費 (優先找 flat_rate)
+                    $dynamic_base_cost = 250.0; // 保底運費金額
+
+                    // 從系統計算出的其他運費選項中，找出真實的運費。放寬比對
+                    // 條件為「slug 或方式 id 含有 flat_rate／Tcat」而非只比對
+                    // 開頭，因為 chao_gang_cheng_restrict_rates_by_shipping_class()
+                    // 或方式本身的「若有更低費率則隱藏」設定，都可能讓這個
+                    // package 目前的 $rates 裡根本沒有 flat_rate 選項殘留。
                     $found_base = false;
                     foreach ( $rates as $r_id => $r ) {
-                        if ( strpos( $r_id, 'flat_rate' ) === 0 && (float) $r->cost > 0 ) {
+                        $is_flat_like = ( false !== stripos( $r_id, 'flat_rate' ) )
+                            || ( false !== stripos( $r_id, 'Tcat' ) )
+                            || ( isset( $r->method_id ) && false !== stripos( $r->method_id, 'flat_rate' ) );
+                        if ( $is_flat_like && (float) $r->cost > 0 ) {
                             $dynamic_base_cost = (float) $r->cost;
                             $found_base = true;
                             break;
                         }
                     }
-                    
-                    // 若無 flat_rate，則取可用運費中的最大值作為真實運費
+
+                    // 若目前 $rates 裡完全沒有非零費率殘留，直接去運送區域設定
+                    // 讀「固定費率」方式本身設定的費用（不受目前 package 篩選
+                    // 結果影響），比取「可用運費中的最大值」更準確可靠。
+                    if ( ! $found_base ) {
+                        $zone_cost = chao_get_zone_flat_rate_cost();
+                        if ( $zone_cost > 0 ) {
+                            $dynamic_base_cost = $zone_cost;
+                            $found_base = true;
+                        }
+                    }
+
+                    // 最後保底：取目前可用運費中的最大值
                     if ( ! $found_base ) {
                         $max_cost = 0.0;
                         foreach ( $rates as $r ) {
@@ -113,7 +169,7 @@ function chao_calc_cart_total_savings( $cart = null ) {
                             $dynamic_base_cost = $max_cost;
                         }
                     }
-                    
+
                     $shipping_savings = $dynamic_base_cost;
                 }
             }
@@ -173,9 +229,20 @@ function chao_calc_cart_original_subtotal( $cart = null ) {
  * ckc_cart_item_price_add_regular()），維持前台視覺一致。
  * 只有在原價確實高於小計（有實際折扣）時才加顯原價，避免沒有折扣的
  * 訂單也顯示一模一樣的兩行造成混淆。
+ *
+ * 注意：這裡原本掛錯 filter 名稱（woocommerce_cart_totals_subtotal_html
+ * 這個 filter 根本不存在，wc_cart_totals_subtotal_html() 直接輸出
+ * WC_Cart::get_cart_subtotal() 的結果，實際套用的 filter 是
+ * WC_Cart::get_cart_subtotal() 內部呼叫的 woocommerce_cart_subtotal，
+ * 且回呼參數是 3 個：$return, $compound, $cart），導致這個 filter 從
+ * 頭到尾沒被執行過。改成正確的 filter 名稱與參數簽名。
  */
-add_filter( 'woocommerce_cart_totals_subtotal_html', 'chao_cart_totals_subtotal_add_regular', 10, 2 );
-function chao_cart_totals_subtotal_add_regular( $subtotal_html, $cart ) {
+add_filter( 'woocommerce_cart_subtotal', 'chao_cart_totals_subtotal_add_regular', 10, 3 );
+function chao_cart_totals_subtotal_add_regular( $subtotal_html, $compound, $cart ) {
+    if ( $compound ) {
+        return $subtotal_html; // 複合稅額顯示模式維持原樣，不處理
+    }
+
     $original_sum = chao_calc_cart_original_subtotal( $cart );
     $subtotal     = (float) $cart->get_subtotal();
 
