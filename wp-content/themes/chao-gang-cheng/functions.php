@@ -2007,9 +2007,18 @@ function chao_gang_cheng_addon_purchase_section() {
     $addon_settings   = chao_gang_cheng_get_addon_zone_settings();
     $addon_categories = apply_filters( 'chao_addon_zone_categories', $addon_settings['categories'] );
     $addon_max_items  = max( 1, (int) $addon_settings['max_items'] );
+
+    // 加價購的商品必須跟目前瀏覽商品同溫層（常溫／冷藏／冷凍），避免出貨時
+    // 混到不同溫層的商品。因為溫層篩選是在取到候選商品之後才做（溫層存在
+    // 可複選的 meta 欄位，無法單純用 tax_query／meta_query 精準比對交集），
+    // 這裡先多抓一批候選（$addon_max_items 的 5 倍，至少 30 件），過濾掉溫層
+    // 不符的之後再截斷成實際要顯示的件數，避免抓太少導致篩完剩沒幾件。
+    $current_product = wc_get_product( get_the_ID() );
+    $current_zones    = chao_gang_cheng_get_product_temperature_zones( $current_product );
+
     $args = array(
         'post_type'      => 'product',
-        'posts_per_page' => $addon_max_items,
+        'posts_per_page' => max( 30, $addon_max_items * 5 ),
         'post__not_in'   => array( get_the_ID() ),
         'orderby'        => 'date',
         'order'          => 'DESC',
@@ -2030,10 +2039,34 @@ function chao_gang_cheng_addon_purchase_section() {
         $addon_products = get_posts( $args );
     }
 
+    // 溫層篩選：目前瀏覽的商品有標注溫層時，加價購候選商品必須跟它至少有
+    // 一個共同溫層才留下；候選商品本身沒有標注溫層（未設定＝不限制，沿用
+    // 全站既有的溫層判斷慣例，見 chao_gang_cheng_get_cart_temperature_conflict()）
+    // 則視為可以搭配，不會被擋掉。目前瀏覽的商品本身沒標溫層時，維持原本
+    // 不篩選的行為（沒有基準可比對）。
+    if ( ! empty( $current_zones ) ) {
+        $addon_products = array_values(
+            array_filter(
+                $addon_products,
+                function( $post ) use ( $current_zones ) {
+                    $addon_product = wc_get_product( $post->ID );
+                    $addon_zones   = chao_gang_cheng_get_product_temperature_zones( $addon_product );
+                    if ( empty( $addon_zones ) ) {
+                        return true;
+                    }
+                    return (bool) array_intersect( $current_zones, $addon_zones );
+                }
+            )
+        );
+    }
+
+    // 篩完溫層後才截斷成後台設定要顯示的件數。
+    $addon_products = array_slice( $addon_products, 0, $addon_max_items );
+
     if ( empty( $addon_products ) ) {
         return;
     }
-    
+
     ?>
     <div class="product-addons-section">
         <div class="addons-header">
