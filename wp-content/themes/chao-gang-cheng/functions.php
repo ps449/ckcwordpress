@@ -5221,6 +5221,12 @@ function chao_gang_cheng_is_outlying_island_destination( $package ) {
 }
 
 // 22. Adjust shipping rates for outlying islands (澎湖, 金門, 連江, 綠島, 蘭嶼, 琉球)
+// 離島地區只支援「宅配」與「超商取貨」，不支援「門市自取」（門市自取
+// 需要客人親自到店，門市只設在台灣本島）；free_shipping／local_pickup
+// 在離島直接移除，flat_rate 改為離島專屬費率。結帳頁「配送方式」卡片
+// 的可點選狀態（見 checkout.php 的 chaoSetShippingCardAvailability()）
+// 是依當下實際存在哪些 shipping_method radio 判斷，這裡把 local_pickup
+// 移除後，前台「門市自取」卡片會自動變灰階不可點，不需要另外改前端。
 add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_adjust_shipping_rates', 10, 2 );
 function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
     $is_outlying = chao_gang_cheng_is_outlying_island_destination( $package );
@@ -5242,6 +5248,12 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
 
             if ( 'free_shipping' === $rate->method_id ) {
                 // Disable/Remove free shipping for outlying islands
+                unset( $rates[$rate_key] );
+            }
+
+            if ( 'local_pickup' === $rate->method_id ) {
+                // 離島收件地址不支援「門市自取」（門市只在台灣本島，離島
+                // 客人無法親自到店取貨），只保留宅配與超商取貨。
                 unset( $rates[$rate_key] );
             }
         }
