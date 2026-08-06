@@ -1836,14 +1836,101 @@ function chao_gang_cheng_get_cart_temperature_conflict() {
 }
 
 /**
- * 購物車／結帳頁面提示：溫層衝突時顯示錯誤訊息（不會擋下，只是提醒，
- * 實際擋下是靠 woocommerce_after_checkout_validation）。
+ * 購物車頁面提示：溫層衝突時顯示錯誤訊息（不會擋下，只是提醒，實際擋下
+ * 是靠 woocommerce_after_checkout_validation）。
+ *
+ * 注意：結帳頁（is_checkout()）刻意不在這裡加這個 error 等級的提示——
+ * WooCommerce 核心的結帳頁 [woocommerce_checkout] 只要偵測到頁面載入時
+ * 已經有 error 等級的通知，就會整個不渲染結帳表單，改顯示很籠統的
+ * 「你的購物車項目發生一些問題，請在結帳前回到購物車頁面並解決這些
+ * 問題」，看不到真正的原因，也沒有直接可以刪除商品的地方。結帳頁改用
+ * 下面 chao_gang_cheng_checkout_temperature_zone_panel() 在表單最上方
+ * 直接列出衝突商品明細＋各自的移除連結，比籠統的通知更清楚可操作。
  */
 add_action( 'woocommerce_check_cart_items', 'chao_gang_cheng_notice_temperature_zone_conflict' );
 function chao_gang_cheng_notice_temperature_zone_conflict() {
+    if ( is_checkout() ) {
+        return;
+    }
     if ( chao_gang_cheng_get_cart_temperature_conflict() ) {
         wc_add_notice( '購物車內的商品溫層不同（例如常溫與冷凍無法同時出貨），請分開下單。', 'error' );
     }
+}
+
+/**
+ * 結帳頁面提示：溫層衝突時，在結帳表單最上方直接列出目前購物車裡
+ * 各個溫層各有哪些商品，並提供每件商品的「移除」連結，讓客人可以
+ * 直接在結帳頁上動手刪除其中一種溫層的商品，不用先看到一段籠統、
+ * 不知道問題出在哪的錯誤訊息才能繼續。
+ *
+ * 沿用 chao_gang_cheng_notice_temperature_zone_conflict() 上面說明的
+ * 原因：這裡刻意不用 wc_add_notice( ..., 'error' )，改成自己渲染面板，
+ * 避免觸發 WooCommerce 核心「有 error 通知就整頁不顯示結帳表單」的行為。
+ */
+add_action( 'woocommerce_before_checkout_form', 'chao_gang_cheng_checkout_temperature_zone_panel', 5 );
+function chao_gang_cheng_checkout_temperature_zone_panel() {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart || ! chao_gang_cheng_get_cart_temperature_conflict() ) {
+        return;
+    }
+
+    // 依溫層分組，只列出「有標注溫層」的商品——這些才是造成衝突、需要
+    // 客人自己選一種溫層保留的商品；沒標溫層（不限制）的商品不影響
+    // 衝突判斷，不需要出現在這裡。
+    $groups = array(); // zone_slug => array of { name, remove_url }
+    foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+        if ( empty( $cart_item['product_id'] ) ) {
+            continue;
+        }
+        $product = wc_get_product( $cart_item['product_id'] );
+        if ( ! $product ) {
+            continue;
+        }
+        $zones = chao_gang_cheng_get_product_temperature_zones( $product );
+        if ( empty( $zones ) ) {
+            continue;
+        }
+        $remove_url = WC()->cart->get_remove_url( $cart_item_key );
+        foreach ( $zones as $zone ) {
+            if ( ! isset( $groups[ $zone ] ) ) {
+                $groups[ $zone ] = array();
+            }
+            $groups[ $zone ][] = array(
+                'name'       => $product->get_name(),
+                'remove_url' => $remove_url,
+            );
+        }
+    }
+
+    if ( empty( $groups ) ) {
+        return;
+    }
+    ?>
+    <div class="chao-checkout-section chao-temperature-conflict-panel" style="border-color:#f0b4ae;background:#fff6f5;">
+        <div class="chao-section-title" style="border-bottom-color:#e2685f;">
+            <span aria-hidden="true">⚠️</span> 購物車內的商品溫層不同，無法一起出貨
+        </div>
+        <p style="margin:0 0 16px 0;color:#5c4033;font-size:14px;line-height:1.6;">
+            請保留其中一種溫層的商品，並手動移除其餘溫層的商品，才能繼續結帳。
+        </p>
+        <?php foreach ( $groups as $zone => $items ) :
+            $zone_info = chao_gang_cheng_get_temperature_zone_info( $zone );
+            $zone_label = $zone_info ? $zone_info['label'] : $zone;
+            $zone_icon  = $zone_info ? $zone_info['icon'] : '';
+            ?>
+            <div class="chao-sub-title" style="margin-top:14px;">
+                <?php echo esc_html( $zone_icon ); ?> <?php echo esc_html( $zone_label ); ?>
+            </div>
+            <ul style="list-style:none;margin:0;padding:0;">
+                <?php foreach ( $items as $item ) : ?>
+                    <li style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid #e2d2b3;border-radius:8px;background:#fff;margin-bottom:8px;">
+                        <span style="font-size:14px;color:#1a140f;"><?php echo esc_html( $item['name'] ); ?></span>
+                        <a href="<?php echo esc_url( $item['remove_url'] ); ?>" style="flex-shrink:0;font-size:13px;font-weight:600;color:#e2685f;border:1px solid #e2685f;border-radius:20px;padding:5px 14px;text-decoration:none;white-space:nowrap;">移除此商品</a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endforeach; ?>
+    </div>
+    <?php
 }
 
 /**
