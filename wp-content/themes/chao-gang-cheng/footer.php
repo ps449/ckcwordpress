@@ -99,15 +99,27 @@ document.addEventListener('DOMContentLoaded', function() {
         var targetAttr = target.getAttribute('target');
         
         // Prevent loader on internal links, mailto, tel, empty hrefs, or new tabs
+        //
+        // 修正：WooCommerce 商品列表頁的「加入購物車」快速加入按鈕
+        // （<a class="add_to_cart_button ajax_add_to_cart" href="?add-to-cart=xxx">）
+        // 本身是有 href 的 <a> 連結，但實際點擊時是被 WooCommerce 自己的 JS
+        // 攔截、用 AJAX 加入購物車，並不會真的離開頁面。這裡原本沒有排除
+        // 這種連結，導致每次點「加入購物車」都會誤觸發這個全頁過場遮罩，
+        // 因為沒有真正的頁面離開事件可以把遮罩收掉，只能靠 8 秒保底逾時，
+        // 結果整整 8 秒把畫面（包含下面「已加入購物車」提示 toast）都蓋住。
+        // 同理排除 WooCommerce 自己另一個常見的 AJAX 連結 class
+        // 「add_to_wishlist」（加入收藏，同樣是有 href 但走 AJAX 攔截）。
         if (
-            !href || 
-            href.startsWith('#') || 
-            href.startsWith('javascript:') || 
-            href.startsWith('mailto:') || 
+            !href ||
+            href.startsWith('#') ||
+            href.startsWith('javascript:') ||
+            href.startsWith('mailto:') ||
             href.startsWith('tel:') ||
             targetAttr === '_blank' ||
             e.ctrlKey || e.metaKey || e.shiftKey || e.altKey ||
             target.classList.contains('no-loader') ||
+            target.classList.contains('ajax_add_to_cart') ||
+            target.classList.contains('add_to_wishlist') ||
             target.closest('.no-loader') ||
             (href.indexOf(window.location.hostname) === -1 && href.startsWith('http'))
         ) {
