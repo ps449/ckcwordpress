@@ -5184,9 +5184,10 @@ require_once get_template_directory() . '/includes/woocommerce/shop-styles.php';
 
 /**
  * 22a-1. 判斷一個運費 $package 的收件地址是否為離島（澎湖、金門、連江、
- * 綠島、蘭嶼、琉球）。抽成獨立函式，讓下面 22（離島運費調整）跟 22f
- * （商品層級的「適用運送類別」限制，離島是其中一個修飾條件）共用同一套
- * 判斷邏輯，避免兩處各自維護一份、以後修改判斷條件時只改到一邊。
+ * 綠島、蘭嶼、琉球）。給下面 chao_gang_cheng_apply_shipping_management_rates()
+ * （優先權 30）判斷要套用「運費管理」裡本島還是離島的費率格。（22d 的
+ * 商品運送類別限制先前也會用到這個函式判斷離島修飾條件，該邏輯已於
+ * 2026-08 移除，見 22d 的 docblock 說明。）
  */
 function chao_gang_cheng_is_outlying_island_destination( $package ) {
     $destination = isset( $package['destination'] ) ? $package['destination'] : array();
@@ -5221,12 +5222,15 @@ function chao_gang_cheng_is_outlying_island_destination( $package ) {
 }
 
 // 22. Adjust shipping rates for outlying islands (澎湖, 金門, 連江, 綠島, 蘭嶼, 琉球)
-// 離島地區只支援「宅配」與「超商取貨」，不支援「門市自取」（門市自取
-// 需要客人親自到店，門市只設在台灣本島）；free_shipping／local_pickup
-// 在離島直接移除，flat_rate 改為離島專屬費率。結帳頁「配送方式」卡片
-// 的可點選狀態（見 checkout.php 的 chaoSetShippingCardAvailability()）
-// 是依當下實際存在哪些 shipping_method radio 判斷，這裡把 local_pickup
-// 移除後，前台「門市自取」卡片會自動變灰階不可點，不需要另外改前端。
+// 【2026-08 更新】依商家最新確認：離島與本島都要能自由選「超商／宅配／
+// 門市自取」三種配送方式，不應該因為收件地址是離島就把某個方式整組拿掉
+// ——後台「運費管理」本身也已經幫宅配、超商都各自設定了本島／離島兩種
+// 費率（門市自取則不分本島離島，固定 0 元），代表離島本來就在設計範圍
+// 內，只是費用不同，不是「不能選」。因此這裡不再移除 local_pickup（先前
+// 一度誤加上「離島不支援門市自取」的限制，已移除）。free_shipping 仍在
+// 這裡移除，但那只是把 WC 原生「免運送」這個方式本身關掉，離島訂單一樣
+// 能透過下面 chao_gang_cheng_apply_shipping_management_rates()（優先權
+// 30）依「運費管理」的免運門檻把宅配/超商費用算成 0，兩者不衝突。
 add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_adjust_shipping_rates', 10, 2 );
 function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
     $is_outlying = chao_gang_cheng_is_outlying_island_destination( $package );
@@ -5248,12 +5252,6 @@ function chao_gang_cheng_adjust_shipping_rates( $rates, $package ) {
 
             if ( 'free_shipping' === $rate->method_id ) {
                 // Disable/Remove free shipping for outlying islands
-                unset( $rates[$rate_key] );
-            }
-
-            if ( 'local_pickup' === $rate->method_id ) {
-                // 離島收件地址不支援「門市自取」（門市只在台灣本島，離島
-                // 客人無法親自到店取貨），只保留宅配與超商取貨。
                 unset( $rates[$rate_key] );
             }
         }
@@ -5349,10 +5347,14 @@ function chao_gang_cheng_ensure_shipping_classes() {
  * 商品），保守起見不限制、回傳原本全部方式，避免客人卡在結帳頁完全無法
  * 選擇任何運送方式。
  *
- * 「離島」是修飾條件，不是獨立的運送方式：只有在客人收件地址確實是離島
- * 時才會生效——這時商品的「宅配」資格必須同時也勾選「離島」才算數，否則
- * 這件商品在離島訂單裡就不允許用宅配（但自取／超商自取類別不受此影響，
- * 因為那兩種本來就跟收件地址無關）。
+ * 【2026-08 更新】原本這裡還有一段「離島」修飾條件：收件地址是離島、
+ * 商品又沒勾選「離島」類別時，會把「宅配」從允許清單中拿掉。依商家最新
+ * 確認，這段已經移除——後台「運費管理」本身就有幫宅配、超商分別設定
+ * 本島／離島兩種費率，離島訂單本來就在設計範圍內，只是費用不同，不應該
+ * 因為收件地址是離島就整個不能選宅配。商品的「適用運送類別」（自取／
+ * 超商自取／宅配）現在純粹依商品本身可否用該方式出貨判斷，不再疊加地址
+ * 條件；「離島」這個類別選項本身保留在商品編輯畫面，但目前沒有任何邏輯
+ * 讀取它，純粹保留欄位相容性，之後如有需要可再重新賦予意義。
  */
 add_filter( 'woocommerce_package_rates', 'chao_gang_cheng_restrict_rates_by_shipping_class', 20, 2 );
 function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
@@ -5376,7 +5378,6 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
         return false;
     };
 
-    $is_outlying        = chao_gang_cheng_is_outlying_island_destination( $package );
     $allowed_rate_keys  = null; // null = 目前為止沒有任何商品限制過運送方式
 
     foreach ( $package['contents'] as $item ) {
@@ -5393,13 +5394,9 @@ function chao_gang_cheng_restrict_rates_by_shipping_class( $rates, $package ) {
             continue; // 沒設定運送類別，不限制此商品的運送方式。
         }
 
-        // 「離島」是修飾條件，本身不對應任何運送方式；目的地是離島時，
-        // 商品若沒有勾選「離島」，就把「宅配」從這件商品允許的類別中移除。
+        // 「離島」類別選項本身不對應任何運送方式，純粹從允許清單中排除，
+        // 不再依收件地址是否為離島疊加額外限制（見上方 docblock 說明）。
         $active_groups = array_diff( $categories, array( 'outlying-island' ) );
-        if ( $is_outlying && in_array( 'home-delivery', $active_groups, true )
-            && ! in_array( 'outlying-island', $categories, true ) ) {
-            $active_groups = array_diff( $active_groups, array( 'home-delivery' ) );
-        }
 
         if ( empty( $active_groups ) ) {
             // 這件商品在目前收件地址下沒有任何允許的運送方式，保守起見
