@@ -1,0 +1,542 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * 使用者權限管理（簡化版）。
+ *
+ * 背景：後台使用者列表（使用者 > 全部使用者）本身可以指派角色（網站管理員／
+ * 編輯／作者／投稿者／訂閱者／客戶／商店經理），但 WordPress／WooCommerce
+ * 預設的角色權限是寫死的，商家沒辦法自己決定「客服人員（例如指派成商店經理）
+ * 能不能看到運費管理」「哪個角色能不能碰折價券點數」這種細節。這裡加一個
+ * 獨立的後台頁面，讓網站管理員可以用勾選矩陣的方式，針對每個角色，決定
+ * 他們登入後台後看不看得到／能不能打開每一個頂層選單（含這個主題自訂的
+ * 運費管理、折價券點數…等，以及 WordPress／WooCommerce 原生的商品、
+ * 使用者、外掛…等）。
+ *
+ * 設計取捨（商家已確認採用簡化版，而非安裝 User Role Editor 這類成熟外掛）：
+ * - 權限granularity 只到「頂層選單」，不做到子選單、更不做到 WordPress
+ *   capability 這種細粒度（例如沒辦法做到「能看訂單但不能刪除訂單」）。
+ *   一個頂層選單被封鎖時，它底下所有子選單一併封鎖，簡化心智模型。
+ * - 「網站管理員」角色永遠不受限、且無法在這裡被限制——避免設定錯誤時
+ *   把自己或其他管理員鎖在後台外面，叫天不應叫地不靈。
+ * - 預設（尚未替某個角色儲存過設定）＝完全不限制，維持 WordPress 原本的
+ *   角色權限行為，這個功能是「選擇性疊加限制」，不會一裝上就打亂現有站台。
+ * - 只做「隱藏選單」還不夠（懂網址的人可以直接輸入 URL 繞過），所以另外
+ *   在 admin_init 擋一次直接存取；但要完整比對出「目前這一頁對應到哪個
+ *   頂層選單 slug」，WordPress 沒有現成的通用函式可以做到 100% 全面，
+ *   這裡涵蓋所有 admin.php?page=xxx 形式的自訂頁面（涵蓋這個主題目前所有
+ *   自訂後台功能）＋常見的原生後台頁面（商品、文章、使用者、外掛、佈景
+ *   主題、工具、設定、媒體、留言），未涵蓋到的冷門頁面保守起見不擋，
+ *   避免誤傷正常操作。
+ */
+
+/**
+ * 取得可以被個別設定權限的角色清單（排除「網站管理員」，理由見上方說明）。
+ *
+ * @return array role_slug => 角色顯示名稱
+ */
+function chao_gang_cheng_get_manageable_roles() {
+    if ( ! function_exists( 'get_editable_roles' ) ) {
+        require_once ABSPATH . 'wp-admin/includes/user.php';
+    }
+    $editable = get_editable_roles();
+    $out = array();
+    foreach ( $editable as $role_slug => $role ) {
+        if ( 'administrator' === $role_slug ) {
+            continue; // 網站管理員永遠完整權限，不開放在這裡設定
+        }
+        $out[ $role_slug ] = translate_user_role( $role['name'] );
+    }
+    return $out;
+}
+
+/**
+ * 讀取目前已儲存的角色權限設定。
+ *
+ * 格式：array( role_slug => array( 允許的頂層選單 slug, ... ) )
+ * 某個角色的 key 完全不存在＝該角色目前不受限制（維持 WordPress 預設權限）。
+ */
+function chao_gang_cheng_get_role_menu_permissions() {
+    $saved = get_option( 'chao_gang_cheng_role_menu_permissions', array() );
+    return is_array( $saved ) ? $saved : array();
+}
+
+/**
+ * 讀取目前後台選單的完整清單（只抓頂層項目），給設定頁渲染勾選矩陣用。
+ * 必須在 admin_menu 都跑完之後呼叫（也就是頁面渲染階段呼叫沒問題，因為
+ * admin_menu 這個 hook 這時候一定已經全部執行完畢），才能抓到「最終」
+ * 呈現在側邊欄的選單結構（含這個主題自己重新分組過的順序／分類標題）。
+ *
+ * 跳過：分隔線（wp-menu-separator）、我們自己插入的分類標題列
+ * （slug 開頭是 #ckc-header-，見 ckc_reorganize_admin_menu_groups()）、
+ * 「控制台」（index.php，永遠保留給所有角色，避免整個後台空白）。
+ */
+function chao_gang_cheng_get_admin_menu_inventory() {
+    global $menu;
+    $inventory = array();
+    if ( ! is_array( $menu ) ) {
+        return $inventory;
+    }
+
+    $current_group = '一般';
+    foreach ( $menu as $item ) {
+        if ( empty( $item[2] ) ) {
+            continue;
+        }
+        $slug  = $item[2];
+        $class = isset( $item[4] ) ? $item[4] : '';
+
+        if ( false !== strpos( $class, 'wp-menu-separator' ) ) {
+            continue;
+        }
+        if ( 0 === strpos( $slug, '#ckc-header-' ) ) {
+            // 這是我們自己插入的分類標題列，記錄下來當作接下來項目的分組名稱，
+            // 本身不列成一個可勾選的權限項目。
+            $current_group = wp_strip_all_tags( isset( $item[0] ) ? $item[0] : '一般' );
+            continue;
+        }
+        if ( 'index.php' === $slug ) {
+            continue; // 控制台每個角色都保留，不需要也不應該被限制
+        }
+
+        // 選單文字裡可能包著更新數量的小紅點（例如「外掛 3」），先把
+        // 這種 <span class="update-plugins">…</span> 拿掉再 strip_tags，
+        // 不然會變成「外掛3」這種奇怪的殘留數字。
+        $raw_label = isset( $item[0] ) ? $item[0] : $slug;
+        $raw_label = preg_replace( '/<span[^>]*class="[^"]*(update-plugins|awaiting-mod|count-\d+)[^"]*"[^>]*>.*?<\/span>/is', '', $raw_label );
+        $label = trim( wp_strip_all_tags( $raw_label ) );
+        if ( '' === $label ) {
+            $label = $slug;
+        }
+
+        $inventory[] = array(
+            'slug'  => $slug,
+            'label' => $label,
+            'group' => $current_group,
+        );
+    }
+
+    return $inventory;
+}
+
+/**
+ * 後台選單：掛在「會員管理」分組底下（見 functions.php 的
+ * ckc_reorganize_admin_menu_groups()，把這個 slug 加進『會員管理』分組
+ * 陣列，才會排在使用者、分潤夥伴旁邊，符合這個功能本質上是「使用者
+ * （角色）管理」的一部分）。
+ */
+add_action( 'admin_menu', 'ckc_role_permissions_menu' );
+function ckc_role_permissions_menu() {
+    add_menu_page(
+        '使用者權限管理',
+        '使用者權限管理',
+        'manage_options',
+        'ckc-role-permissions',
+        'ckc_role_permissions_render_page',
+        'dashicons-lock',
+        58
+    );
+}
+
+/**
+ * 表單送出處理：儲存每個角色的選單權限設定。
+ */
+function ckc_role_permissions_handle_save() {
+    if ( ! isset( $_POST['ckc_role_permissions_nonce'] ) ) {
+        return null;
+    }
+    if ( ! wp_verify_nonce( $_POST['ckc_role_permissions_nonce'], 'ckc_role_permissions_save' ) ) {
+        return false;
+    }
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return false;
+    }
+
+    $roles = chao_gang_cheng_get_manageable_roles();
+    $raw_allowed      = isset( $_POST['ckc_role_perm'] ) && is_array( $_POST['ckc_role_perm'] ) ? wp_unslash( $_POST['ckc_role_perm'] ) : array();
+    $raw_unrestricted = isset( $_POST['ckc_role_unrestricted'] ) && is_array( $_POST['ckc_role_unrestricted'] ) ? wp_unslash( $_POST['ckc_role_unrestricted'] ) : array();
+
+    $new_settings = chao_gang_cheng_get_role_menu_permissions();
+
+    foreach ( $roles as $role_slug => $role_label ) {
+        if ( isset( $raw_unrestricted[ $role_slug ] ) ) {
+            // 使用者勾選「此角色不限制」→ 直接移除這個角色的設定，
+            // 等於恢復 WordPress 預設權限，不受這個功能影響。
+            unset( $new_settings[ $role_slug ] );
+            continue;
+        }
+
+        $allowed = isset( $raw_allowed[ $role_slug ] ) && is_array( $raw_allowed[ $role_slug ] )
+            ? array_map( 'sanitize_text_field', $raw_allowed[ $role_slug ] )
+            : array();
+
+        // 一律保留「使用者權限管理」本身的存取權，避免管理員一時失手
+        // 把某個角色的所有選單都取消勾選、又忘了留下這一頁，導致那個
+        // 角色（如果之後被其他方式改回受限狀態）永遠無法自己修正設定
+        // ——雖然一般情況下 manage_options 只有網站管理員才有，這裡多一層
+        // 保險完全不影響正常使用。
+        $allowed[] = 'ckc-role-permissions';
+
+        $new_settings[ $role_slug ] = array_values( array_unique( $allowed ) );
+    }
+
+    update_option( 'chao_gang_cheng_role_menu_permissions', $new_settings, false );
+
+    return true;
+}
+
+/**
+ * 後台頁面渲染：勾選矩陣（列＝後台選單項目，依現有五大分類分組；
+ * 欄＝可設定的角色），每個角色最上面有一個「此角色不限制」總開關。
+ */
+function ckc_role_permissions_render_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( '您沒有權限存取此頁面。', 'chao-gang-cheng' ) );
+    }
+
+    $save_result = null;
+    if ( isset( $_POST['ckc_role_permissions_submit'] ) ) {
+        $save_result = ckc_role_permissions_handle_save();
+    }
+
+    $roles     = chao_gang_cheng_get_manageable_roles();
+    $settings  = chao_gang_cheng_get_role_menu_permissions();
+    $inventory = chao_gang_cheng_get_admin_menu_inventory();
+
+    // 依 group 分組，維持選單原本的走訪順序。
+    $grouped = array();
+    foreach ( $inventory as $row ) {
+        $grouped[ $row['group'] ][] = $row;
+    }
+    ?>
+    <div class="wrap ckc-role-permissions-wrap">
+        <h1 class="wp-heading-inline">使用者權限管理</h1>
+        <hr class="wp-header-end">
+        <p style="max-width:760px;color:#555;">
+            針對每個角色，勾選他們登入後台後可以看到、使用的功能（以左側選單的頂層項目為單位；某個項目被取消勾選時，它底下的子項目也會一併被隱藏、直接輸入網址也無法打開）。「網站管理員」角色權限完整、不在這裡設定，避免誤設把管理員自己鎖在後台外面。尚未設定過的角色維持 WordPress 預設權限，不受影響。
+        </p>
+
+        <?php if ( true === $save_result ) : ?>
+            <div class="notice notice-success is-dismissible"><p>權限設定已儲存。</p></div>
+        <?php elseif ( false === $save_result ) : ?>
+            <div class="notice notice-error is-dismissible"><p>儲存失敗，請重新整理頁面後再試一次。</p></div>
+        <?php endif; ?>
+
+        <?php if ( empty( $roles ) ) : ?>
+            <p>目前網站沒有可以個別設定的角色。</p>
+            <?php return; ?>
+        <?php endif; ?>
+
+        <style>
+            .ckc-role-permissions-wrap table.ckc-role-perm-table {
+                border-collapse: collapse;
+                background: #fff;
+                border: 1px solid #dcdcde;
+                margin-top: 16px;
+                width: 100%;
+            }
+            .ckc-role-permissions-wrap table.ckc-role-perm-table th,
+            .ckc-role-permissions-wrap table.ckc-role-perm-table td {
+                border: 1px solid #e2e4e7;
+                padding: 8px 10px;
+                text-align: center;
+                vertical-align: middle;
+            }
+            .ckc-role-permissions-wrap table.ckc-role-perm-table th {
+                background: #f6f7f7;
+                font-weight: 700;
+            }
+            .ckc-role-permissions-wrap table.ckc-role-perm-table td:first-child,
+            .ckc-role-permissions-wrap table.ckc-role-perm-table th:first-child {
+                text-align: left;
+                min-width: 220px;
+            }
+            .ckc-role-permissions-wrap tr.ckc-role-perm-group-row td {
+                background: #fbfbfc;
+                font-weight: 700;
+                text-align: left;
+                color: #3a2f24;
+            }
+            .ckc-role-permissions-wrap tr.ckc-role-perm-unrestricted-row td {
+                background: #fffaf1;
+            }
+            .ckc-role-permissions-wrap .ckc-role-perm-checkbox[disabled] {
+                opacity: 0.35;
+            }
+            .ckc-role-permissions-wrap .ckc-role-perm-note {
+                font-size: 12px;
+                color: #8c7a64;
+                margin-top: 4px;
+            }
+        </style>
+
+        <form method="post">
+            <?php wp_nonce_field( 'ckc_role_permissions_save', 'ckc_role_permissions_nonce' ); ?>
+
+            <div style="overflow-x:auto;">
+            <table class="ckc-role-perm-table">
+                <thead>
+                    <tr>
+                        <th>後台功能</th>
+                        <?php foreach ( $roles as $role_slug => $role_label ) : ?>
+                            <th><?php echo esc_html( $role_label ); ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="ckc-role-perm-unrestricted-row">
+                        <td>此角色不限制（維持 WordPress 預設權限）</td>
+                        <?php foreach ( $roles as $role_slug => $role_label ) :
+                            $is_unrestricted = ! isset( $settings[ $role_slug ] );
+                            ?>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    class="ckc-role-perm-unrestricted"
+                                    name="ckc_role_unrestricted[<?php echo esc_attr( $role_slug ); ?>]"
+                                    value="1"
+                                    data-role="<?php echo esc_attr( $role_slug ); ?>"
+                                    <?php checked( $is_unrestricted ); ?>
+                                >
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+                    <?php foreach ( $grouped as $group_label => $rows ) : ?>
+                        <tr class="ckc-role-perm-group-row">
+                            <td colspan="<?php echo esc_attr( count( $roles ) + 1 ); ?>"><?php echo esc_html( $group_label ); ?></td>
+                        </tr>
+                        <?php foreach ( $rows as $row ) : ?>
+                            <tr>
+                                <td><?php echo esc_html( $row['label'] ); ?></td>
+                                <?php foreach ( $roles as $role_slug => $role_label ) :
+                                    $is_unrestricted = ! isset( $settings[ $role_slug ] );
+                                    $allowed_list    = $is_unrestricted ? array() : (array) $settings[ $role_slug ];
+                                    $is_checked      = $is_unrestricted ? true : in_array( $row['slug'], $allowed_list, true );
+                                    ?>
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            class="ckc-role-perm-checkbox ckc-role-perm-checkbox-<?php echo esc_attr( $role_slug ); ?>"
+                                            name="ckc_role_perm[<?php echo esc_attr( $role_slug ); ?>][]"
+                                            value="<?php echo esc_attr( $row['slug'] ); ?>"
+                                            <?php checked( $is_checked ); ?>
+                                            <?php disabled( $is_unrestricted ); ?>
+                                        >
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+            <p class="ckc-role-perm-note">勾選「此角色不限制」時，下面該角色欄位的勾選框會停用（該角色維持完整權限，不會送出限制清單）；取消「不限制」後就能個別勾選這個角色可以使用的功能。</p>
+
+            <p style="margin-top:20px;">
+                <button type="submit" name="ckc_role_permissions_submit" class="button button-primary">儲存權限設定</button>
+            </p>
+        </form>
+    </div>
+
+    <script>
+    (function() {
+        document.querySelectorAll('.ckc-role-perm-unrestricted').forEach(function(cb) {
+            function sync() {
+                var role = cb.getAttribute('data-role');
+                document.querySelectorAll('.ckc-role-perm-checkbox-' + CSS.escape(role)).forEach(function(target) {
+                    target.disabled = cb.checked;
+                });
+            }
+            cb.addEventListener('change', sync);
+            sync();
+        });
+    })();
+    </script>
+    <?php
+}
+
+/**
+ * 隱藏受限角色看不到的頂層選單（含子選單，因為 WordPress 移除頂層項目時
+ * 子選單本來就一併不會顯示）。網站管理員、或尚未替該角色儲存過設定的
+ * 情況，完全不受影響。
+ */
+add_action( 'admin_menu', 'chao_gang_cheng_enforce_role_menu_permissions', 99999 );
+function chao_gang_cheng_enforce_role_menu_permissions() {
+    $user = wp_get_current_user();
+    if ( ! $user || ! $user->exists() ) {
+        return;
+    }
+    if ( in_array( 'administrator', (array) $user->roles, true ) ) {
+        return;
+    }
+
+    $settings = chao_gang_cheng_get_role_menu_permissions();
+    if ( empty( $settings ) ) {
+        return; // 完全沒有任何角色被設定過，不影響任何人
+    }
+
+    $user_roles = (array) $user->roles;
+
+    // 使用者可能身兼多個角色：只要其中一個角色沒被設定過（＝不受限），
+    // 就整體不限制，採最寬鬆認定，避免多角色使用者被過度限制。
+    foreach ( $user_roles as $role_slug ) {
+        if ( ! isset( $settings[ $role_slug ] ) ) {
+            return;
+        }
+    }
+
+    // 取所有角色允許清單的聯集（只要某個角色允許，就允許）。
+    $allowed_union = array();
+    foreach ( $user_roles as $role_slug ) {
+        if ( isset( $settings[ $role_slug ] ) && is_array( $settings[ $role_slug ] ) ) {
+            $allowed_union = array_merge( $allowed_union, $settings[ $role_slug ] );
+        }
+    }
+    $allowed_union   = array_unique( $allowed_union );
+    $allowed_union[] = 'index.php'; // 控制台永遠保留
+
+    global $menu;
+    if ( ! is_array( $menu ) ) {
+        return;
+    }
+
+    foreach ( $menu as $item ) {
+        if ( empty( $item[2] ) ) {
+            continue;
+        }
+        $slug  = $item[2];
+        $class = isset( $item[4] ) ? $item[4] : '';
+
+        if ( false !== strpos( $class, 'wp-menu-separator' ) ) {
+            continue;
+        }
+        if ( 0 === strpos( $slug, '#ckc-header-' ) ) {
+            continue; // 分類標題列本身不是可勾選項目，交給旁邊真正的項目決定去留
+        }
+        if ( ! in_array( $slug, $allowed_union, true ) ) {
+            remove_menu_page( $slug );
+        }
+    }
+}
+
+/**
+ * 把目前這個後台頁面請求，對應回它所屬的「頂層選單 slug」，給下面
+ * chao_gang_cheng_block_direct_menu_access() 用來比對權限。
+ *
+ * 這是簡化版比對，不追求涵蓋 WordPress 後台每一個可能的頁面：
+ * - admin.php?page=xxx 形式的頁面（這個主題所有自訂後台功能都是這個
+ *   形式），直接回傳 $_GET['page']，一定準確。
+ * - 商品／文章這類依 post_type 分開的原生列表頁／編輯頁，組回
+ *   'edit.php?post_type=xxx' 這個跟 $menu 裡登記的 slug 完全一致的格式。
+ * - 使用者、外掛、佈景主題、工具、設定、媒體、留言這幾個最常見的原生
+ *   後台分類，各自歸戶到對應的頂層 slug。
+ * - 其他沒特別處理到的冷門頁面，回傳 null（=不擋，保守起見避免誤傷
+ *   正常功能）。
+ *
+ * @return string|null
+ */
+function chao_gang_cheng_resolve_current_admin_slug() {
+    global $pagenow;
+
+    if ( ! empty( $_GET['page'] ) ) {
+        return sanitize_text_field( wp_unslash( $_GET['page'] ) );
+    }
+
+    if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) ) {
+        $post_type = '';
+        if ( ! empty( $_GET['post_type'] ) ) {
+            $post_type = sanitize_text_field( wp_unslash( $_GET['post_type'] ) );
+        } elseif ( ! empty( $_GET['post'] ) ) {
+            $existing = get_post( absint( $_GET['post'] ) );
+            $post_type = $existing ? $existing->post_type : 'post';
+        } else {
+            $post_type = 'post';
+        }
+        return 'post' === $post_type ? 'edit.php' : 'edit.php?post_type=' . $post_type;
+    }
+
+    if ( in_array( $pagenow, array( 'users.php', 'user-new.php', 'user-edit.php' ), true ) ) {
+        return 'users.php';
+    }
+    if ( in_array( $pagenow, array( 'plugins.php', 'plugin-install.php', 'plugin-editor.php' ), true ) ) {
+        return 'plugins.php';
+    }
+    if ( in_array( $pagenow, array( 'themes.php', 'theme-editor.php', 'customize.php' ), true ) ) {
+        return 'themes.php';
+    }
+    if ( in_array( $pagenow, array( 'tools.php', 'import.php', 'export.php', 'site-health.php' ), true ) ) {
+        return 'tools.php';
+    }
+    if ( 0 === strpos( (string) $pagenow, 'options-' ) ) {
+        return 'options-general.php';
+    }
+    if ( in_array( $pagenow, array( 'upload.php', 'media-new.php' ), true ) ) {
+        return 'upload.php';
+    }
+    if ( 'edit-comments.php' === $pagenow ) {
+        return 'edit-comments.php';
+    }
+
+    return null;
+}
+
+/**
+ * 擋下直接輸入網址存取「選單被隱藏」頁面的行為——單純隱藏選單連結還不夠，
+ * 知道網址的人還是可以直接打開。個人資料頁、AJAX 端點、控制台一律放行，
+ * 這幾個是每個角色本來就該能用／背景需要用到的頁面。
+ */
+add_action( 'admin_init', 'chao_gang_cheng_block_direct_menu_access' );
+function chao_gang_cheng_block_direct_menu_access() {
+    if ( wp_doing_ajax() ) {
+        return;
+    }
+
+    $user = wp_get_current_user();
+    if ( ! $user || ! $user->exists() ) {
+        return;
+    }
+    if ( in_array( 'administrator', (array) $user->roles, true ) ) {
+        return;
+    }
+
+    $settings = chao_gang_cheng_get_role_menu_permissions();
+    if ( empty( $settings ) ) {
+        return;
+    }
+
+    $user_roles = (array) $user->roles;
+    foreach ( $user_roles as $role_slug ) {
+        if ( ! isset( $settings[ $role_slug ] ) ) {
+            return; // 有一個角色不受限，整體不擋
+        }
+    }
+
+    global $pagenow;
+    $always_allowed = array( 'index.php', 'profile.php', 'admin-ajax.php', 'async-upload.php' );
+    if ( in_array( $pagenow, $always_allowed, true ) ) {
+        return;
+    }
+
+    $current_slug = chao_gang_cheng_resolve_current_admin_slug();
+    if ( null === $current_slug ) {
+        return; // 判斷不出來的頁面保守起見不擋
+    }
+
+    $allowed_union = array();
+    foreach ( $user_roles as $role_slug ) {
+        if ( isset( $settings[ $role_slug ] ) && is_array( $settings[ $role_slug ] ) ) {
+            $allowed_union = array_merge( $allowed_union, $settings[ $role_slug ] );
+        }
+    }
+    $allowed_union = array_unique( $allowed_union );
+
+    if ( ! in_array( $current_slug, $allowed_union, true ) ) {
+        wp_die(
+            '<h1>權限不足</h1><p>您的帳號角色目前沒有開放使用這個後台功能，如有需要請聯繫網站管理員。</p>',
+            '權限不足',
+            array( 'response' => 403, 'back_link' => true )
+        );
+    }
+}

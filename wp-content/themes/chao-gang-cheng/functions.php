@@ -6638,6 +6638,7 @@ function ckc_reorganize_admin_menu_groups() {
         ),
         '會員管理' => array(
             'users.php'                 => null, // 使用者
+            'ckc-role-permissions'      => null, // 使用者權限管理
             'ckc-referral-admin'        => null, // 分潤夥伴
             'ckc-referral-product-tier' => null, // 商品分潤分類
         ),
@@ -10102,6 +10103,10 @@ require_once get_template_directory() . '/includes/admin/category-banner.php';
 
 // 電商營運 > 運費管理（依配送方式 × 地區 × 溫層 × 件數級距設定運費）
 require_once get_template_directory() . '/includes/admin/shipping-management.php';
+
+// 會員管理 > 使用者權限管理（依角色勾選可使用的後台頂層選單，簡化版，
+// 不動 WordPress capability，網站管理員永遠不受限）
+require_once get_template_directory() . '/includes/admin/role-permissions.php';
 
 // 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
 require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
