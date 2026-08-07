@@ -547,6 +547,12 @@ function chao_cart_free_shipping_cross_sell() {
     // AJAX 更新（加減數量、套券）都重跑一次 meta_value_num 排序查詢。
     $price_cap = max( $diff, 400 );
     $candidate_ids = chao_checkout_crosssell_pool_ids();
+    // 溫層過濾：不推薦會跟購物車現有商品溫層衝突的加購品（例如購物車已
+    // 有冷凍年菜，就不該推薦常溫零食），見 functions.php 的
+    // chao_gang_cheng_get_cart_common_temperature_zones() 說明。
+    $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
+        ? chao_gang_cheng_get_cart_common_temperature_zones()
+        : null;
 
     $picks = array();
     foreach ( $candidate_ids as $product_id ) {
@@ -559,6 +565,10 @@ function chao_cart_free_shipping_cross_sell() {
         }
         $price = floatval( $product->get_price() );
         if ( $price <= 0 || $price > $price_cap ) {
+            continue;
+        }
+        if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
+            && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
             continue;
         }
         $picks[] = $product;
@@ -646,6 +656,11 @@ function chao_checkout_free_shipping_cross_sell() {
         $exclude[] = $cart_item['product_id'];
     }
     $price_cap = max( $diff, 400 );
+    // 溫層過濾：跟購物車頁 chao_cart_free_shipping_cross_sell() 用同一套邏輯，
+    // 不推薦會跟購物車現有商品溫層衝突的加購品。
+    $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
+        ? chao_gang_cheng_get_cart_common_temperature_zones()
+        : null;
 
     $candidate_ids = chao_checkout_crosssell_pool_ids();
     $picks = array();
@@ -659,6 +674,10 @@ function chao_checkout_free_shipping_cross_sell() {
         }
         $price = floatval( $product->get_price() );
         if ( $price <= 0 || $price > $price_cap ) {
+            continue;
+        }
+        if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
+            && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
             continue;
         }
         $picks[] = $product;

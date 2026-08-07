@@ -1812,8 +1812,28 @@ function chao_gang_cheng_temperature_zone_save( $product ) {
  * @return bool true = 有衝突
  */
 function chao_gang_cheng_get_cart_temperature_conflict() {
+    $common = chao_gang_cheng_get_cart_common_temperature_zones();
+    return ( null !== $common && empty( $common ) );
+}
+
+/**
+ * 購物車目前「共同溫層」交集，跟上面 chao_gang_cheng_get_cart_temperature_conflict()
+ * 用同一套「取所有有標注溫層商品的交集」邏輯，這裡多回傳交集結果本身
+ * （而不只是有沒有衝突的布林值），給「湊免運加購商品」區塊
+ * （chao_cart_free_shipping_cross_sell() / chao_checkout_free_shipping_cross_sell()）
+ * 篩選候選商品用——加購商品不該推薦會讓客人買了之後在同一張訂單裡混到
+ * 不同溫層的商品，例如購物車已經有冷凍年菜，就不該推薦常溫零食當「湊
+ * 免運」的加購選項，避免客人加購之後反而在結帳頁被溫層衝突擋下來。
+ *
+ * @return array|null null = 購物車目前沒有任何商品限制溫層，可以推薦任何
+ *                     溫層的加購商品；array = 目前購物車允許的溫層交集
+ *                     （可能是空陣列，代表購物車本身已經衝突——這種情況下
+ *                     刻意讓加購商品一件都篩選不到，不會火上加油，讓客人
+ *                     先處理既有衝突再說）。
+ */
+function chao_gang_cheng_get_cart_common_temperature_zones() {
     if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
-        return false;
+        return null;
     }
     $common      = null;
     $constrained = false;
@@ -1832,7 +1852,23 @@ function chao_gang_cheng_get_cart_temperature_conflict() {
         $constrained = true;
         $common      = ( null === $common ) ? $zones : array_intersect( $common, $zones );
     }
-    return ( $constrained && null !== $common && empty( $common ) );
+    return $constrained ? $common : null;
+}
+
+/**
+ * 判斷某個候選商品能不能安全地推薦給目前購物車當「湊免運」加購品：
+ * 商品本身沒標溫層＝不限制，一律可推薦；有標溫層則必須跟購物車目前的
+ * 共同溫層有交集，否則跳過（避免推薦一個會造成溫層衝突的商品）。
+ */
+function chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) {
+    if ( null === $cart_zones ) {
+        return true; // 購物車目前沒有溫層限制，任何商品都可以推薦
+    }
+    $product_zones = chao_gang_cheng_get_product_temperature_zones( $product );
+    if ( empty( $product_zones ) ) {
+        return true; // 商品沒標溫層＝不限制
+    }
+    return ! empty( array_intersect( $cart_zones, $product_zones ) );
 }
 
 /**
