@@ -764,7 +764,11 @@ function chao_checkout_cross_sell_script() {
 // 32c. Continue-shopping link inside the cart actions row
 add_action( 'woocommerce_cart_actions', 'chao_cart_continue_shopping_link' );
 function chao_cart_continue_shopping_link() {
-    echo '<a class="chao-continue-shopping" href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '">← 繼續購物</a>';
+    // 這個網站沒有設定 WooCommerce 原生「商店頁面」，wc_get_page_permalink('shop')
+    // 會回傳無效網址、點下去變成 404，改用 chao_gang_cheng_get_shop_url()
+    // （定義於 functions.php）導回「全部商品」分類頁，跟首頁選單一致。
+    $shop_url = function_exists( 'chao_gang_cheng_get_shop_url' ) ? chao_gang_cheng_get_shop_url() : wc_get_page_permalink( 'shop' );
+    echo '<a class="chao-continue-shopping" href="' . esc_url( $shop_url ) . '">← 繼續購物</a>';
 }
 
 // 32d. Trust badges + policy link under the proceed-to-checkout button

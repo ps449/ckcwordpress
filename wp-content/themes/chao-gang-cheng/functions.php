@@ -3822,6 +3822,38 @@ function chao_gang_cheng_custom_my_account_menu_items( $items ) {
 
 
 /**
+ * 修復「回到商店」／「繼續購物」類按鈕點下去出現 404 的問題。
+ *
+ * 根因：WooCommerce 設定 > 商品 > 「商店頁面」目前是空的（這個網站沒有
+ * 用原生的 WC 商店主頁，前台改用「全部商品」這個商品分類（slug: allitem）
+ * 當作瀏覽全部商品的入口，見首頁選單「全部商品」連結）。任何用
+ * wc_get_page_permalink('shop') 組出來的連結，在商店頁面未設定時會得到
+ * 一個無效網址，點下去就是 404——這個問題不只出現在購物車是空的時候
+ * 顯示的「回到商店」按鈕，我的帳戶頁「還沒有任何訂單」「繼續購物」快捷
+ * 連結、結帳頁「← 繼續購物」都是同一個根因，一次修好。
+ *
+ * 做法：
+ * 1. 這個共用函式優先回傳「全部商品」分類頁網址（跟首頁選單「全部商品」
+ *    完全一致），分類不存在時保守 fallback 回首頁，不會再出現 404。
+ * 2. 掛上 woocommerce_return_to_shop_redirect 濾鏡——這是 WooCommerce
+ *    核心（包含購物車是空的時候的「回到商店」按鈕）內部產生「回到商店」
+ *    類連結時共用的過濾鉤子，掛一次就能同時修好核心模板跟這個主題自己
+ *    另外兩處用 apply_filters(...) 包起來的「回到商店」按鈕，不用逐一
+ *    改核心模板檔案。
+ * 3. 主題裡另外三處沒有透過這個濾鏡、直接呼叫 wc_get_page_permalink('shop')
+ *    的地方（我的帳戶頁兩處、結帳頁「← 繼續購物」一處），一併改成呼叫
+ *    這個函式，確保整站一致，不會漏掉。
+ */
+function chao_gang_cheng_get_shop_url() {
+    $category_url = get_term_link( 'allitem', 'product_cat' );
+    if ( ! is_wp_error( $category_url ) && $category_url ) {
+        return $category_url;
+    }
+    return home_url( '/' );
+}
+add_filter( 'woocommerce_return_to_shop_redirect', 'chao_gang_cheng_get_shop_url' );
+
+/**
  * My Account dashboard overview: points balance, recent orders and quick links
  * (replaces the bare default two-line dashboard text with useful content).
  */
@@ -3894,7 +3926,7 @@ function chao_gang_cheng_account_dashboard_overview() {
                 <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>" style="display: inline-block; margin-top: 12px; font-size: 13px; color: #f86f69; font-weight: 600; text-decoration: underline;">查看全部訂單 →</a>
             <?php else : ?>
                 <p style="font-size: 14px; color: #8c7a64; margin: 0 0 12px;">還沒有任何訂單，來看看主廚為您準備了什麼吧！</p>
-                <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>" style="display: inline-block; background-color: #f86f69; color: #fff; border-radius: 20px; padding: 8px 24px; text-decoration: none; font-size: 13px; font-weight: 600;">前往商店選購</a>
+                <a href="<?php echo esc_url( chao_gang_cheng_get_shop_url() ); ?>" style="display: inline-block; background-color: #f86f69; color: #fff; border-radius: 20px; padding: 8px 24px; text-decoration: none; font-size: 13px; font-weight: 600;">前往商店選購</a>
             <?php endif; ?>
         </div>
     </div>
@@ -3916,7 +3948,7 @@ function chao_gang_cheng_account_dashboard_overview() {
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
             帳戶資料
         </a>
-        <a href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>">
+        <a href="<?php echo esc_url( chao_gang_cheng_get_shop_url() ); ?>">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
             繼續購物
         </a>
