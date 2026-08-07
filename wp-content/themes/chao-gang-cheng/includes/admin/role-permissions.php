@@ -101,11 +101,14 @@ function chao_gang_cheng_get_admin_menu_inventory() {
             continue; // 控制台每個角色都保留，不需要也不應該被限制
         }
 
-        // 選單文字裡可能包著更新數量的小紅點（例如「外掛 3」），先把
-        // 這種 <span class="update-plugins">…</span> 拿掉再 strip_tags，
-        // 不然會變成「外掛3」這種奇怪的殘留數字。
+        // 選單文字裡常包著更新數量小紅點或其他徽章（例如「外掛 3」、
+        // WordPress.com 加的方案徽章），這些 <span>…</span> 一律整段拿掉
+        // 再 strip_tags，不然會變成文字黏在一起的奇怪殘留（例如
+        // 「升級方案Commerce」）。這裡不限定特定 class 名稱，因為徽章的
+        // class 命名不保證固定（尤其 WordPress.com 相關選單），乾脆對這個
+        // 純粹拿來當權限清單標籤用的文字，直接整段拿掉所有 <span>。
         $raw_label = isset( $item[0] ) ? $item[0] : $slug;
-        $raw_label = preg_replace( '/<span[^>]*class="[^"]*(update-plugins|awaiting-mod|count-\d+)[^"]*"[^>]*>.*?<\/span>/is', '', $raw_label );
+        $raw_label = preg_replace( '/<span\b[^>]*>.*?<\/span>/is', '', $raw_label );
         $label = trim( wp_strip_all_tags( $raw_label ) );
         if ( '' === $label ) {
             $label = $slug;
