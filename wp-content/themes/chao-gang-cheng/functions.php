@@ -10190,8 +10190,10 @@ require_once get_template_directory() . '/includes/admin/role-permissions.php';
  * - 商店經理（shop_manager，WooCommerce 內建角色）維持原名，不在改名
  *   清單內。
  *
- * 對照表：編輯→出貨人員、作者→財務人員、投稿者→客服人員、
- * 訂閱者→行銷人員、客戶→倉管人員。
+ * 對照表：編輯→出貨人員、作者→財務人員、投稿者→客服人員。
+ * （2026-08 第二次調整：訂閱者、客戶改回原本的 WordPress／WooCommerce
+ * 預設名稱，不再改名——商家確認訂閱者／客戶這兩個維持原名即可，只有
+ * 編輯／作者／投稿者這三個需要客製化名稱。）
  */
 add_action( 'init', 'chao_gang_cheng_rename_admin_roles', 20 );
 function chao_gang_cheng_rename_admin_roles() {
@@ -10204,8 +10206,6 @@ function chao_gang_cheng_rename_admin_roles() {
 		'editor'      => '出貨人員',
 		'author'      => '財務人員',
 		'contributor' => '客服人員',
-		'subscriber'  => '行銷人員',
-		'customer'    => '倉管人員',
 	);
 
 	foreach ( $renames as $role_slug => $new_name ) {
