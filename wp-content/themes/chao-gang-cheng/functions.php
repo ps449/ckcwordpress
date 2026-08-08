@@ -10176,6 +10176,48 @@ require_once get_template_directory() . '/includes/admin/shipping-management.php
 // 不動 WordPress capability，網站管理員永遠不受限）
 require_once get_template_directory() . '/includes/admin/role-permissions.php';
 
+/**
+ * 後台角色顯示名稱客製化（2026-08）。
+ *
+ * 商家希望原生角色名稱貼近實際分工，而不是 WordPress／WooCommerce 預設
+ * 的泛用稱呼。這裡只換「顯示名稱」（$wp_roles 內部的 name／role_names），
+ * 角色 slug（editor/author/contributor/subscriber/customer）與底層
+ * capabilities 完全不動，純粹是換一個中文標籤：
+ * - 既有使用者的角色指派不受影響（資料庫存的還是原本的 slug）。
+ * - 「使用者權限管理」頁面（role-permissions.php）與批量發放點數頁面
+ *   （ckc-points-admin.php）都是即時從 get_editable_roles() /
+ *   wp_roles()->get_names() 讀取，會自動套用新名稱，不需要另外改。
+ * - 商店經理（shop_manager，WooCommerce 內建角色）維持原名，不在改名
+ *   清單內。
+ *
+ * 對照表：編輯→出貨人員、作者→財務人員、投稿者→客服人員、
+ * 訂閱者→行銷人員、客戶→倉管人員。
+ */
+add_action( 'init', 'chao_gang_cheng_rename_admin_roles', 20 );
+function chao_gang_cheng_rename_admin_roles() {
+	global $wp_roles;
+	if ( ! isset( $wp_roles ) || ! ( $wp_roles instanceof WP_Roles ) ) {
+		$wp_roles = wp_roles();
+	}
+
+	$renames = array(
+		'editor'      => '出貨人員',
+		'author'      => '財務人員',
+		'contributor' => '客服人員',
+		'subscriber'  => '行銷人員',
+		'customer'    => '倉管人員',
+	);
+
+	foreach ( $renames as $role_slug => $new_name ) {
+		if ( isset( $wp_roles->roles[ $role_slug ] ) ) {
+			$wp_roles->roles[ $role_slug ]['name'] = $new_name;
+		}
+		if ( isset( $wp_roles->role_names[ $role_slug ] ) ) {
+			$wp_roles->role_names[ $role_slug ] = $new_name;
+		}
+	}
+}
+
 // 後台 UI/UX 全站統一風格（色彩／圖示系統，套用於整個 wp-admin，不限自建頁面）
 require_once get_template_directory() . '/includes/admin/admin-ui-theme.php';
 
