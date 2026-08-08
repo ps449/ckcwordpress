@@ -113,19 +113,23 @@ add_action( 'wp_enqueue_scripts', 'chao_gang_cheng_scripts' );
  * [class*="wc-block"] 元素數為 0）。故僅在結帳頁移除這個檔案，
  * 不影響其他可能真的有用到區塊樣式的頁面。
  *
- * 掛在 wp_head priority 7：需晚於 wp_enqueue_scripts（wp_head priority 1
- * 觸發，一般外掛/佈景主題的樣式註冊都在此階段完成)，但要早於 WordPress
- * 核心印出樣式標籤的 wp_print_styles（wp_head priority 8），確保能在
- * 印出 <link> 之前把它從佇列移除。
+ * 實作方式：原本掛在 wp_head priority 7 用 wp_dequeue_style() 攔截，
+ * 實測（2026-08-08 現場驗收）發現無效——wc-blocks-style 實際被
+ * enqueue 的時機比預期晚（在 wp_print_styles 印出標籤的當下才確定），
+ * 用「priority 排序去猜時機」攔截不到。改用 style_loader_tag 篩選器：
+ * 這個篩選器是 WordPress 真正要把 <link> 標籤印到 HTML 的那一刻才會
+ * 呼叫，不管樣式是什麼時候、被誰 enqueue 的都一定會經過這裡，直接把
+ * 對應的 handle 換成空字串即可保證不會輸出，不受時機影響。
  */
-add_action( 'wp_head', 'chao_gang_cheng_dequeue_unused_checkout_css', 7 );
-function chao_gang_cheng_dequeue_unused_checkout_css() {
+add_filter( 'style_loader_tag', 'chao_gang_cheng_strip_unused_checkout_css', 10, 2 );
+function chao_gang_cheng_strip_unused_checkout_css( $tag, $handle ) {
+	if ( 'wc-blocks-style' !== $handle ) {
+		return $tag;
+	}
 	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
-		return;
+		return $tag;
 	}
-	if ( wp_style_is( 'wc-blocks-style', 'enqueued' ) || wp_style_is( 'wc-blocks-style', 'registered' ) ) {
-		wp_dequeue_style( 'wc-blocks-style' );
-	}
+	return '';
 }
 
 /**
