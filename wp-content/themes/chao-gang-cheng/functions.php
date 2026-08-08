@@ -97,6 +97,38 @@ function chao_gang_cheng_scripts() {
 add_action( 'wp_enqueue_scripts', 'chao_gang_cheng_scripts' );
 
 /**
+ * 結帳頁效能優化（2026-08）：移除結帳頁用不到的 CSS。
+ *
+ * 背景：PageSpeed/Lighthouse 在行動版結帳頁報告「Reduce unused CSS」。
+ * 實際檢查發現 WooCommerce 核心的 wc-blocks-style（Cart/Checkout 區塊
+ * 的樣式）在每個頁面的 wp_head 都會被無條件 enqueue（見
+ * woocommerce/src/Blocks/Domain/Services/Notices.php enqueue_notice_styles()，
+ * 用途是給「區塊版」通知樣式 .wc-block-components-notice-banner 使用）。
+ * 但本站結帳頁是走傳統 shortcode 版型（header.php/footer.php 為經典
+ * 佈景主題，wp_is_block_theme() 為 false，也沒有開啟
+ * woocommerce_use_block_notices_in_classic_theme 篩選器），所以通知
+ * 一律走舊版 .woocommerce-message / .woocommerce-error 樣式（由
+ * WooCommerce 主要的 woocommerce.css 提供），wc-blocks-style 整包在
+ * 結帳頁完全沒有對應的 DOM 元素在使用（已逐一確認頁面上
+ * [class*="wc-block"] 元素數為 0）。故僅在結帳頁移除這個檔案，
+ * 不影響其他可能真的有用到區塊樣式的頁面。
+ *
+ * 掛在 wp_head priority 7：需晚於 wp_enqueue_scripts（wp_head priority 1
+ * 觸發，一般外掛/佈景主題的樣式註冊都在此階段完成)，但要早於 WordPress
+ * 核心印出樣式標籤的 wp_print_styles（wp_head priority 8），確保能在
+ * 印出 <link> 之前把它從佇列移除。
+ */
+add_action( 'wp_head', 'chao_gang_cheng_dequeue_unused_checkout_css', 7 );
+function chao_gang_cheng_dequeue_unused_checkout_css() {
+	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+		return;
+	}
+	if ( wp_style_is( 'wc-blocks-style', 'enqueued' ) || wp_style_is( 'wc-blocks-style', 'registered' ) ) {
+		wp_dequeue_style( 'wc-blocks-style' );
+	}
+}
+
+/**
  * Preconnect & DNS Prefetch to speed up external resource loading
  */
 add_action( 'wp_head', 'chao_gang_cheng_resource_hints', 1 );
@@ -4983,7 +5015,7 @@ function chao_gang_cheng_floating_contact_buttons() {
         <?php if ( ! empty( $opts['show_line'] ) && ! empty( $opts['line_url'] ) ) : ?>
         <!-- 2. LINE Link -->
         <a href="<?php echo esc_url( $opts['line_url'] ); ?>" target="_blank" rel="noopener noreferrer" class="floating-btn btn-line" aria-label="LINE 客服">
-            <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/LINE_APP_Android.png' ); ?>" alt="LINE">
+            <img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/LINE_APP_Android.png' ); ?>" alt="LINE" width="150" height="150">
         </a>
         <?php endif; ?>
 
