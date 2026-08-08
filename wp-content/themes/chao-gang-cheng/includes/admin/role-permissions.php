@@ -175,13 +175,19 @@ function ckc_role_permissions_handle_save() {
             ? array_map( 'sanitize_text_field', $raw_allowed[ $role_slug ] )
             : array();
 
-        // 一律保留「使用者權限管理」本身的存取權，避免管理員一時失手
-        // 把某個角色的所有選單都取消勾選、又忘了留下這一頁，導致那個
-        // 角色（如果之後被其他方式改回受限狀態）永遠無法自己修正設定
-        // ——雖然一般情況下 manage_options 只有網站管理員才有，這裡多一層
-        // 保險完全不影響正常使用。
-        $allowed[] = 'ckc-role-permissions';
-
+        // 2026-08 修正：原本這裡會強制把「使用者權限管理」塞進每個角色的
+        // 允許清單，導致管理員在畫面上取消勾選這一項、按儲存後又被強制
+        // 打勾，看起來像是勾不掉的 bug（商家實測回報）。
+        // 移除這個強制邏輯的原因：這個頁面本身是掛
+        // 'manage_options' 權限（見 ckc_role_permissions_menu()），而這裡
+        // 能個別設定的角色（商店經理／出貨人員／財務人員／客服人員／
+        // 行銷人員／倉管人員）依 WordPress／WooCommerce 預設都沒有
+        // manage_options（WooCommerce 只給 shop_manager
+        // manage_woocommerce，不是 manage_options）。也就是說，就算選單
+        // 有顯示「使用者權限管理」，這些角色點進去也只會看到「您沒有
+        // 權限存取此頁面」，強制保留選單可見性其實沒有實質保護作用，
+        // 只會造成使用上的困惑。故拿掉，讓這個項目跟矩陣裡其他項目
+        // 一樣完全由管理員自己勾選決定。
         $new_settings[ $role_slug ] = array_values( array_unique( $allowed ) );
     }
 
