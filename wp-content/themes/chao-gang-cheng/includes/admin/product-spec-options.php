@@ -34,28 +34,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 /**
- * 1. 自動建立「預約類商品」分類（若不存在），slug 固定 reservation-item。
- * 掛在 init，冪等（重複執行不會重複建立）。這個分類目前不再用來判斷
- * 是否顯示規格選項設定（見下方 chao_gang_cheng_product_uses_spec_options()
- * 的說明），保留這個函式只是不動舊有分類資料，不影響任何既有商品分類。
+ * 1.（已移除）原本這裡會在 init 自動建立「預約類商品」分類，因為規格
+ * 選項功能已經開放給所有商品使用，不再需要這個分類，於是移除了自動
+ * 重建的邏輯——之前手動刪除分類後又被重新建立，就是這段程式碼造成的。
+ * 如果之後想恢復「只給特定分類使用」的設計，可以把這個函式加回來，
+ * 並把下面 chao_gang_cheng_product_uses_spec_options() 改回 has_term()
+ * 判斷。
  */
-add_action( 'init', 'chao_gang_cheng_ensure_reservation_product_category', 20 );
-function chao_gang_cheng_ensure_reservation_product_category() {
-    if ( ! taxonomy_exists( 'product_cat' ) ) {
-        return;
-    }
-    if ( term_exists( 'reservation-item', 'product_cat' ) ) {
-        return;
-    }
-    wp_insert_term(
-        '預約類商品',
-        'product_cat',
-        array(
-            'slug'        => 'reservation-item',
-            'description' => '需要選擇日期／時間等規格的宴席、預約、時段類商品。',
-        )
-    );
-}
 
 /**
  * 2. 判斷商品是否可以使用「規格選項設定」——目前開放所有商品使用，不再
