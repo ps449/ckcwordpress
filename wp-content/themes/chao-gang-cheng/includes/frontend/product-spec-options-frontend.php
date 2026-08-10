@@ -283,7 +283,19 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 } );
             } );
 
-            refresh();
+            // 一開始「規格沒選完整」預設就要停用「加入購物車」，但這段
+            // <script> 是透過 woocommerce_before_add_to_cart_button 掛在
+            // 按鈕「前面」輸出的，第一次同步執行到這裡的當下，瀏覽器根本
+            // 還沒解析到後面那顆真正的按鈕元素——getSubmitBtn() 雖然是即
+            // 時查詢，但「即時」也早於按鈕存在的時間點，一樣查不到（實測
+            // 踩過），停用會被靜靜跳過。改成等 DOMContentLoaded（此時整份
+            // HTML 都解析完了）才做第一次 refresh()，之後按鈕點擊觸發的
+            // refresh() 不受影響，本來就是使用者互動之後才會發生。
+            if ( 'loading' === document.readyState ) {
+                document.addEventListener( 'DOMContentLoaded', refresh );
+            } else {
+                refresh();
+            }
         })();
         </script>
     </div>
