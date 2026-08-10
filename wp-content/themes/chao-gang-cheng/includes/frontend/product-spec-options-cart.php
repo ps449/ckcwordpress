@@ -198,10 +198,20 @@ function chao_gang_cheng_apply_spec_price_adjust( $cart ) {
         if ( ! $fresh_product ) {
             continue;
         }
-        $base_price = (float) $fresh_product->get_price();
-        $adjust     = isset( $combo['price_adjust'] ) ? (float) $combo['price_adjust'] : 0;
+        $base_price   = (float) $fresh_product->get_price();
+        $adjust       = isset( $combo['price_adjust'] ) ? (float) $combo['price_adjust'] : 0;
+        $final_price  = max( 0, $base_price + $adjust );
 
-        $cart_item['data']->set_price( max( 0, $base_price + $adjust ) );
+        // 同時把「原價」也設成跟最終價格一樣，讓這個購物車項目回報自己
+        // 「沒有在特價」。原因：如果不這樣做，WooCommerce 的購物車/結帳
+        // 頁樣板還是會照商品原本的特價設定，畫出「NT$350（劃線）→
+        // NT$399」這種樣子——因為調整後的價格比商品原價還高，看起來會
+        // 變成「打折後反而更貴」，容易讓客人誤會算錯了。規格加價本來就
+        // 是跟「特價」不同的概念（已經有「日期：8/15」這類文字說明選了
+        // 什麼），這裡直接顯示單一、明確的最終金額最不會造成誤會。
+        $cart_item['data']->set_regular_price( $final_price );
+        $cart_item['data']->set_sale_price( '' );
+        $cart_item['data']->set_price( $final_price );
     }
     unset( $cart_item );
 }
