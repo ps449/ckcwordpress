@@ -92,7 +92,15 @@ function chao_gang_cheng_render_spec_options_frontend() {
             var pricePreview = wrap.querySelector('.ckc-spec-price-preview');
             var stockWarning = wrap.querySelector('.ckc-spec-stock-warning');
             var form         = wrap.closest('form.cart');
-            var submitBtn    = form ? form.querySelector('button[type="submit"], .single_add_to_cart_button') : null;
+
+            // 注意：這段 script 是透過 woocommerce_before_add_to_cart_button 掛進去的，
+            // 在 HTML 原始碼裡排在「加入購物車」按鈕的「前面」，所以頁面第一次解析
+            // 這段 <script> 的當下，按鈕元素根本還沒被瀏覽器解析出來——如果在這裡
+            // 先查一次快取起來，拿到的會是 null，之後永遠停用不了按鈕（實測踩過）。
+            // 改成每次要用的時候才即時查詢，確保一定拿得到當下真正存在的按鈕。
+            function getSubmitBtn() {
+                return form ? form.querySelector('button[type="submit"], .single_add_to_cart_button') : null;
+            }
 
             var combos       = <?php echo wp_json_encode( is_array( $combinations ) ? $combinations : new stdClass() ); ?>;
             var sortedCatIds = <?php echo wp_json_encode( array_values( $cat_ids ) ); ?>;
@@ -128,6 +136,7 @@ function chao_gang_cheng_render_spec_options_frontend() {
             }
 
             function setAddToCartDisabled( disabled ) {
+                var submitBtn = getSubmitBtn();
                 if ( ! submitBtn ) { return; }
                 submitBtn.disabled = disabled;
                 submitBtn.classList.toggle( 'disabled', disabled );
