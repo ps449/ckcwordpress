@@ -63,6 +63,18 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 color: #b32d2e;
                 margin: 8px 0;
             }
+            /* 規格已額滿/已停用時，「立即購買」（含桌機／手機黏底列版本）
+               也要跟主要的「加入購物車」按鈕一樣呈現停用外觀，避免使用者
+               以為還能直接搶購。用 !important 蓋過主題原本對這些按鈕的
+               background-color !important 設定。 */
+            .buy-now-btn.ckc-spec-disabled,
+            .sticky-buy-now-btn.ckc-spec-disabled,
+            .mydybox-taiwan-for-woocommerce-sticky-btn.ckc-spec-disabled {
+                opacity: 0.5 !important;
+                cursor: not-allowed !important;
+                pointer-events: none !important;
+                filter: grayscale(40%);
+            }
         </style>
 
         <?php foreach ( $categories as $cat ) : ?>
@@ -135,12 +147,26 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 return parts.join( '|' );
             }
 
+            // 「立即購買」按鈕（主要版本 + 桌機/手機黏底列版本）跟主要的
+            // 「加入購物車」按鈕共用同一個 form.cart，送出時一樣會帶著
+            // 目前選到的規格一起送到伺服器，所以伺服器端的驗證本來就會擋
+            // 下已額滿/已停用的組合，不會真的賣超。但畫面上先前這幾顆
+            // 「立即購買」按鈕沒有跟著停用，使用者會誤以為還能直接搶購，
+            // 送出後才被導回商品頁看到錯誤訊息，體驗不好，這裡一起處理。
+            var buyNowSelectors = '.buy-now-btn, .sticky-buy-now-btn, .mydybox-taiwan-for-woocommerce-sticky-btn';
+
             function setAddToCartDisabled( disabled ) {
                 var submitBtn = getSubmitBtn();
-                if ( ! submitBtn ) { return; }
-                submitBtn.disabled = disabled;
-                submitBtn.classList.toggle( 'disabled', disabled );
-                submitBtn.classList.toggle( 'wc-variation-selection-needed', disabled );
+                if ( submitBtn ) {
+                    submitBtn.disabled = disabled;
+                    submitBtn.classList.toggle( 'disabled', disabled );
+                    submitBtn.classList.toggle( 'wc-variation-selection-needed', disabled );
+                }
+
+                document.querySelectorAll( buyNowSelectors ).forEach( function ( btn ) {
+                    btn.disabled = disabled;
+                    btn.classList.toggle( 'ckc-spec-disabled', disabled );
+                } );
             }
 
             function refresh() {
