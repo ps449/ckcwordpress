@@ -2516,6 +2516,7 @@ function ckc_checkout_coupon_ajax_script() {
     }
     $done = true;
     ?>
+    <!-- CKC_COUPON_SCRIPT_MARKER_V1 -->
     <style>
     #ckc-coupon-toast{
         position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px);
