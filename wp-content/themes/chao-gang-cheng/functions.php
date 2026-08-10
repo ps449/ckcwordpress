@@ -3065,6 +3065,15 @@ function chao_gang_cheng_seo_geo_meta_tags() {
     <?php if ( $canonical_url ) : ?>
     <meta property="og:url" content="<?php echo esc_url( $canonical_url ); ?>" />
     <?php endif; ?>
+    <?php
+    // WordPress 核心的 rel_canonical() 只處理 is_singular()（商品／文章／頁面）
+    // 的頁面，首頁（沒有設定靜態頁面時）、商店頁、分類頁這些非單篇頁面核心
+    // 完全不會輸出 canonical──這裡補上剛剛算好的 $canonical_url，只在核心
+    // 不會處理的頁面類型才輸出，避免跟核心重複。
+    if ( $canonical_url && ! is_singular() ) :
+        ?>
+    <link rel="canonical" href="<?php echo esc_url( $canonical_url ); ?>" />
+    <?php endif; ?>
     <meta property="og:site_name" content="<?php echo esc_attr( $site_name ); ?>" />
     <meta property="og:image" content="<?php echo esc_url( $og_image ); ?>" />
     <meta property="og:image:alt" content="<?php echo esc_attr( $og_image_alt ); ?>" />
@@ -3112,16 +3121,17 @@ function chao_gang_cheng_wp_robots( $robots ) {
         || ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-received' ) );
 
     if ( $should_noindex ) {
-        $robots['noindex'] = true;
-        unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
-        return $robots;
+        // 完全換成只有 noindex，不要跟核心／其他外掛已經放進陣列的
+        // max-image-preview 等鍵值混在一起（實測混在一起會讓核心組字串時
+        // 少了冒號後面的值，變成 "max-snippet, max-video-preview" 這種
+        // 格式錯誤的內容，乾脆換成最單純、保證正確的版本）。
+        return array( 'noindex' => true );
     }
 
-    $robots['index']             = true;
-    $robots['follow']            = true;
-    $robots['max-image-preview'] = 'large';
-    $robots['max-snippet']       = -1;
-    $robots['max-video-preview'] = -1;
+    // 一般公開頁面：不特別覆寫，核心本身（wp_robots_max_image_preview_large()）
+    // 已經會加上 max-image-preview:large，沒有 noindex/nofollow 對爬蟲來說
+    // 本來就等於「index, follow」，不需要畫蛇添足自己再組一次容易撞在一起
+    // 出錯的版本。
     return $robots;
 }
 
