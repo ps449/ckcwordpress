@@ -22,8 +22,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - 訂單成立時把已選規格寫進訂單項目 meta（woocommerce_checkout_create_order_line_item），
  *   讓訂單明細、後台訂單頁、通知信都看得到，且是「下單當下」的規格文字，
  *   之後就算後台規格類別/值被改名或刪除，這筆訂單的紀錄也不會跟著變動。
+ *   同時也存一份不對外顯示的 _ckc_spec_selected 內部 meta（原始的
+ *   cat_id=>val_id 對照），給第 4 期的庫存扣減／回補邏輯用，不用回頭
+ *   解析客人看到的中文文字。
  *
- * 不包含（留到第 4 期）：庫存扣減與超賣防護。
+ * 庫存扣減與超賣防護（第 4 期）實作在 product-spec-options-stock.php，
+ * 這裡的 woocommerce_add_to_cart_validation 也在第 4 期加強成連「庫存
+ * 夠不夠這次要買的數量」都會檢查（原本只檢查「是不是完全額滿」）。
  */
 
 /**
@@ -94,8 +99,18 @@ function chao_gang_cheng_spec_full_match_key( $product_id, $selected ) {
 }
 
 /**
- * 加入購物車前的伺服器端把關：如果選的規格「完整命中」一個已停用或
- * 已額滿（庫存 0）的組合，擋下來並顯示錯誤訊息，不讓它進購物車。
+ * 加入購物車前的伺服器端把關：如果選的規格「完整命中」一個已停用、
+ * 已額滿、或庫存不夠這次要買的數量的組合，擋下來並顯示錯誤訊息，不讓
+ * 它進購物車。這裡讀到的 stock_qty 是即時庫存（見
+ * chao_gang_cheng_get_spec_combinations() 的說明），所以能擋到「庫存還
+ * 剩 2 個，但這次想買 5 個」這種情況，不是只有「完全額滿」才擋。
+ *
+ * 提醒：這只是「加入購物車那一刻」的檢查，不是預留／鎖庫存，購物車裡
+ * 放著、還沒付款的商品不會佔用庫存名額；真正的庫存扣減發生在付款完成
+ * 的當下（見 product-spec-options-stock.php），所以極端情況下（很多人
+ * 同時搶最後幾個名額並且都在很短時間內完成付款）還是有可能有一兩筆訂單
+ * 在這裡通過檢查、但實際扣庫存時因為已經被搶光而扣不到，屆時後台會在
+ * 該筆訂單留下附註提醒管理員人工處理，不會讓訂單卡住或失敗。
  */
 add_filter( 'woocommerce_add_to_cart_validation', 'chao_gang_cheng_validate_spec_selection_add_to_cart', 10, 3 );
 function chao_gang_cheng_validate_spec_selection_add_to_cart( $passed, $product_id, $quantity ) {
@@ -115,9 +130,17 @@ function chao_gang_cheng_validate_spec_selection_add_to_cart( $passed, $product_
         return $passed; // 找不到對應組合資料，不擋（跟前台 JS 的保守做法一致）
     }
 
-    $sold_out = ( false === $combo['enabled'] ) || ( null !== $combo['stock_qty'] && (int) $combo['stock_qty'] <= 0 );
-    if ( $sold_out ) {
-        wc_add_notice( '此規格組合目前無法選購（已額滿或已停用），請選擇其他組合。', 'error' );
+    if ( false === $combo['enabled'] ) {
+        wc_add_notice( '此規格組合目前無法選購（已停用），請選擇其他組合。', 'error' );
+        return false;
+    }
+
+    if ( null !== $combo['stock_qty'] && (int) $combo['stock_qty'] < (int) $quantity ) {
+        if ( (int) $combo['stock_qty'] <= 0 ) {
+            wc_add_notice( '此規格組合目前無法選購（已額滿），請選擇其他組合。', 'error' );
+        } else {
+            wc_add_notice( sprintf( '此規格組合目前只剩下 %d 份，請減少購買數量。', (int) $combo['stock_qty'] ), 'error' );
+        }
         return false;
     }
 
@@ -231,4 +254,9 @@ function chao_gang_cheng_save_spec_selection_to_order_item( $item, $cart_item_ke
     foreach ( $values['ckc_spec_selected'] as $selection ) {
         $item->add_meta_data( $selection['cat_label'], $selection['val_label'] );
     }
+    // 不對客人顯示的內部 meta（底線開頭），保留原始的 cat_id=>val_id
+    // 對照，給第 4 期的庫存扣減／回補邏輯直接算出組合 key 用，不用回頭
+    // 解析上面那些給客人看的中文標籤（標籤之後可能改名，不能拿來當
+    // 資料庫查詢的依據）。
+    $item->add_meta_data( '_ckc_spec_selected', $values['ckc_spec_selected'], true );
 }

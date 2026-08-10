@@ -74,12 +74,117 @@ function chao_gang_cheng_get_spec_categories( $product_id ) {
 /**
  * 4. 讀取商品目前已儲存的組合定價／庫存設定。
  *
+ * 注意（第 4 期）：回傳的 stock_qty 是「即時庫存」，不是單純讀
+ * _ckc_spec_combinations 這包陣列裡存的靜態數字——如果這個組合有設定
+ * 庫存上限（不是 null／不限制），會用獨立 meta 記錄的即時庫存覆蓋過去
+ * （訂單扣庫存/回補庫存都是改那個獨立 meta，理由見
+ * chao_gang_cheng_adjust_spec_combo_stock() 的說明）。這樣不管是後台
+ * 顯示、前台試算、或加入購物車檢查，讀到的都是同一份「現在真正剩多少」
+ * 的數字。
+ *
  * @param int $product_id
  * @return array key（組合鍵）=> array( price_adjust, stock_qty, enabled )
  */
 function chao_gang_cheng_get_spec_combinations( $product_id ) {
     $data = get_post_meta( $product_id, '_ckc_spec_combinations', true );
-    return is_array( $data ) ? $data : array();
+    $data = is_array( $data ) ? $data : array();
+
+    foreach ( $data as $key => &$combo ) {
+        if ( ! isset( $combo['stock_qty'] ) || null === $combo['stock_qty'] ) {
+            continue; // 本來就是「不限制」，不需要有即時庫存 meta
+        }
+        $live = chao_gang_cheng_get_spec_combo_live_stock( $product_id, $key );
+        if ( null !== $live ) {
+            $combo['stock_qty'] = $live;
+        }
+    }
+    unset( $combo );
+
+    return $data;
+}
+
+/**
+ * 4a. 組合的「即時庫存」用的 meta key。庫存數字不是跟其他組合資料塞在
+ * 同一包 _ckc_spec_combinations 陣列裡，而是每個組合各自存成一個獨立的
+ * meta row，這樣才能用資料庫層級的條件式 UPDATE 做「原子扣庫存」
+ * （同時間兩筆訂單搶最後一件也不會都扣成功）。組合 key 本身含有
+ * `:` `|` 這類字元，直接當 meta_key 用不影響 SQL 儲存，
+ * 但用 md5 雜湊一次讓長度固定、也避免特殊字元在少數環境下踩到坑。
+ *
+ * @param string $combo_key
+ * @return string
+ */
+function chao_gang_cheng_spec_stock_meta_key( $combo_key ) {
+    return '_ckc_spec_stock_' . md5( $combo_key );
+}
+
+/**
+ * 4b. 讀取單一組合目前的即時庫存。
+ *
+ * @param int    $product_id
+ * @param string $combo_key
+ * @return int|null null 代表沒有設定庫存上限（不限制，或這個組合根本沒有庫存 meta）
+ */
+function chao_gang_cheng_get_spec_combo_live_stock( $product_id, $combo_key ) {
+    $val = get_post_meta( $product_id, chao_gang_cheng_spec_stock_meta_key( $combo_key ), true );
+    return ( '' === $val || false === $val ) ? null : (int) $val;
+}
+
+/**
+ * 4c. 原子調整（扣減／回補）單一組合的即時庫存，用資料庫層級的條件式
+ * UPDATE，避免「同時間兩筆訂單一起讀到庫存還有 1、兩邊都扣成功變成
+ * -1」這種超賣情況——跟 WooCommerce 核心自己扣商品庫存（wc_update_product_stock）
+ * 是同一種做法。
+ *
+ * 只有這個組合「本來就有設定庫存上限」（存在即時庫存 meta）才會真的去
+ * 扣／補；沒有設定（不限制）的組合完全不受影響，呼叫這個函式也是安全
+ * 的空操作。
+ *
+ * @param int    $product_id
+ * @param string $combo_key
+ * @param int    $delta 負數＝扣庫存，正數＝回補庫存。
+ * @return bool 扣庫存時如果目前庫存不足（或這個組合根本不限制庫存）會回傳 false，
+ *              代表沒有扣成功；回補一律回傳 true（回補不會有「扣不夠」的問題）。
+ */
+function chao_gang_cheng_adjust_spec_combo_stock( $product_id, $combo_key, $delta ) {
+    global $wpdb;
+
+    $delta = (int) $delta;
+    if ( 0 === $delta ) {
+        return true;
+    }
+
+    $meta_key = chao_gang_cheng_spec_stock_meta_key( $combo_key );
+
+    if ( $delta > 0 ) {
+        // 回補：直接加回去。如果這個組合根本沒有庫存 meta（代表當初就是
+        // 不限制），這裡不會意外新增一筆 meta——用 UPDATE 而不是
+        // update_post_meta()，沒有對應的 row 就什麼事都不會發生。
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = CAST(meta_value AS SIGNED) + %d WHERE post_id = %d AND meta_key = %s",
+                $delta,
+                $product_id,
+                $meta_key
+            )
+        );
+        clean_post_cache( $product_id );
+        return true;
+    }
+
+    $need = abs( $delta );
+    $updated_rows = $wpdb->query(
+        $wpdb->prepare(
+            "UPDATE {$wpdb->postmeta} SET meta_value = CAST(meta_value AS SIGNED) - %d WHERE post_id = %d AND meta_key = %s AND CAST(meta_value AS SIGNED) >= %d",
+            $need,
+            $product_id,
+            $meta_key,
+            $need
+        )
+    );
+    clean_post_cache( $product_id );
+
+    return $updated_rows > 0;
 }
 
 /**
@@ -474,6 +579,10 @@ function chao_gang_cheng_save_spec_options( $post_id ) {
         return;
     }
 
+    // 存檔前先記住舊的組合有哪些 key，等一下存完新資料後用來清掉「不再
+    // 存在的組合」殘留的即時庫存 meta（例如刪掉了某個規格值）。
+    $old_combo_keys = array_keys( get_post_meta( $post_id, '_ckc_spec_combinations', true ) ?: array() );
+
     $raw_categories = isset( $_POST['ckc_spec_categories'] ) && is_array( $_POST['ckc_spec_categories'] )
         ? wp_unslash( $_POST['ckc_spec_categories'] )
         : array();
@@ -548,4 +657,25 @@ function chao_gang_cheng_save_spec_options( $post_id ) {
     }
 
     update_post_meta( $post_id, '_ckc_spec_combinations', $combinations );
+
+    // 第 4 期：把每個組合「管理員在後台填的庫存數字」同步到各自獨立的
+    // 即時庫存 meta（訂單扣庫存/回補用的那份，見
+    // chao_gang_cheng_adjust_spec_combo_stock() 的說明）。管理員在這裡
+    // 存檔，等於是明確設定「現在庫存是多少」，會覆蓋掉先前訂單扣減留下
+    // 的數字——跟 WooCommerce 原生商品庫存欄位的行為一致（後台填的數字
+    // 就是目前庫存，之後新訂單才會繼續從這個數字往下扣）。
+    foreach ( $combinations as $combo_key => $combo_data ) {
+        $stock_meta_key = chao_gang_cheng_spec_stock_meta_key( $combo_key );
+        if ( null !== $combo_data['stock_qty'] ) {
+            update_post_meta( $post_id, $stock_meta_key, (int) $combo_data['stock_qty'] );
+        } else {
+            delete_post_meta( $post_id, $stock_meta_key ); // 改成不限制，清掉舊的庫存 meta
+        }
+    }
+    // 清掉「這次存檔後已經不存在」的舊組合殘留的庫存 meta（例如刪除了某個規格值）。
+    foreach ( $old_combo_keys as $old_key ) {
+        if ( ! isset( $combinations[ $old_key ] ) ) {
+            delete_post_meta( $post_id, chao_gang_cheng_spec_stock_meta_key( $old_key ) );
+        }
+    }
 }

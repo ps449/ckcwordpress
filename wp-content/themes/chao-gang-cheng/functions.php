@@ -10233,8 +10233,10 @@ require_once get_template_directory() . '/includes/admin/product-order.php';
 require_once get_template_directory() . '/includes/admin/product-spec-options.php';
 // 第 2 期：前台規格選擇 UI ＋ 即時價格試算。
 require_once get_template_directory() . '/includes/frontend/product-spec-options-frontend.php';
-// 第 3 期：購物車／結帳／訂單資料整合（庫存扣減/超賣防護是第 4 期）。
+// 第 3 期：購物車／結帳／訂單資料整合。
 require_once get_template_directory() . '/includes/frontend/product-spec-options-cart.php';
+// 第 4 期：庫存扣減與超賣防護。
+require_once get_template_directory() . '/includes/frontend/product-spec-options-stock.php';
 
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
