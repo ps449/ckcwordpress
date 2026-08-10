@@ -265,11 +265,41 @@ function chao_gang_cheng_yt_autoplay_mobile_proxy() {
  */
 add_action( 'wp_head', 'chao_gang_cheng_preload_lcp_image', 2 );
 function chao_gang_cheng_preload_lcp_image() {
-	if ( is_front_page() ) {
-		// Preload the hero banner background image (LCP candidate)
-		$banner_image = get_theme_mod( 'ckc_banner_image', get_template_directory_uri() . '/assets/images/slide-buffet.jpg' );
-		echo '<link rel="preload" as="image" href="' . esc_url( $banner_image ) . '">' . "\n";
+	if ( ! is_front_page() ) {
+		return;
 	}
+
+	// 效能修復（2026-08）：這裡原本永遠 preload get_theme_mod('ckc_banner_image')
+	// 這個舊版固定圖（預設 slide-buffet.jpg）。但首頁 Hero 輪播模塊
+	// （ckc_render_module_hero_slider，見 includes/homepage-modules-render.php）
+	// 現在改成動態抓「精選商品」的圖片來當第一張輪播圖，實際畫面上第一張
+	// （也就是真正的 LCP 元素）早就不是這張固定圖了——實測結果：瀏覽器會
+	// 搶先去抓一張根本沒用到的圖（浪費頻寬跟連線優先權），而真正顯示出來
+	// 的 LCP 圖反而完全沒有 preload，等於這個「優化」其實在扯後腿。這裡
+	// 改成套用跟 hero_slider 模塊完全一樣的查詢邏輯，preload 真正會顯示
+	// 的第一張圖，抓不到精選商品時才 fallback 回原本的固定預設圖。
+	$first_image_url = '';
+	if ( class_exists( 'WooCommerce' ) ) {
+		$featured_products = wc_get_products( array(
+			'featured' => true,
+			'status'   => 'publish',
+			'limit'    => 1,
+			'orderby'  => 'menu_order',
+			'order'    => 'ASC',
+		) );
+		if ( ! empty( $featured_products ) ) {
+			$image_id = $featured_products[0]->get_image_id();
+			if ( $image_id ) {
+				$first_image_url = wp_get_attachment_url( $image_id );
+			}
+		}
+	}
+
+	if ( '' === $first_image_url ) {
+		$first_image_url = get_theme_mod( 'ckc_banner_image', get_template_directory_uri() . '/assets/images/slide-buffet.jpg' );
+	}
+
+	echo '<link rel="preload" as="image" href="' . esc_url( $first_image_url ) . '">' . "\n";
 }
 
 /**

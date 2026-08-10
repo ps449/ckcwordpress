@@ -161,8 +161,17 @@ function ckc_render_module_hero_slider( $settings ) {
                     $short_desc = wp_strip_all_tags( $product->get_description() );
                     $short_desc = mb_strimwidth( $short_desc, 0, 160, '...' );
                 }
+                // 效能修復（2026-08）：原本不管是不是目前顯示中的那張，全部
+                // slide 的背景圖都用 inline style="background-image" 直接輸出，
+                // CSS 一解析完瀏覽器就會把全部（最多 5 張）輪播圖一次排進下載
+                // 佇列，但同一時間其實只有 .active 那張看得到，等於讓其他張
+                // 圖片去跟真正的 LCP 圖（第一張）搶頻寬跟連線數。這裡改成只有
+                // 第一張（一開始就是 .active）用 inline style 立即載入，其餘
+                // 用 data-bg 屬性延後，交給下面的 JS 在背景閒置時間才補上
+                // background-image，減少首屏一開始要搶頻寬的圖片請求數。
+                $is_first_slide = ( 0 === $slide_index );
                 ?>
-                <div class="slide<?php echo $slide_index === 0 ? ' active' : ''; ?>" style="background-image: url('<?php echo esc_url( $image_url ); ?>');">
+                <div class="slide<?php echo $is_first_slide ? ' active' : ''; ?>"<?php echo $is_first_slide ? ' style="background-image: url(\'' . esc_url( $image_url ) . '\');"' : ' data-bg="' . esc_url( $image_url ) . '"'; ?>>
                     <div class="slide-overlay"></div>
                     <div class="container" style="position: relative; height: 100%;">
                         <div class="slide-content">
@@ -232,12 +241,29 @@ function ckc_render_module_hero_slider( $settings ) {
         var prevBtn = document.getElementById('slider-prev-btn');
         var nextBtn = document.getElementById('slider-next-btn');
         var currentSlide = 0;
+
+        // 效能修復（2026-08）：搭配上面 PHP 端的修改——第一張（.active）以外
+        // 的輪播圖現在只帶 data-bg、不帶 background-image，這裡負責在「首屏
+        // 關鍵資源大致載入完」之後才幫它們補上 background-image、觸發瀏覽器
+        // 背景下載，輪到它顯示時通常已經預先快取好，不會有明顯的圖片延遲
+        // 閃爍；也在每次真的切換到某張時再補一次保險（避免使用者手動快速
+        // 點下一張、比 setTimeout 還早觸發的邊界情況）。
+        function warmSlideImage(el) {
+            if (el && !el.style.backgroundImage && el.dataset.bg) {
+                el.style.backgroundImage = "url('" + el.dataset.bg + "')";
+            }
+        }
+        setTimeout(function() {
+            slides.forEach(warmSlideImage);
+        }, 1500);
+
         var slideInterval = setInterval(nextSlide, 5000);
 
         function goToSlide(n) {
             slides[currentSlide].classList.remove('active');
             if (dots[currentSlide]) { dots[currentSlide].classList.remove('active'); }
             currentSlide = (n + slides.length) % slides.length;
+            warmSlideImage(slides[currentSlide]);
             slides[currentSlide].classList.add('active');
             if (dots[currentSlide]) { dots[currentSlide].classList.add('active'); }
         }
