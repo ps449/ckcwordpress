@@ -275,6 +275,27 @@ function chao_gang_cheng_fill_empty_category_descriptions() {
  * 屬性，對圖片搜尋／無障礙／AI 讀圖都不利。這裡只補「完全沒有 alt 或
  * alt 是空字串」的 <img>，已經手動寫過 alt 的圖片不會被覆蓋。
  */
+/**
+ * 7. 幫商品的 Product 結構化資料補上 brand 欄位。
+ *
+ * WooCommerce 核心本身已經會自動產生完整的 Product／Offer 結構化資料
+ * （name／description／image／sku／offers 裡的 price／priceCurrency／
+ * availability 都有，符合 Google 最低要求），只是沒有 brand——這裡用
+ * WooCommerce 官方提供的 woocommerce_structured_data_product 篩選器補上，
+ * 全店都是潮港城自有商品，固定帶上品牌名稱即可，不需要另外設定分店/
+ * 廠牌資料。
+ */
+add_filter( 'woocommerce_structured_data_product', 'chao_gang_cheng_add_product_brand_schema', 10, 2 );
+function chao_gang_cheng_add_product_brand_schema( $markup, $product ) {
+    if ( empty( $markup['brand'] ) ) {
+        $markup['brand'] = array(
+            '@type' => 'Brand',
+            'name'  => '潮港城',
+        );
+    }
+    return $markup;
+}
+
 add_filter( 'the_content', 'chao_gang_cheng_fill_missing_image_alt', 20 );
 function chao_gang_cheng_fill_missing_image_alt( $content ) {
     if ( is_admin() || ! is_singular( 'product' ) || empty( $content ) || false === strpos( $content, '<img' ) ) {
