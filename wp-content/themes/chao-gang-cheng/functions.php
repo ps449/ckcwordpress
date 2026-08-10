@@ -9614,7 +9614,11 @@ function ckc_call_gemini_api( $prompt ) {
         $response = wp_remote_post( $endpoint, array(
             'headers' => array( 'Content-Type' => 'application/json' ),
             'body'    => json_encode( $payload ),
-            'timeout' => 15,
+            // 效能修復（2026-08）：從 15 秒降到 8 秒。這支函式目前只會在後台
+            // 手動儲存商品，或是上面新增的背景 wp-cron 任務裡執行，已經不會
+            // 卡住前台訪客了，但編輯後台儲存商品時如果 4 個 endpoint 都逾時，
+            // 15 秒 x 4 還是會讓後台操作明顯卡頓，8 秒對 Gemini API 已經足夠。
+            'timeout' => 8,
         ) );
 
         if ( ! is_wp_error( $response ) ) {
@@ -9728,12 +9732,22 @@ function ckc_ai_automated_related_products( $related_posts, $product_id, $args )
     if ( is_array( $cached ) && ! empty( $cached ) ) {
         $result = $cached;
     } else {
-        $recommended_ids = ckc_generate_ai_recommendations( $product_id );
-        if ( ! empty( $recommended_ids ) ) {
-            update_post_meta( $product_id, '_ckc_ai_recommendations', $recommended_ids );
-            $result = $recommended_ids;
-        } else {
-            $result = $related_posts;
+        // 效能修復（2026-08）：這裡原本在快取不存在時，會在「前台」請求中
+        // 同步呼叫 ckc_generate_ai_recommendations()→ckc_call_gemini_api()，
+        // 該函式最多會依序嘗試 4 個 Gemini API endpoint、每個 15 秒逾時，
+        // 最壞情況下等於讓一個訪客的商品頁請求卡住將近 60 秒——這正是
+        // 「檢查全站效率」時要抓的那種會拖垮伺服器回應時間的阻塞式外部
+        // API 呼叫。前台一律不即時呼叫 API，快取不存在就先用 WooCommerce
+        // 預設的相關商品頂著，同時排一個背景（wp-cron）任務非同步產生
+        // AI 推薦，下次快取就會有資料，訪客完全不會被卡住。
+        $result = $related_posts;
+
+        $lock_key = 'ckc_ai_reco_pending_' . $product_id;
+        if ( false === get_transient( $lock_key ) ) {
+            set_transient( $lock_key, 1, HOUR_IN_SECONDS );
+            if ( ! wp_next_scheduled( 'ckc_generate_ai_recommendations_async', array( $product_id ) ) ) {
+                wp_schedule_single_event( time() + 5, 'ckc_generate_ai_recommendations_async', array( $product_id ) );
+            }
         }
     }
 
@@ -9746,6 +9760,18 @@ function ckc_ai_automated_related_products( $related_posts, $product_id, $args )
     $result = ckc_top_up_related_product_ids( $result, $product_id, 4 );
 
     return $result;
+}
+
+/**
+ * 32d-0. 背景（wp-cron）非同步產生 AI 推薦——不佔用前台訪客的請求時間。
+ */
+add_action( 'ckc_generate_ai_recommendations_async', 'ckc_generate_ai_recommendations_async_handler' );
+function ckc_generate_ai_recommendations_async_handler( $product_id ) {
+    $recommended_ids = ckc_generate_ai_recommendations( $product_id );
+    if ( ! empty( $recommended_ids ) ) {
+        update_post_meta( $product_id, '_ckc_ai_recommendations', $recommended_ids );
+    }
+    delete_transient( 'ckc_ai_reco_pending_' . $product_id );
 }
 
 /**
