@@ -66,17 +66,16 @@ function chao_gang_cheng_render_spec_options_frontend() {
             /* 規格已額滿/已停用時，「立即購買」（含桌機／手機黏底列版本）
                也要跟主要的「加入購物車」按鈕一樣呈現停用外觀，避免使用者
                以為還能直接搶購。
-               注意：這裡不能只用 opacity/filter——實測發現 .buy-now-btn
-               本來就有 transition，用 opacity 降不透明度時，瀏覽器會把它
-               當成一次「正常的過渡動畫」來處理，同一次 style 重新計算內
-               算出的 computed style 還是舊值，视覺上完全看不出變灰（不是
-               動畫本身的問題，是這顆按鈕原本的樣式規則 specificity 比對
-               直接蓋過）。改用 background-color／color 直接換成灰色最保
-               險；同時 selector 要跟主題原本那條
-               `.woocommerce .product-action-buttons button.buy-now-btn.alt`
-               規則的 specificity 打平或更高（同樣是 !important，光加
-               !important 沒用，specificity 較低還是會輸），才蓋得過去。 */
-            .woocommerce .product-action-buttons button.buy-now-btn.alt.ckc-spec-disabled,
+               注意：光靠這裡的 CSS 規則本身蓋不過去——實測發現
+               .buy-now-btn 本來就有 background-color 的 transition，
+               只要是「用切換 class 改變樣式」這種寫法，瀏覽器都會把顏色
+               變化當成一次過渡動畫處理，而 CSS Cascade 規則規定「正在跑
+               的 transition 值」的優先權比任何 !important（甚至 ID
+               selector）都高，所以不管這裡的 selector 疊得多高，畫面看
+               起來還是完全沒變灰。真正有效的做法是在 JS 那邊（見下方
+               setAddToCartDisabled）先用 inline style 把這顆按鈕的
+               transition 關掉，讓顏色瞬間切換，不透過過渡動畫，這裡的
+               background-color 才吃得進去。 */
             .buy-now-btn.ckc-spec-disabled,
             .sticky-buy-now-btn.ckc-spec-disabled,
             .mydybox-taiwan-for-woocommerce-sticky-btn.ckc-spec-disabled {
@@ -175,6 +174,11 @@ function chao_gang_cheng_render_spec_options_frontend() {
 
                 document.querySelectorAll( buyNowSelectors ).forEach( function ( btn ) {
                     btn.disabled = disabled;
+                    // 先關掉這顆按鈕的 transition，讓下面切換 class 造成的
+                    // background-color 改變是「瞬間套用」，不是走過渡動畫
+                    // （不這樣做的話，畫面上顏色實測完全看不出變化，細節
+                    // 說明見上面 <style> 裡的註解）。
+                    btn.style.setProperty( 'transition', 'none', 'important' );
                     btn.classList.toggle( 'ckc-spec-disabled', disabled );
                 } );
             }
