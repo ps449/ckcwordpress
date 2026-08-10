@@ -220,3 +220,96 @@ function chao_gang_cheng_robots_txt_ai_notes( $output ) {
 
     return $output;
 }
+
+/**
+ * 5. 商品分類描述自動補齊。
+ *
+ * 背景：目前 7 個商品分類（allitem／warmgift／icegift／warmfood／frozen／
+ * side-dishes／newyeardishes）在後台都沒有填寫「內容說明」，導致：
+ * (a) 前台分類頁本身內容很薄（只有商品格子，沒有任何獨特文字）；
+ * (b) 更嚴重的是，WordPress.com Atomic／Jetpack 平台在分類描述是空的時候，
+ *     會自動生出「glin680830 及 zxc3326197 所撰寫有關 常溫食品 的文章」
+ *     這種提到後台帳號名稱的通用預設文字，當成 <meta name="description">
+ *     直接曝光在前台原始碼裡（實測抓到）。這裡先幫忙填上真正有意義、
+ *     不重複的分類描述，兩個問題可以一次解決（Jetpack 那段話目前找不到
+ *     乾淨的關閉方式，但只要分類本身有描述，它就不會用那個帳號名稱的
+ *     樣板文字）。
+ *
+ * 只在分類描述「目前是空的」時才寫入，不會覆蓋你之後在後台手動修改過的
+ * 內容；已經有描述的分類（不論是原本就有、還是被這段程式寫入過）都不會
+ * 再被動到。
+ */
+add_action( 'init', 'chao_gang_cheng_fill_empty_category_descriptions', 20 );
+function chao_gang_cheng_fill_empty_category_descriptions() {
+    if ( ! taxonomy_exists( 'product_cat' ) ) {
+        return;
+    }
+
+    $descriptions = array(
+        'allitem'       => '潮港城電商購物全站商品總覽，涵蓋常溫禮盒、冷凍美食、年菜、伴手禮，總鋪師手路菜線上訂購、低溫宅配到府。',
+        'warmgift'      => '潮港城常溫禮盒系列，送禮自用兩相宜，伴手禮、節慶禮盒常溫保存好攜帶，全台宅配免出門。',
+        'icegift'       => '潮港城冷凍禮盒系列，總鋪師手路菜、聚餐宴客好選擇，冷凍低溫配送到府，在家輕鬆重現辦桌好味道。',
+        'warmfood'      => '潮港城常溫食品系列，乾拌麵、醬料等常溫保存美食，免冷藏、方便存放，隨時品嚐總鋪師獨門手路。',
+        'frozen'        => '潮港城冷凍美食系列，水餃、粽子等冷凍常備菜，加熱即可上桌，忙碌生活也能吃到辦桌等級美味。',
+        'side-dishes'   => '潮港城冷藏佳餚系列，蘿蔔糕、泡菜等即食小菜，冷藏配送到府，開封即可享用。',
+        'newyeardishes' => '潮港城年菜系列，30年辦桌世家總鋪師坐鎮，冷凍年菜宅配到府，年節團圓餐桌免出門也能吃辦桌菜。',
+    );
+
+    foreach ( $descriptions as $slug => $description ) {
+        $term = get_term_by( 'slug', $slug, 'product_cat' );
+        if ( ! $term || is_wp_error( $term ) ) {
+            continue; // 分類不存在（例如之後改名／刪除），跳過不處理
+        }
+        if ( '' !== trim( $term->description ) ) {
+            continue; // 已經有描述（不管是原本就有還是後台手動改過的），不覆蓋
+        }
+        wp_update_term( $term->term_id, 'product_cat', array( 'description' => $description ) );
+    }
+}
+
+/**
+ * 6. 商品「商品介紹」分頁內文圖片自動補 alt 文字。
+ *
+ * 商品主圖／相簿圖片本來就有 alt（WooCommerce 自動帶商品名稱），但商品
+ * 介紹分頁裡另外手動插入的圖片（例如成分表、包裝照片）完全沒有 alt
+ * 屬性，對圖片搜尋／無障礙／AI 讀圖都不利。這裡只補「完全沒有 alt 或
+ * alt 是空字串」的 <img>，已經手動寫過 alt 的圖片不會被覆蓋。
+ */
+add_filter( 'the_content', 'chao_gang_cheng_fill_missing_image_alt', 20 );
+function chao_gang_cheng_fill_missing_image_alt( $content ) {
+    if ( is_admin() || ! is_singular( 'product' ) || empty( $content ) || false === strpos( $content, '<img' ) ) {
+        return $content;
+    }
+
+    $base_alt = get_the_title();
+    if ( '' === $base_alt ) {
+        return $content;
+    }
+
+    $count = 0;
+    $content = preg_replace_callback(
+        '/<img\s+([^>]*?)\/?>/i',
+        function ( $matches ) use ( $base_alt, &$count ) {
+            $attrs = $matches[1];
+
+            // 已經有非空 alt 的圖片不動。
+            if ( preg_match( '/\balt\s*=\s*(["\'])(?:(?!\1).)+\1/i', $attrs ) ) {
+                return $matches[0];
+            }
+
+            $count++;
+            $alt_text = $base_alt . '－商品說明圖' . $count;
+
+            if ( preg_match( '/\balt\s*=\s*["\']["\']/i', $attrs ) ) {
+                $attrs = preg_replace( '/\balt\s*=\s*["\']["\']/i', 'alt="' . esc_attr( $alt_text ) . '"', $attrs );
+            } else {
+                $attrs .= ' alt="' . esc_attr( $alt_text ) . '"';
+            }
+
+            return '<img ' . $attrs . '>';
+        },
+        $content
+    );
+
+    return $content;
+}
