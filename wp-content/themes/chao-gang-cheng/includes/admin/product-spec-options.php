@@ -18,10 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   key 由各類別選到的值 id 依類別 id 字母序組成，例如
  *   'date:v1|time:v2' => { price_adjust, stock_qty, enabled }
  *
- * 這個功能只給「預約類商品」分類底下的商品使用（一般零售商品不需要，
- * 避免每個商品編輯頁都多一個用不到的區塊），分類由
- * chao_gang_cheng_ensure_reservation_product_category() 自動建立，
- * slug 固定是 'reservation-item'。
+ * 這個功能開放給「所有商品」使用（原本只限定「預約類商品」分類，後來
+ * 改成不再依分類限制——不管商品有沒有掛 reservation-item 這個分類，
+ * 商品編輯頁都會顯示「規格選項設定」區塊；沒有實際設定任何規格類別的
+ * 商品，前台不會多顯示任何東西，等於維持原樣，所以放開這個限制對既有
+ * 商品是安全的）。
+ *
+ * reservation-item 這個分類本身還留著（沒有刪除自動建立的邏輯），只是
+ * 不再拿來當作「要不要顯示規格設定」的判斷依據；如果之後想恢復成只給
+ * 特定分類使用，把 chao_gang_cheng_product_uses_spec_options() 改回
+ * has_term() 判斷即可。
  *
  * 本檔案只做「第 1 期」：後台資料結構＋ meta box 設定介面。前台顯示、
  * 加入購物車／訂單整合、庫存扣減防超賣是後續階段，尚未包含在這裡。
@@ -29,8 +35,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * 1. 自動建立「預約類商品」分類（若不存在），slug 固定 reservation-item。
- * 掛在 init，冪等（重複執行不會重複建立），確保不管站台有沒有人手動
- * 建過這個分類，程式碼都能正常運作。
+ * 掛在 init，冪等（重複執行不會重複建立）。這個分類目前不再用來判斷
+ * 是否顯示規格選項設定（見下方 chao_gang_cheng_product_uses_spec_options()
+ * 的說明），保留這個函式只是不動舊有分類資料，不影響任何既有商品分類。
  */
 add_action( 'init', 'chao_gang_cheng_ensure_reservation_product_category', 20 );
 function chao_gang_cheng_ensure_reservation_product_category() {
@@ -45,19 +52,20 @@ function chao_gang_cheng_ensure_reservation_product_category() {
         'product_cat',
         array(
             'slug'        => 'reservation-item',
-            'description' => '需要選擇日期／時間等規格的宴席、預約、時段類商品，會在商品編輯頁顯示「規格選項設定」區塊。',
+            'description' => '需要選擇日期／時間等規格的宴席、預約、時段類商品。',
         )
     );
 }
 
 /**
- * 2. 判斷商品是否屬於「預約類商品」分類，決定要不要顯示規格選項設定。
+ * 2. 判斷商品是否可以使用「規格選項設定」——目前開放所有商品使用，不再
+ * 限定「預約類商品」分類。
  *
  * @param int $product_id
  * @return bool
  */
 function chao_gang_cheng_product_uses_spec_options( $product_id ) {
-    return (bool) has_term( 'reservation-item', 'product_cat', $product_id );
+    return true;
 }
 
 /**
@@ -188,7 +196,7 @@ function chao_gang_cheng_adjust_spec_combo_stock( $product_id, $combo_key, $delt
 }
 
 /**
- * 5. Meta box：只在「預約類商品」分類底下的商品編輯頁顯示。
+ * 5. Meta box：所有商品的編輯頁都會顯示。
  */
 add_action( 'add_meta_boxes', 'chao_gang_cheng_add_spec_options_meta_box' );
 function chao_gang_cheng_add_spec_options_meta_box() {

@@ -10227,8 +10227,8 @@ require_once get_template_directory() . '/includes/admin/site-logo.php';
 // 商品「顯示排序」管理頁（「商品」子選單，拖曳調整前台預設排序用的 menu_order）
 require_once get_template_directory() . '/includes/admin/product-order.php';
 
-// 商品「二層規格選項」（日期／時間等，可選、影響價格與庫存），只在
-// 「預約類商品」分類（reservation-item）底下的商品編輯頁顯示設定區塊。
+// 商品「二層規格選項」（日期／時間等，可選、影響價格與庫存），開放給
+// 所有商品使用（原本只限「預約類商品」分類，已改成不限分類）。
 // 第 1 期：後台資料結構＋ meta box。
 require_once get_template_directory() . '/includes/admin/product-spec-options.php';
 // 第 2 期：前台規格選擇 UI ＋ 即時價格試算。
