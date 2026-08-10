@@ -10231,8 +10231,10 @@ require_once get_template_directory() . '/includes/admin/product-order.php';
 // 「預約類商品」分類（reservation-item）底下的商品編輯頁顯示設定區塊。
 // 第 1 期：後台資料結構＋ meta box。
 require_once get_template_directory() . '/includes/admin/product-spec-options.php';
-// 第 2 期：前台規格選擇 UI ＋ 即時價格試算（購物車/訂單整合是後續階段）。
+// 第 2 期：前台規格選擇 UI ＋ 即時價格試算。
 require_once get_template_directory() . '/includes/frontend/product-spec-options-frontend.php';
+// 第 3 期：購物車／結帳／訂單資料整合（庫存扣減/超賣防護是第 4 期）。
+require_once get_template_directory() . '/includes/frontend/product-spec-options-cart.php';
 
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
