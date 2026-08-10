@@ -202,11 +202,11 @@ function chao_gang_cheng_render_spec_options_meta_box( $post ) {
             <?php echo chao_gang_cheng_render_spec_value_row_html( '__CAT_INDEX__', '__VAL_INDEX__', array( 'id' => '', 'label' => '' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
         </template>
         <template id="ckc-spec-combo-row-template">
-            <tr class="ckc-spec-combo-row" data-combo-key="__COMBO_KEY__">
-                <td class="ckc-spec-combo-label">__COMBO_LABEL__</td>
-                <td><input type="number" step="1" name="ckc_spec_combos[__COMBO_KEY__][price_adjust]" value="0" class="ckc-combo-price"></td>
-                <td><input type="number" step="1" min="0" name="ckc_spec_combos[__COMBO_KEY__][stock_qty]" value="" placeholder="不限制" class="ckc-combo-stock"></td>
-                <td style="text-align:center;"><input type="checkbox" name="ckc_spec_combos[__COMBO_KEY__][enabled]" value="1" checked class="ckc-combo-enabled"></td>
+            <tr class="ckc-spec-combo-row">
+                <td class="ckc-spec-combo-label"></td>
+                <td><input type="number" step="1" value="0" class="ckc-combo-price"></td>
+                <td><input type="number" step="1" min="0" value="" placeholder="不限制" class="ckc-combo-stock"></td>
+                <td style="text-align:center;"><input type="checkbox" value="1" checked class="ckc-combo-enabled"></td>
             </tr>
         </template>
 
@@ -371,25 +371,35 @@ function chao_gang_cheng_render_spec_options_meta_box( $post ) {
                 comboBody.innerHTML = '';
                 comboEmpty.style.display = combos.length ? 'none' : '';
                 combos.forEach(function ( combo ) {
-                    // combo.key 只會是類別/值的 id（sanitize_key 過的英數字），可以安全用字串取代；
-                    // combo.label 是使用者填的中文顯示文字，不經過字串取代進 innerHTML，
-                    // 改用 textContent 賦值，避免自己填的文字裡有 < > 之類字元被當成 HTML 解析。
-                    var tpl = comboRowTemplate.innerHTML.split('__COMBO_KEY__').join( combo.key );
-                    var node = html( tpl );
-                    node.querySelector('.ckc-spec-combo-label').textContent = combo.label;
+                    // <tr> 樣板必須用 <template>.content.cloneNode() 取出，不能像類別/值
+                    // 那樣用「塞進一個 <div> 再讀 innerHTML」的字串拼接方式——瀏覽器的
+                    // HTML 解析器不允許 <tr> 單獨出現在 <div> 底下（沒有 <table> 包著），
+                    // 會被直接丟棄，導致 querySelector 抓到 null（實測踩過這個坑）。
+                    // combo.label 是使用者填的中文顯示文字，用 textContent 賦值，避免文字
+                    // 裡如果剛好有 < > 之類字元被當成 HTML 解析。
+                    var frag = comboRowTemplate.content.cloneNode( true );
+                    var tr = frag.querySelector('.ckc-spec-combo-row');
+                    tr.setAttribute( 'data-combo-key', combo.key );
+                    tr.querySelector('.ckc-spec-combo-label').textContent = combo.label;
+                    var priceInput   = tr.querySelector('.ckc-combo-price');
+                    var stockInput   = tr.querySelector('.ckc-combo-stock');
+                    var enabledInput = tr.querySelector('.ckc-combo-enabled');
+                    priceInput.name   = 'ckc_spec_combos[' + combo.key + '][price_adjust]';
+                    stockInput.name   = 'ckc_spec_combos[' + combo.key + '][stock_qty]';
+                    enabledInput.name = 'ckc_spec_combos[' + combo.key + '][enabled]';
                     var saved = liveCombos[ combo.key ];
                     if ( saved ) {
                         if ( typeof saved.price_adjust !== 'undefined' ) {
-                            node.querySelector('.ckc-combo-price').value = saved.price_adjust;
+                            priceInput.value = saved.price_adjust;
                         }
                         if ( typeof saved.stock_qty !== 'undefined' ) {
-                            node.querySelector('.ckc-combo-stock').value = saved.stock_qty;
+                            stockInput.value = saved.stock_qty;
                         }
                         if ( typeof saved.enabled !== 'undefined' ) {
-                            node.querySelector('.ckc-combo-enabled').checked = ( saved.enabled === true || saved.enabled === '1' || saved.enabled === 1 );
+                            enabledInput.checked = ( saved.enabled === true || saved.enabled === '1' || saved.enabled === 1 );
                         }
                     }
-                    comboBody.appendChild( node );
+                    comboBody.appendChild( tr );
                 } );
             }
 
