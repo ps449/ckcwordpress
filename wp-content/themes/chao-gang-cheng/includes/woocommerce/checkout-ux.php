@@ -127,7 +127,7 @@ function chao_checkout_free_shipping_progress() {
     $is_free = $coupon_free_shipping || $remaining <= 0;
     ?>
     <div class="chao-shipping-progress-container" style="margin-bottom: 25px; padding: 18px; border-radius: 10px; background: #fffaf1; border: 1px solid #e2d2b3; box-shadow: 0 1px 3px rgba(26,20,15,0.04);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: 600;">
+        <div class="chao-shipping-progress-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: 600;">
             <span style="color: #3a2f24; display: flex; align-items: center; gap: 6px;">
                 <?php if ( $coupon_free_shipping ) : ?>
                     <span style="font-size: 16px;"></span> 已套用免運優惠券，本次配送免運費！
@@ -149,6 +149,35 @@ function chao_checkout_free_shipping_progress() {
             <div class="chao-progress-bar" style="width: <?php echo esc_attr( $percentage ); ?>%; height: 100%; background: <?php echo esc_attr( $bar_color ); ?>; transition: width 0.4s ease-in-out;"></div>
         </div>
     </div>
+    <?php
+}
+
+/**
+ * 3a. 修復：手機版結帳頁的免運進度提示條，右側「免運門檻 NT$X」文字
+ * 用 justify-content: space-between 頂到容器最右邊，跟右下角浮動的
+ * LINE／電話按鈕（.floating-contact-buttons，right: 20px）幾乎落在
+ * 同一個水平位置，頁面捲動到特定位置時文字會被浮動按鈕整個蓋住、
+ * 看不到完整金額（使用者截圖回報「NT$2」後面被切斷）。這裡在手機
+ * 版讓那一列改成自動換行，門檻文字掉到第二行，不會再跟浮動按鈕
+ * 搶同一個右側位置。只在結帳頁輸出，不影響其他頁面。
+ */
+add_action( 'wp_head', 'chao_checkout_free_shipping_progress_mobile_fix_css' );
+function chao_checkout_free_shipping_progress_mobile_fix_css() {
+    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+        return;
+    }
+    ?>
+    <style>
+    @media (max-width: 480px) {
+        .chao-shipping-progress-row {
+            flex-wrap: wrap;
+            row-gap: 6px;
+        }
+        .chao-shipping-progress-row > span:last-child {
+            margin-left: auto;
+        }
+    }
+    </style>
     <?php
 }
 
