@@ -4,13 +4,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 商品「二層規格選項」購物車／結帳／訂單整合（第 3 期）。
+ * 商品「二層規格選項」購物車／結帳／訂單整合。
  *
- * 串接第 2 期前台選單送出的 ckc_spec_selected[類別id]=值id：
+ * 串接前台按鈕介面送出的 ckc_spec_selected[類別id]=值id：
  * - 加入購物車時把選擇的值記錄進購物車項目資料（woocommerce_add_cart_item_data）。
- * - 加入購物車前擋掉「完整命中一個已停用／已額滿組合」的請求
- *   （woocommerce_add_to_cart_validation），跟前台 JS 的擋法呼應，但這裡
- *   是伺服器端最後一道防線，避免繞過前台直接送表單。
+ * - 加入購物車前擋掉「規格沒選完整」以及「完整命中一個已停用／已額滿
+ *   組合」的請求（woocommerce_add_to_cart_validation），跟前台按鈕介面
+ *   的擋法呼應，但這裡是伺服器端最後一道防線，避免繞過前台直接送表單。
+ *   有設定規格類別的商品，規格是必填欄位；沒有設定規格類別的商品不受
+ *   影響。
  * - 購物車頁／結帳頁顯示已選規格（woocommerce_get_item_data）。
  * - 每次重新計算金額時，如果購物車項目的規格選擇「完整命中」組合表，
  *   套用該組合當下的 price_adjust；沒有完整命中（部分選擇或完全沒選）
@@ -53,7 +55,11 @@ function chao_gang_cheng_sanitize_spec_selection_from_post( $product_id ) {
     foreach ( $categories as $cat ) {
         $cat_id = $cat['id'];
         if ( empty( $raw[ $cat_id ] ) ) {
-            continue; // 這個類別使用者沒選，允許（規格是可選的）
+            // 這個類別沒有送出值：這裡只是單純不收進結果，不在這個函式
+            // 判斷「規格是不是必填」——是否要擋下這次請求，由呼叫端
+            // （例如 chao_gang_cheng_validate_spec_selection_add_to_cart()）
+            // 依商品有沒有設定規格類別自行決定。
+            continue;
         }
         $val_id = sanitize_key( $raw[ $cat_id ] );
         foreach ( $cat['values'] as $val ) {
@@ -99,11 +105,17 @@ function chao_gang_cheng_spec_full_match_key( $product_id, $selected ) {
 }
 
 /**
- * 加入購物車前的伺服器端把關：如果選的規格「完整命中」一個已停用、
- * 已額滿、或庫存不夠這次要買的數量的組合，擋下來並顯示錯誤訊息，不讓
- * 它進購物車。這裡讀到的 stock_qty 是即時庫存（見
- * chao_gang_cheng_get_spec_combinations() 的說明），所以能擋到「庫存還
- * 剩 2 個，但這次想買 5 個」這種情況，不是只有「完全額滿」才擋。
+ * 加入購物車前的伺服器端把關。分兩層：
+ *
+ * 1. 只要商品有設定規格類別，規格就是必填欄位——前台按鈕介面已經不給
+ *    選「不指定」，這裡是伺服器端最後一道防線，擋掉「JS 被停用、或直接
+ *    繞過前台送表單」時規格沒選完整的請求。沒有設定任何規格類別的商品
+ *    不受影響（$categories 為空，直接放行）。
+ * 2. 選的規格「完整命中」一個已停用、已額滿、或庫存不夠這次要買的數量
+ *    的組合時，擋下來並顯示錯誤訊息。這裡讀到的 stock_qty 是即時庫存
+ *    （見 chao_gang_cheng_get_spec_combinations() 的說明），所以能擋到
+ *    「庫存還剩 2 個，但這次想買 5 個」這種情況，不是只有「完全額滿」
+ *    才擋。
  *
  * 提醒：這只是「加入購物車那一刻」的檢查，不是預留／鎖庫存，購物車裡
  * 放著、還沒付款的商品不會佔用庫存名額；真正的庫存扣減發生在付款完成
@@ -118,10 +130,16 @@ function chao_gang_cheng_validate_spec_selection_add_to_cart( $passed, $product_
         return $passed;
     }
 
+    $categories = chao_gang_cheng_get_spec_categories( $product_id );
+    if ( empty( $categories ) ) {
+        return $passed; // 這個商品根本沒設定規格類別，不受影響
+    }
+
     $selected = chao_gang_cheng_sanitize_spec_selection_from_post( $product_id );
     $key      = chao_gang_cheng_spec_full_match_key( $product_id, $selected );
     if ( null === $key ) {
-        return $passed; // 部分選擇或完全沒選，不受組合表限制
+        wc_add_notice( '請選擇完整的規格後再加入購物車。', 'error' );
+        return false;
     }
 
     $combos = chao_gang_cheng_get_spec_combinations( $product_id );

@@ -4,18 +4,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 商品「二層規格選項」前台顯示（第 2 期）。
+ * 商品「二層規格選項」前台顯示。
  *
- * 只做：在商品頁「加入購物車」按鈕上方顯示規格類別選單（可不選，預設
- * 「不指定」），選擇時用 JS 即時比對後台設定的組合表，命中「全部類別
- * 都選了」的組合時更新價格顯示；命中的組合如果庫存為 0 或被停用，顯示
- * 提示並停用「加入購物車」按鈕。
+ * 在商品頁「加入購物車」按鈕上方，依後台設定的規格類別，逐類別顯示一排
+ * 可點選的按鈕（不是下拉選單，也沒有「不指定」這個選項）；每個類別都要
+ * 點選一個按鈕才算選完，任何類別沒選就不能加入購物車／立即購買。已點選
+ * 的按鈕可以再點一次取消選取，回到「沒選」的狀態。用 JS 即時比對後台設
+ * 定的組合表，命中「全部類別都選了」的組合時更新價格顯示；命中的組合如
+ * 果庫存為 0 或被停用，顯示提示並停用「加入購物車」按鈕。
  *
- * 不包含（留到後續階段）：加入購物車/購物車頁/結帳頁/訂單資料整合、
- * 庫存扣減與超賣防護。這裡的 <select> 欄位命名為
- * ckc_spec_selected[類別id]，本來就在 WooCommerce 的 form.cart 表單裡，
- * 選擇結果會隨表單一起送到伺服器，方便後續階段直接讀取，但目前還沒有
- * 任何程式碼處理這個送出的資料。
+ * 表單欄位命名維持 ckc_spec_selected[類別id]（用隱藏欄位存目前選到的值
+ * id，按鈕本身不是表單欄位），跟後端（購物車/結帳/訂單整合、庫存扣減）
+ * 讀取 $_POST 的方式相容，不需要另外改後端讀取邏輯。
  */
 
 add_action( 'woocommerce_before_add_to_cart_button', 'chao_gang_cheng_render_spec_options_frontend', 5 );
@@ -42,15 +42,39 @@ function chao_gang_cheng_render_spec_options_frontend() {
     <div class="ckc-spec-frontend">
         <style>
             .ckc-spec-frontend { margin: 0 0 16px; }
-            .ckc-spec-frontend .ckc-spec-frontend-group { margin-bottom: 10px; }
-            .ckc-spec-frontend .ckc-spec-frontend-group label {
+            .ckc-spec-frontend .ckc-spec-frontend-group { margin-bottom: 14px; }
+            .ckc-spec-frontend .ckc-spec-frontend-group > label {
                 display: block;
                 font-weight: 600;
-                margin-bottom: 4px;
+                margin-bottom: 6px;
             }
-            .ckc-spec-frontend select {
-                min-width: 200px;
-                padding: 6px 10px;
+            .ckc-spec-btn-group {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .ckc-spec-value-btn {
+                padding: 8px 16px;
+                border: 1px solid #c9c2b8;
+                border-radius: 6px;
+                background: #ffffff;
+                color: #333333;
+                cursor: pointer;
+                font-size: 14px;
+                line-height: 1.4;
+                /* 不用 transition：選取狀態要瞬間切換，跟下面「立即購買」
+                   停用樣式踩過的過渡動畫問題是同一件事，這裡從一開始就
+                   避免。 */
+                transition: none;
+            }
+            .ckc-spec-value-btn:hover {
+                border-color: var( --accent-color, #f86f69 );
+            }
+            .ckc-spec-value-btn.ckc-spec-value-btn--active {
+                background: var( --accent-color, #f86f69 );
+                border-color: var( --accent-color, #f86f69 );
+                color: #ffffff;
+                font-weight: 600;
             }
             .ckc-spec-price-preview {
                 font-size: 15px;
@@ -63,19 +87,30 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 color: #b32d2e;
                 margin: 8px 0;
             }
+            .ckc-spec-incomplete-hint {
+                font-size: 14px;
+                color: #8c7a64;
+                margin: 8px 0;
+            }
             /* 規格已額滿/已停用時，「立即購買」（含桌機／手機黏底列版本）
                也要跟主要的「加入購物車」按鈕一樣呈現停用外觀，避免使用者
-               以為還能直接搶購。
-               注意：光靠這裡的 CSS 規則本身蓋不過去——實測發現
-               .buy-now-btn 本來就有 background-color 的 transition，
-               只要是「用切換 class 改變樣式」這種寫法，瀏覽器都會把顏色
-               變化當成一次過渡動畫處理，而 CSS Cascade 規則規定「正在跑
-               的 transition 值」的優先權比任何 !important（甚至 ID
-               selector）都高，所以不管這裡的 selector 疊得多高，畫面看
-               起來還是完全沒變灰。真正有效的做法是在 JS 那邊（見下方
-               setAddToCartDisabled）先用 inline style 把這顆按鈕的
-               transition 關掉，讓顏色瞬間切換，不透過過渡動畫，這裡的
-               background-color 才吃得進去。 */
+               以為還能直接搶購。這裡踩過兩個坑，兩個都要一起處理才會真
+               的顯示成灰色，缺一個都會看起來完全沒套用到樣式：
+               1) Specificity 不夠：主題原本那條
+                  `.woocommerce .product-action-buttons button.buy-now-btn.alt`
+                  規則也是 !important，但它的 selector 比單純疊兩個 class
+                  的 specificity 高，兩邊都 !important 時規則是比
+                  specificity，不是比後寫先贏，所以這裡的 selector 要跟
+                  主題那條打平或更高才蓋得過去。
+               2) Transition 動畫：就算 specificity 贏了，因為這顆按鈕本
+                  來就有 background-color 的 transition，單純切換 class
+                  在瀏覽器眼裡是一次「正常的過渡動畫」，而正在跑的
+                  transition 值的優先權比任何 !important 都高，所以還要
+                  搭配下面 JS（setAddToCartDisabled）裡用 inline style
+                  先把這顆按鈕的 transition 關掉，讓顏色是瞬間切換、不
+                  透過過渡動畫，這裡的 background-color 才會真的顯示出
+                  來。 */
+            .woocommerce .product-action-buttons button.buy-now-btn.alt.ckc-spec-disabled,
             .buy-now-btn.ckc-spec-disabled,
             .sticky-buy-now-btn.ckc-spec-disabled,
             .mydybox-taiwan-for-woocommerce-sticky-btn.ckc-spec-disabled {
@@ -87,32 +122,29 @@ function chao_gang_cheng_render_spec_options_frontend() {
         </style>
 
         <?php foreach ( $categories as $cat ) : ?>
-            <div class="ckc-spec-frontend-group">
-                <label for="ckc-spec-select-<?php echo esc_attr( $cat['id'] ); ?>"><?php echo esc_html( $cat['label'] ); ?></label>
-                <select
-                    id="ckc-spec-select-<?php echo esc_attr( $cat['id'] ); ?>"
-                    class="ckc-spec-frontend-select"
-                    name="ckc_spec_selected[<?php echo esc_attr( $cat['id'] ); ?>]"
-                    data-cat-id="<?php echo esc_attr( $cat['id'] ); ?>"
-                >
-                    <option value="">不指定</option>
+            <div class="ckc-spec-frontend-group" data-cat-id="<?php echo esc_attr( $cat['id'] ); ?>">
+                <label><?php echo esc_html( $cat['label'] ); ?></label>
+                <div class="ckc-spec-btn-group">
                     <?php foreach ( $cat['values'] as $val ) : ?>
-                        <option value="<?php echo esc_attr( $val['id'] ); ?>"><?php echo esc_html( $val['label'] ); ?></option>
+                        <button type="button" class="ckc-spec-value-btn" data-val-id="<?php echo esc_attr( $val['id'] ); ?>"><?php echo esc_html( $val['label'] ); ?></button>
                     <?php endforeach; ?>
-                </select>
+                </div>
+                <input type="hidden" class="ckc-spec-hidden-input" name="ckc_spec_selected[<?php echo esc_attr( $cat['id'] ); ?>]" value="">
             </div>
         <?php endforeach; ?>
 
+        <p class="ckc-spec-incomplete-hint" style="display:none;">請選擇規格後才能加入購物車。</p>
         <p class="ckc-spec-price-preview" style="display:none;"></p>
         <p class="ckc-spec-stock-warning" style="display:none;"></p>
 
         <script>
         (function () {
-            var wrap        = document.currentScript.closest('.ckc-spec-frontend');
-            var selects      = wrap.querySelectorAll('.ckc-spec-frontend-select');
-            var pricePreview = wrap.querySelector('.ckc-spec-price-preview');
-            var stockWarning = wrap.querySelector('.ckc-spec-stock-warning');
-            var form         = wrap.closest('form.cart');
+            var wrap          = document.currentScript.closest('.ckc-spec-frontend');
+            var groups        = wrap.querySelectorAll('.ckc-spec-frontend-group');
+            var pricePreview  = wrap.querySelector('.ckc-spec-price-preview');
+            var stockWarning  = wrap.querySelector('.ckc-spec-stock-warning');
+            var incompleteHint = wrap.querySelector('.ckc-spec-incomplete-hint');
+            var form          = wrap.closest('form.cart');
 
             // 注意：這段 script 是透過 woocommerce_before_add_to_cart_button 掛進去的，
             // 在 HTML 原始碼裡排在「加入購物車」按鈕的「前面」，所以頁面第一次解析
@@ -135,8 +167,9 @@ function chao_gang_cheng_render_spec_options_frontend() {
 
             function currentSelections() {
                 var sel = {};
-                selects.forEach( function ( s ) {
-                    sel[ s.getAttribute( 'data-cat-id' ) ] = s.value;
+                groups.forEach( function ( g ) {
+                    var input = g.querySelector('.ckc-spec-hidden-input');
+                    sel[ g.getAttribute( 'data-cat-id' ) ] = input ? input.value : '';
                 } );
                 return sel;
             }
@@ -188,12 +221,15 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 var key = fullMatchKey( selections );
 
                 if ( ! key ) {
-                    // 部分選擇或完全沒選：維持原價，正常可以加入購物車
+                    // 規格是必填欄位：只要還有類別沒選就不能加入購物車，
+                    // 顯示提示告訴使用者要先選完規格。
                     pricePreview.style.display = 'none';
                     stockWarning.style.display = 'none';
-                    setAddToCartDisabled( false );
+                    incompleteHint.style.display = '';
+                    setAddToCartDisabled( true );
                     return;
                 }
+                incompleteHint.style.display = 'none';
 
                 var combo = combos[ key ];
 
@@ -227,8 +263,24 @@ function chao_gang_cheng_render_spec_options_frontend() {
                 setAddToCartDisabled( false );
             }
 
-            selects.forEach( function ( s ) {
-                s.addEventListener( 'change', refresh );
+            groups.forEach( function ( group ) {
+                var hiddenInput = group.querySelector('.ckc-spec-hidden-input');
+                group.querySelectorAll('.ckc-spec-value-btn').forEach( function ( btn ) {
+                    btn.addEventListener( 'click', function () {
+                        var wasActive = btn.classList.contains( 'ckc-spec-value-btn--active' );
+                        group.querySelectorAll('.ckc-spec-value-btn').forEach( function ( b ) {
+                            b.classList.remove( 'ckc-spec-value-btn--active' );
+                        } );
+                        if ( wasActive ) {
+                            // 再點一次已選取的按鈕：取消選取，回到「沒選」狀態
+                            hiddenInput.value = '';
+                        } else {
+                            btn.classList.add( 'ckc-spec-value-btn--active' );
+                            hiddenInput.value = btn.getAttribute( 'data-val-id' );
+                        }
+                        refresh();
+                    } );
+                } );
             } );
 
             refresh();
