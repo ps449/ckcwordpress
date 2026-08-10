@@ -2966,46 +2966,52 @@ function chao_gang_cheng_custom_additional_information_heading() {
 }
 
 /**
- * Dynamic SEO & GEO Meta Tags
+ * Dynamic SEO & GEO（地理位置）Meta Tags
+ *
+ * 2026-08 SEO/GEO 優化時修正／調整過的地方：
+ * - canonical 拿掉了：原本這裡自己組 <link rel="canonical" href="<?php echo get_permalink(); ?>">，
+ *   get_permalink() 在非單篇頁面（首頁、分類頁…）沒有正確指向當前頁面時，
+ *   會抓到 loop 裡最後跑過的文章──實測發生過首頁的 canonical 誤指到「測試2」
+ *   這篇文章。WordPress 核心本身的 rel_canonical()（掛在 wp_head，各種頁面
+ *   類型都處理得比這裡完整正確）已經會自動輸出，拿掉這段重複又會出錯的
+ *   版本，改用核心內建的即可。
+ * - robots meta 也拿掉了：原本這裡不管什麼頁面一律輸出「index, follow」，
+ *   連購物車／結帳／會員中心／搜尋結果這些本來就不該被索引的頁面也一起被
+ *   放行。改用 WordPress 核心的 wp_robots 篩選器管理（見下面
+ *   chao_gang_cheng_wp_robots()），不會跟核心本身重複輸出 meta 標籤。
+ * - Jetpack 本身也有一組 Open Graph／Twitter Card／description／robots 的
+ *   輸出，跟這裡同時存在時會在同一頁印出兩份 og:type 等 meta（且值可能不
+ *   一樣，例如商品頁 Jetpack 印 og:type=article，這裡印 og:type=product，
+ *   兩個同時存在，瀏覽器/爬蟲只會採信其中一個，行為不可預期）。已經用
+ *   Jetpack 官方支援的 jetpack_enable_open_graph 篩選器關掉 Jetpack 那份
+ *   （見下方），這裡的版本改為唯一來源，並補上 Twitter Card、擴大涵蓋到
+ *   一般文章／頁面（原本只有首頁／商品／分類頁三種）。
  */
 add_action( 'wp_head', 'chao_gang_cheng_seo_geo_meta_tags', 1 );
 function chao_gang_cheng_seo_geo_meta_tags() {
-    // 1. General GEO Meta Tags (Site-wide for Chao Gang Cheng in Taichung)
+    // 1. GEO（地理位置）Meta Tags（潮港城台中據點，全站適用，不受下面頁面類型判斷影響）
     ?>
     <!-- GEO Target Metadata -->
     <meta name="geo.region" content="TW-TXG" />
     <meta name="geo.placename" content="台中市南屯區" />
     <meta name="geo.position" content="24.13524;120.61528" />
     <meta name="ICBM" content="24.13524, 120.61528" />
-    
-    <!-- General SEO Meta Tags -->
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <link rel="canonical" href="<?php echo esc_url( get_permalink() ); ?>" />
     <?php
 
-    // 2. Dynamic Description & Open Graph
+    // 2. 依頁面類型組出 title／description／OG／Twitter Card 用的資料
+    $site_name    = get_bloginfo( 'name' );
+    $og_type      = 'website';
+    $meta_title   = $site_name;
+    $meta_desc    = '';
+    $og_image     = get_template_directory_uri() . '/assets/images/logo-square.png?v=3';
+    $og_image_alt = $site_name;
+    $canonical_url = '';
+
     if ( is_front_page() || is_home() ) {
-        $site_name = get_bloginfo( 'name' );
         $site_description = get_bloginfo( 'description' );
-        
-        $meta_title = $site_name . ( $site_description ? ' | ' . $site_description : '' );
-        $meta_desc = $site_description;
-        $og_image = get_template_directory_uri() . '/assets/images/logo-square.png?v=3';
-        ?>
-        <meta name="description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-        <meta name="keywords" content="潮港城, 太陽百匯, 台中美食, 潮港城餐券, 冷凍食品, 年菜宅配, 功夫菜, 台中餐廳" />
-        
-        <!-- Open Graph -->
-        <meta property="og:locale" content="zh_TW" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="<?php echo esc_attr( $meta_title ); ?>" />
-        <meta property="og:description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-        <meta property="og:url" content="<?php echo esc_url( home_url( '/' ) ); ?>" />
-        <meta property="og:site_name" content="<?php echo esc_attr( $site_name ); ?>" />
-        <meta property="og:image" content="<?php echo esc_url( $og_image ); ?>" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <?php
+        $meta_title = $site_name . ( $site_description ? ' | ' . wp_html_excerpt( wp_strip_all_tags( $site_description ), 40, '' ) : '' );
+        $meta_desc  = wp_strip_all_tags( $site_description );
+        $canonical_url = home_url( '/' );
     } elseif ( is_product() ) {
         global $post;
         $product = wc_get_product( $post->ID );
@@ -3014,41 +3020,124 @@ function chao_gang_cheng_seo_geo_meta_tags() {
             if ( empty( $meta_desc ) ) {
                 $meta_desc = wp_strip_all_tags( $product->get_description() );
             }
-            $meta_desc = wp_html_excerpt( $meta_desc, 150, '...' );
-            $meta_title = $product->get_name() . ' | 潮港城美食商城';
-            $image_id = $product->get_image_id();
-            $og_image = $image_id ? wp_get_attachment_image_url( $image_id, 'large' ) : get_template_directory_uri() . '/assets/images/logo.png';
+            $meta_desc    = wp_html_excerpt( $meta_desc, 150, '...' );
+            $meta_title   = $product->get_name() . ' | 潮港城美食商城';
+            $image_id     = $product->get_image_id();
+            $og_image     = $image_id ? wp_get_attachment_image_url( $image_id, 'large' ) : $og_image;
+            $og_image_alt = $product->get_name();
+            $og_type      = 'product';
+            $canonical_url = get_permalink( $post->ID );
+        }
+    } elseif ( is_product_category() || is_product_tag() ) {
+        $term = get_queried_object();
+        $meta_desc  = $term->description ? wp_strip_all_tags( $term->description ) : $term->name . '系列商品線上訂購，名廚手藝低溫配送。';
+        $meta_desc  = wp_html_excerpt( $meta_desc, 155, '...' );
+        $meta_title = $term->name . '商品分類 | 潮港城美食商城';
+        $canonical_url = get_term_link( $term );
+    } elseif ( is_shop() ) {
+        $meta_title = '全部商品 | 潮港城美食商城';
+        $meta_desc  = '潮港城線上商城，常溫禮盒、冷凍美食、年菜、伴手禮一次購足，總鋪師手路菜低溫宅配到府。';
+        $canonical_url = get_permalink( wc_get_page_id( 'shop' ) );
+    } elseif ( is_singular() ) {
+        global $post;
+        $meta_desc = has_excerpt( $post ) ? wp_strip_all_tags( get_the_excerpt( $post ) ) : wp_strip_all_tags( $post->post_content );
+        $meta_desc  = wp_html_excerpt( $meta_desc, 155, '...' );
+        $meta_title = get_the_title( $post ) . ' | 潮港城美食商城';
+        $og_type    = ( 'page' === get_post_type( $post ) ) ? 'website' : 'article';
+        if ( has_post_thumbnail( $post ) ) {
+            $og_image = get_the_post_thumbnail_url( $post, 'large' );
+        }
+        $og_image_alt  = get_the_title( $post );
+        $canonical_url = get_permalink( $post );
+    }
+    ?>
+    <?php if ( '' !== $meta_desc ) : ?>
+    <meta name="description" content="<?php echo esc_attr( $meta_desc ); ?>" />
+    <?php endif; ?>
+
+    <!-- Open Graph -->
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:type" content="<?php echo esc_attr( $og_type ); ?>" />
+    <meta property="og:title" content="<?php echo esc_attr( $meta_title ); ?>" />
+    <?php if ( '' !== $meta_desc ) : ?>
+    <meta property="og:description" content="<?php echo esc_attr( $meta_desc ); ?>" />
+    <?php endif; ?>
+    <?php if ( $canonical_url ) : ?>
+    <meta property="og:url" content="<?php echo esc_url( $canonical_url ); ?>" />
+    <?php endif; ?>
+    <meta property="og:site_name" content="<?php echo esc_attr( $site_name ); ?>" />
+    <meta property="og:image" content="<?php echo esc_url( $og_image ); ?>" />
+    <meta property="og:image:alt" content="<?php echo esc_attr( $og_image_alt ); ?>" />
+
+    <!-- Twitter Card（Jetpack 自己的版本已用 jetpack_enable_open_graph 關掉，這裡是唯一來源） -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="<?php echo esc_attr( $meta_title ); ?>" />
+    <?php if ( '' !== $meta_desc ) : ?>
+    <meta name="twitter:description" content="<?php echo esc_attr( $meta_desc ); ?>" />
+    <?php endif; ?>
+    <meta name="twitter:image" content="<?php echo esc_url( $og_image ); ?>" />
+
+    <?php
+    if ( is_product() ) {
+        global $post;
+        $product = wc_get_product( $post->ID );
+        if ( $product ) {
             ?>
-            <meta name="description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-            
-            <!-- Open Graph -->
-            <meta property="og:locale" content="zh_TW" />
-            <meta property="og:type" content="product" />
-            <meta property="og:title" content="<?php echo esc_attr( $meta_title ); ?>" />
-            <meta property="og:description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-            <meta property="og:url" content="<?php echo esc_url( get_permalink() ); ?>" />
-            <meta property="og:site_name" content="潮港城美食商城" />
-            <meta property="og:image" content="<?php echo esc_url( $og_image ); ?>" />
             <meta property="product:price:amount" content="<?php echo esc_attr( $product->get_price() ); ?>" />
             <meta property="product:price:currency" content="TWD" />
             <?php
         }
-    } elseif ( is_product_category() ) {
-        $term = get_queried_object();
-        $meta_desc = $term->description ? wp_strip_all_tags( $term->description ) : $term->name . '系列商品線上訂購，名廚手藝低溫配送。';
-        $meta_title = $term->name . '商品分類 | 潮港城美食商城';
-        ?>
-        <meta name="description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-        
-        <!-- Open Graph -->
-        <meta property="og:locale" content="zh_TW" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="<?php echo esc_attr( $meta_title ); ?>" />
-        <meta property="og:description" content="<?php echo esc_attr( $meta_desc ); ?>" />
-        <meta property="og:url" content="<?php echo esc_url( get_term_link( $term ) ); ?>" />
-        <meta property="og:site_name" content="潮港城美食商城" />
-        <?php
     }
+}
+
+/**
+ * 關掉 Jetpack 自己的 Open Graph／Twitter Card 輸出，避免跟上面
+ * chao_gang_cheng_seo_geo_meta_tags() 同時存在造成同一頁重複／衝突的
+ * og:type 等 meta 標籤（Jetpack 官方文件建議的關閉方式）。
+ */
+add_filter( 'jetpack_enable_open_graph', '__return_false', 99 );
+
+/**
+ * 統一管理 robots 規則，取代舊版寫死在 wp_head 的 <meta name="robots">
+ * （舊版不分頁面類型一律 index,follow，連購物車／結帳／會員中心／搜尋結果
+ * 都會被索引）。用 WordPress 核心的 wp_robots 篩選器，不會跟核心本身重複
+ * 輸出 meta 標籤。
+ */
+add_filter( 'wp_robots', 'chao_gang_cheng_wp_robots' );
+function chao_gang_cheng_wp_robots( $robots ) {
+    $should_noindex = is_search()
+        || ( function_exists( 'is_cart' ) && is_cart() )
+        || ( function_exists( 'is_checkout' ) && is_checkout() )
+        || ( function_exists( 'is_account_page' ) && is_account_page() )
+        || ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-received' ) );
+
+    if ( $should_noindex ) {
+        $robots['noindex'] = true;
+        unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
+        return $robots;
+    }
+
+    $robots['index']             = true;
+    $robots['follow']            = true;
+    $robots['max-image-preview'] = 'large';
+    $robots['max-snippet']       = -1;
+    $robots['max-video-preview'] = -1;
+    return $robots;
+}
+
+/**
+ * 首頁 <title> 標籤優化：WordPress 預設在沒有設定靜態首頁時，會把網站
+ * 「標語」整段接在名稱後面──潮港城目前標語很長（開業30多年累積辦桌
+ * 百萬桌次…），接起來會變成一整串不利 SEO 的超長標題。這裡固定成精簡、
+ * 有關鍵字的版本，其餘頁面類型交給 WordPress／WooCommerce 原本的標題邏輯
+ * （本來就正常，不需要動）。
+ */
+add_filter( 'pre_get_document_title', 'chao_gang_cheng_document_title', 20 );
+function chao_gang_cheng_document_title( $title ) {
+    if ( is_front_page() || is_home() ) {
+        return get_bloginfo( 'name' ) . ' - 台中辦桌世家30年 | 冷凍年菜、常溫禮盒宅配';
+    }
+    return $title;
 }
 
 /**
@@ -10237,6 +10326,11 @@ require_once get_template_directory() . '/includes/frontend/product-spec-options
 require_once get_template_directory() . '/includes/frontend/product-spec-options-cart.php';
 // 第 4 期：庫存扣減與超賣防護。
 require_once get_template_directory() . '/includes/frontend/product-spec-options-stock.php';
+
+// 全站 SEO／GEO（生成式引擎優化）補強：WebSite／FAQPage 結構化資料、
+// llms.txt、robots.txt 補充 AI 爬蟲規則。跟本檔案原本就有的
+// chao_gang_cheng_seo_geo_meta_tags() 等函式互補，不重複。
+require_once get_template_directory() . '/includes/seo/seo-geo-optimization.php';
 
 /**
  * Unhook automatic brand output from WC_Brands to prevent duplication
