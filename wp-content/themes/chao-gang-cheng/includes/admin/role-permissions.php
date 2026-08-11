@@ -30,7 +30,67 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   自訂後台功能）＋常見的原生後台頁面（商品、文章、使用者、外掛、佈景
  *   主題、工具、設定、媒體、留言），未涵蓋到的冷門頁面保守起見不擋，
  *   避免誤傷正常操作。
+ *
+ * 修復（2026-08）：勾選矩陣「打勾＝有權限、取消＝隱藏且無權限」原本沒有
+ * 真的生效——因為「出貨人員／財務人員／財務人員／客服人員」這三個角色
+ * 實際上是把 WordPress 內建的 editor／author／contributor 角色換了個
+ * 中文顯示名稱（見 functions.php 的 chao_gang_cheng_rename_admin_roles()，
+ * 底層 capabilities 完全沒動）。這三個內建角色本來就沒有 manage_woocommerce
+ * 之類的能力，所以就算在矩陣裡把「運費管理」「折價券點數」等功能打勾，
+ * 使用者點進去還是會先被 WordPress 自己的權限檢查擋下（顯示「您沒有足夠
+ * 的權限」），跟這個矩陣的勾選狀態無關——看起來就像「打勾沒有用」。
+ * 下面 chao_gang_cheng_sync_staff_role_capabilities() 把「商店經理」
+ * （shop_manager，WooCommerce 內建、專門設計給店員用的角色）目前擁有的
+ * 所有 capability，同步授權給這三個角色，讓底層權限「夠用」，矩陣的勾選
+ * 才能真正決定看不看得到、打不打得開——勾選的項目使用者才真正進得去，
+ * 沒勾選的項目則交給下面既有的 chao_gang_cheng_enforce_role_menu_permissions()
+ * ／chao_gang_cheng_block_direct_menu_access() 隱藏＋擋下直接存取。
  */
+
+/**
+ * 把「商店經理」現有的所有 capability，補給「出貨人員／財務人員／客服人員」
+ * 這三個角色（底層是 editor／author／contributor，只是換了顯示名稱），讓
+ * 「使用者權限管理」矩陣打勾的項目使用者才真的進得去（否則會先被 WordPress
+ * 自己的權限檢查擋下，跟矩陣勾選狀態無關）。只用「新增」capability，不會
+ * 拿掉這三個角色原本就有的能力（例如編輯文章），避免影響既有用法。
+ *
+ * 用一次性版本旗標避免每次頁面載入都重新寫入 wp_options（角色資料存在
+ * wp_user_roles 這個 option 裡，add_cap() 每次呼叫都會整包重寫，量大時
+ * 不必要地跑會有效能成本）。之後如果要調整補的 capability 內容，把
+ * $version 字串改掉（例如 v3），就會讓已經跑過的站台重新同步一次。
+ */
+add_action( 'init', 'chao_gang_cheng_sync_staff_role_capabilities', 25 );
+function chao_gang_cheng_sync_staff_role_capabilities() {
+    $version = 'v1';
+    if ( get_option( 'ckc_staff_role_caps_synced' ) === $version ) {
+        return;
+    }
+
+    $shop_manager = get_role( 'shop_manager' );
+    if ( ! $shop_manager ) {
+        return; // WooCommerce 角色還沒建立好（例如剛啟用），旗標不設定，下次 init 會再試一次
+    }
+
+    $wc_caps = array_keys( array_filter( $shop_manager->capabilities ) );
+
+    // 除了 WooCommerce 相關 capability，這個主題還有幾個自訂後台頁面
+    // （選單管理、快捷列／加價專區／公告列等「網站功能」設定）額外要求
+    // WordPress 原生的 edit_theme_options，一併補上，矩陣打勾才會真的有效。
+    $extra_caps = array( 'edit_theme_options' );
+
+    $staff_roles = array( 'editor', 'author', 'contributor' );
+    foreach ( $staff_roles as $role_slug ) {
+        $role = get_role( $role_slug );
+        if ( ! $role ) {
+            continue;
+        }
+        foreach ( array_merge( $wc_caps, $extra_caps ) as $cap ) {
+            $role->add_cap( $cap );
+        }
+    }
+
+    update_option( 'ckc_staff_role_caps_synced', $version );
+}
 
 /**
  * 取得可以被個別設定權限的角色清單（排除「網站管理員」，理由見上方說明）。
