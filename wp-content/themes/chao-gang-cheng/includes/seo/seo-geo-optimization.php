@@ -67,6 +67,18 @@ function chao_gang_cheng_faq_schema() {
         return;
     }
 
+    // 修復（2026-08）：結帳／購物車／會員中心頁的內容通常是
+    // [woocommerce_checkout] 之類會有副作用的 shortcode。下面的
+    // apply_filters( 'the_content', ... ) 會跑過 do_shortcode，等於在
+    // wp_head（頁面 <head> 階段，比正常的內文渲染早很多）就把整個結帳表單
+    // 提前、多餘地執行一次——包括「我的優惠券」面板裡用 static $done 防止
+    // 重複輸出的 <script> 區塊，導致它在這次提前執行時就被消耗掉，等到
+    // 頁面真正在 <body> 渲染結帳表單時反而完全不會輸出任何東西。這些頁面
+    // 本來就不會手動寫 FAQ 格式的內容，直接跳過，不需要跑內容渲染管線。
+    if ( function_exists( 'is_checkout' ) && ( is_checkout() || is_cart() || is_account_page() ) ) {
+        return;
+    }
+
     global $post;
     if ( ! $post instanceof WP_Post || empty( $post->post_content ) ) {
         return;
