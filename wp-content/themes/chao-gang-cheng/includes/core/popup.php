@@ -15,7 +15,7 @@ function ckc_popup_add_menu() {
         'ckc-homepage-builder',
         '彈窗管理',
         '彈窗管理',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-popup-settings',
         'ckc_popup_page_html'
     );
@@ -71,7 +71,7 @@ function ckc_popup_sanitize( $input ) {
  * 21e. 後台設定頁面 HTML
  */
 function ckc_popup_page_html() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         wp_die( '您沒有權限存取此頁面。' );
     }
 

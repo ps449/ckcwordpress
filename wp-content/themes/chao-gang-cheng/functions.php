@@ -6986,7 +6986,7 @@ function ckc_floating_btns_add_menu() {
         'ckc-homepage-builder', // 父選單 slug（「首頁」）
         '快捷列設定',        // 頁面標題
         '快捷列設定',        // 選單標籤
-        'manage_options',    // 權限：管理員
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-floating-btns', // 選單 slug
         'ckc_floating_btns_page_html' // 渲染回呼
     );
@@ -7023,7 +7023,7 @@ function ckc_floating_btns_sanitize( $input ) {
  * 20d. 後台設定頁面 HTML
  */
 function ckc_floating_btns_page_html() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         wp_die( '您沒有權限存取此頁面。' );
     }
 
@@ -7161,7 +7161,7 @@ function ckc_addon_zone_add_menu() {
         'ckc-homepage-builder',
         '加價專區設定',
         '加價專區設定',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-addon-zone',
         'ckc_addon_zone_page_html'
     );
@@ -7223,7 +7223,7 @@ function ckc_addon_zone_sanitize( $input ) {
  * 後台設定頁面 HTML
  */
 function ckc_addon_zone_page_html() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         wp_die( '您沒有權限存取此頁面。' );
     }
 
@@ -7313,7 +7313,7 @@ function ckc_announcement_bar_add_menu() {
         'ckc-homepage-builder',
         '公告列設定',
         '公告列設定',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-announcement-bar',
         'ckc_announcement_bar_page_html'
     );
@@ -7362,7 +7362,7 @@ function ckc_announcement_bar_sanitize( $input ) {
 }
 
 function ckc_announcement_bar_page_html() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         wp_die( '您沒有權限存取此頁面。' );
     }
 

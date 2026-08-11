@@ -60,14 +60,14 @@ function chao_line_notify_add_admin_menu() {
         'ckc-website-features',
         'LINE 訂單通知設定',
         'LINE 訂單通知設定',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'chao-line-order-notify',
         'chao_line_notify_settings_page'
     );
 }
 
 function chao_line_notify_settings_page() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         return;
     }
 

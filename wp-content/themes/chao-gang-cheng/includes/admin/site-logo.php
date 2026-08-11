@@ -40,7 +40,7 @@ function ckc_site_logo_add_menu() {
 		'ckc-homepage-builder',
 		'Logo 設定',
 		'Logo 設定',
-		'manage_options',
+		'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
 		'ckc-site-logo',
 		'ckc_site_logo_page_html'
 	);
@@ -92,7 +92,7 @@ function ckc_get_site_logo_url() {
  * 5. 設定頁面 HTML
  */
 function ckc_site_logo_page_html() {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! current_user_can( 'edit_theme_options' ) ) {
 		return;
 	}
 	$logo_id  = absint( get_option( 'chao_gang_cheng_site_logo_id', 0 ) );

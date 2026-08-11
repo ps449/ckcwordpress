@@ -61,7 +61,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 add_action( 'init', 'chao_gang_cheng_sync_staff_role_capabilities', 25 );
 function chao_gang_cheng_sync_staff_role_capabilities() {
-    $version = 'v1';
+    $version = 'v2';
     if ( get_option( 'ckc_staff_role_caps_synced' ) === $version ) {
         return;
     }
@@ -73,10 +73,18 @@ function chao_gang_cheng_sync_staff_role_capabilities() {
 
     $wc_caps = array_keys( array_filter( $shop_manager->capabilities ) );
 
-    // 除了 WooCommerce 相關 capability，這個主題還有幾個自訂後台頁面
-    // （選單管理、快捷列／加價專區／公告列等「網站功能」設定）額外要求
-    // WordPress 原生的 edit_theme_options，一併補上，矩陣打勾才會真的有效。
-    $extra_caps = array( 'edit_theme_options' );
+    // 除了 WooCommerce 相關 capability（manage_woocommerce／edit_products／
+    // manage_product_terms 等，商店經理本來就有），這個主題的自訂後台頁面
+    // 還用到兩個「商店經理」預設沒有的 WordPress 原生 capability：
+    // - edit_theme_options：選單管理、快捷列／加價專區／公告列等「網站功能」
+    //   設定要求（實際比較接近網站外觀配置，不是敏感的系統設定）。
+    // - edit_pages：「網站功能」父選單本身、「出貨AI助理」要求（出貨人員
+    //   底層是 editor，本來就有 edit_pages，但財務人員／客服人員底層是
+    //   author／contributor，預設沒有，沒補的話這兩個角色勾選這兩項也沒用）。
+    // 2026-08 第二次調整（v2）：確認全站所有 add_menu_page()／
+    // add_submenu_page() 用到的 capability 只有這幾種＋manage_options；
+    // manage_options 刻意不補（見下方說明），其餘全數涵蓋。
+    $extra_caps = array( 'edit_theme_options', 'edit_pages' );
 
     $staff_roles = array( 'editor', 'author', 'contributor' );
     foreach ( $staff_roles as $role_slug ) {

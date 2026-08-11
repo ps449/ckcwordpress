@@ -455,7 +455,7 @@ function ckc_homepage_sanitize_settings( $type, $raw_settings ) {
  */
 add_action( 'admin_post_ckc_save_homepage_modules', 'ckc_save_homepage_modules_handler' );
 function ckc_save_homepage_modules_handler() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         wp_die( '權限不足' );
     }
     check_admin_referer( 'ckc_homepage_modules_save', 'ckc_homepage_modules_nonce' );
@@ -510,7 +510,7 @@ function ckc_homepage_builder_add_menu() {
     add_menu_page(
         '首頁',
         '首頁',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-homepage-builder',
         'ckc_homepage_builder_render_page',
         'dashicons-layout',
@@ -524,7 +524,7 @@ function ckc_homepage_builder_add_menu() {
         'ckc-homepage-builder',
         '首頁編輯',
         '首頁編輯',
-        'manage_options',
+        'edit_theme_options', // 權限（2026-08 由 manage_options 調整，見「使用者權限管理」說明）
         'ckc-homepage-builder',
         'ckc_homepage_builder_render_page'
     );
@@ -738,7 +738,7 @@ function ckc_homepage_module_summary( $module ) {
 }
 
 function ckc_homepage_builder_render_page() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'edit_theme_options' ) ) {
         return;
     }
     $registry = ckc_homepage_module_registry();
