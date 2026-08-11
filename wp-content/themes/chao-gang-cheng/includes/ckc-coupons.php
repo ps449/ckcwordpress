@@ -2502,14 +2502,6 @@ function ckc_checkout_coupon_panel() {
     echo '</details>';
     echo '</div>';
 
-    // 效能修復（2026-08）：這裡原本呼叫 ckc_checkout_coupon_ajax_script()，
-    // 但實測發現這個檔案（ckc-coupons.php）疑似有編譯快取沒隨部署更新的問題，
-    // 這行呼叫在正式站上完全沒有輸出任何東西。已經把對應的 <script>／<style>
-    // 搬到全新的 includes/ckc-checkout-coupon-sync.php，並在那邊獨立掛
-    // woocommerce_before_checkout_form（priority 7），不依賴這裡的呼叫。
-    // 這行留著呼叫舊函式沒有壞處（它有 static $done 防重複輸出的保護），
-    // 之後如果確認編譯快取問題排除了，這裡自然就會恢復正常，屆時可以視情況
-    // 移除新檔案，改回單一來源。
     ckc_checkout_coupon_ajax_script();
 }
 
@@ -2524,7 +2516,6 @@ function ckc_checkout_coupon_ajax_script() {
     }
     $done = true;
     ?>
-    <!-- CKC_COUPON_SCRIPT_MARKER_V1 -->
     <style>
     #ckc-coupon-toast{
         position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px);

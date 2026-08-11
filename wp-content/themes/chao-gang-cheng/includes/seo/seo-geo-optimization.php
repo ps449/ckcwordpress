@@ -84,14 +84,20 @@ function chao_gang_cheng_faq_schema() {
         return;
     }
 
+    // 修復（2026-08）：先在「原始」內容上做一次快速檢查，完全沒有 Q 的頁面
+    // 直接跳過，不需要再跑下面那段會執行 shortcode／區塊渲染的
+    // apply_filters( 'the_content', ... )。原本這個檢查是放在渲染「之後」，
+    // 等於不管頁面有沒有可能符合 FAQ 格式，每個頁面都會先被渲染一次内容
+    // （包含執行 shortcode），渲染完才判斷要不要用——多做了一次不必要、
+    // 有副作用的渲染。搬到渲染前可以讓大部分頁面直接跳過整段渲染管線。
+    if ( false === stripos( $post->post_content, 'Q' ) ) {
+        return;
+    }
+
     // 內容可能是 Gutenberg 區塊或純 HTML，先跑過 WP 的內容渲染管線
     // （執行區塊／shortcode 渲染），確保抓到的是「最終看起來」的 HTML，
     // 跟前台使用者實際看到的問答文字一致。
     $rendered = apply_filters( 'the_content', $post->post_content );
-
-    if ( false === stripos( $rendered, 'Q' ) ) {
-        return; // 完全沒有 Q 的頁面先快速跳過，省一次 regex
-    }
 
     $pattern = '/<strong>\s*Q[：:]\s*(.+?)\s*<\/strong>\s*<br\s*\/?>\s*A[：:]\s*(.+?)\s*<\/p>/isu';
     if ( ! preg_match_all( $pattern, $rendered, $matches, PREG_SET_ORDER ) || empty( $matches ) ) {

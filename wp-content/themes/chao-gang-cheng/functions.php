@@ -10308,9 +10308,6 @@ require_once get_template_directory() . '/includes/ckc-referral-partner.php'; //
 require_once get_template_directory() . '/includes/ckc-referral-admin.php'; // 分潤系統（後台夥伴管理頁）
 require_once get_template_directory() . '/includes/ckc-referral-tier-admin.php'; // 分潤系統（商品階梯式分潤分類設定）
 require_once get_template_directory() . '/includes/ckc-coupons.php'; // 折扣券（領券中心＋專屬優惠券頁）
-// 結帳頁優惠券套用/移除同步腳本——獨立成新檔案是為了繞開 ckc-coupons.php
-// 疑似卡住的舊版編譯快取，詳見該檔案內的說明註解。
-require_once get_template_directory() . '/includes/ckc-checkout-coupon-sync.php';
 require_once get_template_directory() . '/includes/ckc-points-admin.php'; // 紅利點數後台管理系統
 
 // Load custom ECPay ECPg 2.0 (站內付 2.0) Payment Gateway
