@@ -7288,7 +7288,7 @@ function ckc_addon_zone_page_html() {
                            name="chao_gang_cheng_addon_zone_settings[discount]"
                            value="<?php echo esc_attr( $opts['discount'] ); ?>"
                            style="width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
-                    <p style="margin:6px 0 0;font-size:12px;color:#aaa;">加購價 = 該商品原價 - 這個金額（最低不會低於 NT$10）。</p>
+                    <p style="margin:6px 0 0;font-size:12px;color:#aaa;">加購價 = 該商品特價（有特價時；否則為原價）- 這個金額（最低不會低於 NT$10）。</p>
                 </div>
                 <div>
                     <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">最多顯示幾件</label>
