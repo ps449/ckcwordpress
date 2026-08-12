@@ -2299,6 +2299,9 @@ function chao_gang_cheng_addon_purchase_section() {
                                 <div class="addon-pricing">
                                     <span class="regular-price">售價 NT$<?php echo esc_html( $regular_price ); ?></span>
                                     <span class="promo-price">加價購 NT$<?php echo esc_html( $addon_price ); ?></span>
+                                    <?php if ( $discount > 0 ) : ?>
+                                        <span class="addon-discount-badge">省 NT$<?php echo esc_html( $discount ); ?></span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             

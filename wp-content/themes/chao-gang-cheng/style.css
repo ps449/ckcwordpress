@@ -2515,6 +2515,18 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent-color);
 }
 
+.addon-info .addon-pricing .addon-discount-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent-color);
+  padding: 1px 7px;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
 /* Addon Quantity selector - Bottom-Right */
 .addon-qty-wrapper {
   position: absolute;
