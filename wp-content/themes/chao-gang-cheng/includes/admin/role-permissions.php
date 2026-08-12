@@ -61,7 +61,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 add_action( 'init', 'chao_gang_cheng_sync_staff_role_capabilities', 25 );
 function chao_gang_cheng_sync_staff_role_capabilities() {
-    $version = 'v2';
+    $version = 'v3';
     if ( get_option( 'ckc_staff_role_caps_synced' ) === $version ) {
         return;
     }
@@ -75,15 +75,18 @@ function chao_gang_cheng_sync_staff_role_capabilities() {
 
     // 除了 WooCommerce 相關 capability（manage_woocommerce／edit_products／
     // manage_product_terms 等，商店經理本來就有），這個主題的自訂後台頁面
-    // 還用到兩個「商店經理」預設沒有的 WordPress 原生 capability：
+    // 還用到兩個 WordPress 原生 capability，是 WooCommerce 從來不會給任何
+    // 角色（包含商店經理自己）的：
     // - edit_theme_options：選單管理、快捷列／加價專區／公告列等「網站功能」
     //   設定要求（實際比較接近網站外觀配置，不是敏感的系統設定）。
-    // - edit_pages：「網站功能」父選單本身、「出貨AI助理」要求（出貨人員
-    //   底層是 editor，本來就有 edit_pages，但財務人員／客服人員底層是
-    //   author／contributor，預設沒有，沒補的話這兩個角色勾選這兩項也沒用）。
-    // 2026-08 第二次調整（v2）：確認全站所有 add_menu_page()／
-    // add_submenu_page() 用到的 capability 只有這幾種＋manage_options；
-    // manage_options 刻意不補（見下方說明），其餘全數涵蓋。
+    // - edit_pages：「網站功能」父選單本身、「出貨AI助理」要求。
+    // 2026-08 第三次調整（v3）：修正 v2 的疏漏——這兩個 capability 原本只
+    // 補給出貨／財務／客服人員（editor／author／contributor），忘了商店
+    // 經理（shop_manager）本身也一樣沒有這兩個 WordPress 原生 capability
+    // （WooCommerce 建立這個角色時只給 WooCommerce 相關能力），導致商店
+    // 經理勾選「首頁」「網站功能」整組後，一樣打不開。這裡把商店經理也
+    // 加進補 capability 的名單（只補這兩個 extra_caps，不需要也不會重複
+    // 複製一次自己的 WooCommerce capability）。
     $extra_caps = array( 'edit_theme_options', 'edit_pages' );
 
     $staff_roles = array( 'editor', 'author', 'contributor' );
@@ -95,6 +98,10 @@ function chao_gang_cheng_sync_staff_role_capabilities() {
         foreach ( array_merge( $wc_caps, $extra_caps ) as $cap ) {
             $role->add_cap( $cap );
         }
+    }
+
+    foreach ( $extra_caps as $cap ) {
+        $shop_manager->add_cap( $cap );
     }
 
     update_option( 'ckc_staff_role_caps_synced', $version );
@@ -499,12 +506,55 @@ function chao_gang_cheng_enforce_role_menu_permissions() {
 }
 
 /**
+ * 修復（2026-08）：矩陣的勾選單位是「頂層選單」，但這個主題有好幾組頂層
+ * 選單底下掛了一大串子選單，而且子選單的 slug 通常跟父選單完全不同字串
+ * （例如「首頁」父選單 slug 是 ckc-homepage-builder，底下「快捷列設定」
+ * 子選單卻是完全不相關的 ckc-floating-btns；WooCommerce／商品／折價券
+ * 點數這幾組也都一樣）。下面 chao_gang_cheng_resolve_current_admin_slug()
+ * 原本直接把 $_GET['page'] 當成要比對的 slug，導致就算矩陣打勾了「首頁」
+ * 整組，使用者點進「快捷列設定」「LOGO設定」這類子選單時，比對的是
+ * ckc-floating-btns／ckc-site-logo 這些子選單自己的 slug，根本不在允許
+ * 清單裡（清單裡存的是父選單 slug ckc-homepage-builder），結果被誤擋
+ * 顯示「權限不足」——即使那一整組明明已經打勾允許。
+ *
+ * 這個函式把任何子選單 slug，透過 WordPress 全域 $submenu 陣列（記錄每個
+ * 父選單 slug 底下掛了哪些子選單，跟目前使用者權限無關，一定拿得到完整
+ * 清單）反查回它所屬的頂層父選單 slug，讓比對的對象永遠跟矩陣裡存的
+ * （頂層）slug 一致。如果傳進來的 slug 本身就是頂層選單（或找不到所屬
+ * 父選單，例如少數沒有掛在任何自訂父選單底下的獨立頁面），原樣傳回。
+ */
+function chao_gang_cheng_resolve_slug_to_top_level( $slug ) {
+    global $menu, $submenu;
+
+    if ( is_array( $menu ) ) {
+        foreach ( $menu as $item ) {
+            if ( isset( $item[2] ) && $item[2] === $slug ) {
+                return $slug; // 本身就是頂層選單，不需要轉換
+            }
+        }
+    }
+
+    if ( is_array( $submenu ) ) {
+        foreach ( $submenu as $parent_slug => $items ) {
+            foreach ( (array) $items as $item ) {
+                if ( isset( $item[2] ) && $item[2] === $slug ) {
+                    return $parent_slug;
+                }
+            }
+        }
+    }
+
+    return $slug; // 找不到所屬父選單，原樣傳回
+}
+
+/**
  * 把目前這個後台頁面請求，對應回它所屬的「頂層選單 slug」，給下面
  * chao_gang_cheng_block_direct_menu_access() 用來比對權限。
  *
  * 這是簡化版比對，不追求涵蓋 WordPress 後台每一個可能的頁面：
  * - admin.php?page=xxx 形式的頁面（這個主題所有自訂後台功能都是這個
- *   形式），直接回傳 $_GET['page']，一定準確。
+ *   形式），先取出 $_GET['page']，再用上面 chao_gang_cheng_resolve_slug_to_top_level()
+ *   反查回真正的頂層父選單 slug（子選單 slug 常跟父選單完全不同字串）。
  * - 商品／文章這類依 post_type 分開的原生列表頁／編輯頁，組回
  *   'edit.php?post_type=xxx' 這個跟 $menu 裡登記的 slug 完全一致的格式。
  * - 使用者、外掛、佈景主題、工具、設定、媒體、留言這幾個最常見的原生
@@ -518,7 +568,7 @@ function chao_gang_cheng_resolve_current_admin_slug() {
     global $pagenow;
 
     if ( ! empty( $_GET['page'] ) ) {
-        return sanitize_text_field( wp_unslash( $_GET['page'] ) );
+        return chao_gang_cheng_resolve_slug_to_top_level( sanitize_text_field( wp_unslash( $_GET['page'] ) ) );
     }
 
     if ( in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) ) {
