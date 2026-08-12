@@ -2278,7 +2278,11 @@ function chao_gang_cheng_addon_purchase_section() {
                     <?php foreach ( $addon_products as $post ) : 
                         setup_postdata( $post );
                         $_product = wc_get_product( $post->ID );
-                        $regular_price = $_product->get_regular_price();
+                        // 修復（2026-08）：加價購價格改用商品「特價」（有特價時＝特價，
+                        // 沒有特價時＝原價，即 get_price() 回傳的目前實際售價）當基礎，
+                        // 而不是一律用 get_regular_price()（未打折原價）去扣優惠金額，
+                        // 避免商品本身已在特價時，加價購價格算出來反而比特價還貴。
+                        $regular_price = (float) $_product->get_price();
                         $discount = (float) $addon_settings['discount']; // 後台「加價專區設定」可調整的每件優惠金額
                         $addon_price = max( 10, $regular_price - $discount );
                         $image_id = $_product->get_image_id();
@@ -2565,7 +2569,10 @@ function chao_gang_cheng_add_addons_to_cart_handler( $cart_item_key, $product_id
             // 而兜不起來；即使之後有人改了後台的優惠金額設定，已經在
             // 顧客購物車裡的品項金額也不會因此無預警被改變。
             $addon_product = wc_get_product( $addon_id );
-            $regular_price = $addon_product ? (float) $addon_product->get_regular_price() : 0;
+            // 修復（2026-08）：跟商品頁 chao_gang_cheng_addon_purchase_section() 改成
+            // 同一套基礎——用 get_price()（特價／目前實際售價）而非 get_regular_price()
+            // （未打折原價）去扣優惠金額，兩處計算基礎才會一致。
+            $regular_price = $addon_product ? (float) $addon_product->get_price() : 0;
             $addon_price   = max( 10, $regular_price - $discount );
 
             WC()->cart->add_to_cart(
@@ -2604,7 +2611,8 @@ function chao_gang_cheng_adjust_addon_cart_prices( $cart ) {
             } else {
                 // 相容舊資料：修正前就已經在顧客購物車裡的加購項目沒有
                 // 'addon_price' 這個欄位，退回用目前後台設定即時計算。
-                $original_price = $cart_item['data']->get_regular_price();
+                // 修復（2026-08）：跟另外兩處加價購計算基礎統一改用 get_price()（特價）。
+                $original_price = $cart_item['data']->get_price();
                 $addon_settings = chao_gang_cheng_get_addon_zone_settings();
                 $discount       = (float) $addon_settings['discount'];
                 $addon_price    = max( 10, $original_price - $discount );
