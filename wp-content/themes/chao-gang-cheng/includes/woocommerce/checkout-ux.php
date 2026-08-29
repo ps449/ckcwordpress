@@ -607,6 +607,7 @@ function chao_cart_estimated_shipping_row() {
 }
 
 // 32b. "湊免運" cross-sell block: shown below the cart items when under the threshold (placed outside the cart update form)
+// 32b. "湊免運/熱門加購" cross-sell block: shown below the cart items (placed outside the cart update form)
 add_action( 'woocommerce_before_cart_collaterals', 'chao_cart_free_shipping_cross_sell', 5 );
 function chao_cart_free_shipping_cross_sell() {
     if ( ! WC()->cart || WC()->cart->is_empty() ) {
@@ -624,22 +625,22 @@ function chao_cart_free_shipping_cross_sell() {
         }
     }
 
-    if ( $coupon_free_shipping || $subtotal >= $threshold ) {
-        return;
-    }
-    $diff = $threshold - $subtotal;
+    $is_free_reached = ( $coupon_free_shipping || ( $threshold > 0 && $subtotal >= $threshold ) );
+    $diff            = ( $threshold > $subtotal ) ? ( $threshold - $subtotal ) : 0;
 
     $exclude = array( 0 );
     foreach ( WC()->cart->get_cart() as $cart_item ) {
-        $exclude[] = $cart_item['product_id'];
+        if ( ! empty( $cart_item['product_id'] ) ) {
+            $exclude[] = (int) $cart_item['product_id'];
+        }
     }
 
     $candidate_ids = chao_checkout_crosssell_pool_ids();
-    $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
+    $cart_zones    = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
         ? chao_gang_cheng_get_cart_common_temperature_zones()
         : null;
 
-    $picks = array();
+    $picks            = array();
     $other_candidates = array();
 
     foreach ( $candidate_ids as $product_id ) {
@@ -659,7 +660,7 @@ function chao_cart_free_shipping_cross_sell() {
             continue;
         }
 
-        if ( $price <= max( $diff * 1.5, 500 ) ) {
+        if ( ! $is_free_reached && $diff > 0 && $price <= max( $diff * 1.5, 500 ) ) {
             $picks[] = $product;
         } else {
             $other_candidates[] = $product;
@@ -684,7 +685,13 @@ function chao_cart_free_shipping_cross_sell() {
     }
     ?>
     <div class="chao-cart-cross-sell">
-        <div class="chao-cart-cross-sell-title">還差 <strong><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 ⚡</div>
+        <div class="chao-cart-cross-sell-title">
+            <?php if ( ! $is_free_reached && $diff > 0 ) : ?>
+                還差 <strong><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 ⚡
+            <?php else : ?>
+                🎉 已達免運門檻！加購人氣美味享更多優惠 ⚡
+            <?php endif; ?>
+        </div>
         <div class="chao-cart-cross-sell-grid">
             <?php foreach ( $picks as $product ) : ?>
                 <div class="chao-cart-cross-sell-item">
@@ -706,43 +713,20 @@ function chao_cart_free_shipping_cross_sell() {
 }
 
 /**
- * 效能重構：結帳頁/購物車加購商品的「候選商品池」改用 transient 快取。
+ * 結帳頁/購物車加購商品的「候選商品池」直接由資料庫精準載入。
  */
 function chao_checkout_crosssell_pool_ids() {
-    $cache_key = 'ckc_checkout_crosssell_pool_v2';
-    $ids = get_transient( $cache_key );
-    if ( false !== $ids && is_array( $ids ) && ! empty( $ids ) ) {
-        return $ids;
-    }
-
-    $query = new WP_Query( array(
-        'post_type'      => 'product',
-        'post_status'    => 'publish',
-        'posts_per_page' => 60,
-        'orderby'        => array(
-            'meta_value_num' => 'DESC',
-            'date'           => 'DESC',
-        ),
-        'fields'         => 'ids',
-        'no_found_rows'  => true,
-    ) );
-    $ids = $query->posts;
-    wp_reset_postdata();
-
-    if ( empty( $ids ) ) {
-        $ids = get_posts( array(
-            'post_type'      => 'product',
-            'post_status'    => 'publish',
-            'posts_per_page' => 60,
-            'fields'         => 'ids',
-        ) );
-    }
-
-    set_transient( $cache_key, $ids, 10 * MINUTE_IN_SECONDS );
-    return $ids;
+    global $wpdb;
+    $ids = $wpdb->get_col( "
+        SELECT ID FROM {$wpdb->posts}
+        WHERE post_type = 'product' AND post_status = 'publish'
+        ORDER BY menu_order ASC, ID DESC
+        LIMIT 60
+    " );
+    return is_array( $ids ) ? array_map( 'intval', $ids ) : array();
 }
 
-// 32c-2. 結帳頁：未達免運門檻時顯示加購商品區（AJAX 加入，不整頁重載）
+// 32c-2. 結帳頁：加購商品區（AJAX 加入，不整頁重載）
 add_action( 'woocommerce_checkout_before_order_review', 'chao_checkout_free_shipping_cross_sell', 20 );
 function chao_checkout_free_shipping_cross_sell() {
     if ( ! WC()->cart || WC()->cart->is_empty() ) {
@@ -760,14 +744,14 @@ function chao_checkout_free_shipping_cross_sell() {
         }
     }
 
-    if ( $coupon_free_shipping || $subtotal >= $threshold ) {
-        return;
-    }
-    $diff = $threshold - $subtotal;
+    $is_free_reached = ( $coupon_free_shipping || ( $threshold > 0 && $subtotal >= $threshold ) );
+    $diff            = ( $threshold > $subtotal ) ? ( $threshold - $subtotal ) : 0;
 
     $exclude = array( 0 );
     foreach ( WC()->cart->get_cart() as $cart_item ) {
-        $exclude[] = $cart_item['product_id'];
+        if ( ! empty( $cart_item['product_id'] ) ) {
+            $exclude[] = (int) $cart_item['product_id'];
+        }
     }
 
     $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
@@ -795,7 +779,7 @@ function chao_checkout_free_shipping_cross_sell() {
             continue;
         }
 
-        if ( $price <= max( $diff * 1.5, 500 ) ) {
+        if ( ! $is_free_reached && $diff > 0 && $price <= max( $diff * 1.5, 500 ) ) {
             $picks[] = $product;
         } else {
             $other_candidates[] = $product;
@@ -820,7 +804,13 @@ function chao_checkout_free_shipping_cross_sell() {
     }
     ?>
     <div class="chao-checkout-cross-sell" data-threshold="<?php echo (int) $threshold; ?>" style="margin-bottom:20px;padding:16px;background:#fffaf1;border:1px solid #e2d2b3;border-radius:10px;">
-        <div style="font-size:14px;font-weight:700;color:#3a2f24;margin-bottom:12px;">還差 <strong style="color:#f86f69;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
+        <div style="font-size:14px;font-weight:700;color:#3a2f24;margin-bottom:12px;">
+            <?php if ( ! $is_free_reached && $diff > 0 ) : ?>
+                還差 <strong style="color:#f86f69;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇
+            <?php else : ?>
+                🎉 已達免運門檻！加購人氣美味享更多優惠 👇
+            <?php endif; ?>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
             <?php foreach ( $picks as $product ) : ?>
                 <?php $has_specs = function_exists( 'chao_product_has_specs_or_variations' ) ? chao_product_has_specs_or_variations( $product ) : false; ?>

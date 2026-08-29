@@ -747,10 +747,6 @@ function ckc_render_addon_spec_modal_markup() {
                         closeModal();
                         showToast(response.data.message || '已成功加入購物車！');
 
-                        if (response.data.reached_free) {
-                            $('.chao-checkout-cross-sell, .chao-cart-cross-sell').slideUp(220);
-                        }
-
                         // 觸發 WooCommerce 原生事件
                         $(document.body).trigger('added_to_cart', [response.data.fragments, response.data.cart_hash, $btn]);
                         $(document.body).trigger('wc_fragment_refresh');
@@ -825,9 +821,6 @@ function ckc_render_addon_spec_modal_markup() {
                 success: function(res) {
                     if (res.success) {
                         showToast(res.data.message || '已成功加入購物車！');
-                        if (res.data.reached_free) {
-                            $('.chao-checkout-cross-sell, .chao-cart-cross-sell').slideUp(220);
-                        }
 
                         // 觸發 WooCommerce 原生事件
                         $(document.body).trigger('added_to_cart', [res.data.fragments, res.data.cart_hash, $btn]);
