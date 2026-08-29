@@ -659,142 +659,6 @@ function chao_gang_cheng_woocommerce_breadcrumbs() {
 // Remove default WooCommerce breadcrumb hook to avoid duplicates (we render it in header.php)
 remove_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20, 0 );
 
-
-/**
- * Remote Import Trigger
- */
-add_action( 'init', 'chao_gang_cheng_remote_import' );
-function chao_gang_cheng_remote_import() {
-    if ( isset( $_GET['import_chao_gang_cheng_products'] ) && $_GET['import_chao_gang_cheng_products'] === 'secret123' ) {
-        require_once ABSPATH . 'wp-admin/includes/image.php';
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        require_once ABSPATH . 'wp-admin/includes/media.php';
-
-        $theme_dir = get_template_directory();
-        $products_data = array(
-            array(
-                'name'          => '【太陽百匯】平日單人自助午餐券',
-                'slug'          => 'solis-buffet-weekday-ticket',
-                'category'      => 'tickets',
-                'category_name' => '票券',
-                'price'         => '830',
-                'reg_price'     => '880',
-                'image'         => $theme_dir . '/assets/images/ticket-weekday.jpg',
-                'desc'          => '憑本券可享用潮港城太陽百匯平日自助午餐乙客。享用時段：11:30 - 14:00。本券已內含10%服務費。',
-                'short_desc'    => '台中最受歡迎的生鮮海鮮吃到飽！平日限定超值午餐券。'
-            ),
-            array(
-                'name'          => '【太陽百匯】假日單人午/晚餐券',
-                'slug'          => 'solis-buffet-weekend-ticket',
-                'category'      => 'tickets',
-                'category_name' => '票券',
-                'price'         => '2680',
-                'reg_price'     => '2880',
-                'image'         => $theme_dir . '/assets/images/ticket-weekend.jpg',
-                'desc'          => '憑本券可享用潮港城太陽百匯假日午餐或晚餐吃到飽乙客。本券已內含服務費。適合家庭聚餐與節慶慶祝。',
-                'short_desc'    => '假日海陸全席盛宴！龍蝦、生蠔、和牛無限量供應。'
-            ),
-            array(
-                'name'          => '【主廚嚴選】招牌紅燒牛肉爐 (3-4人份)',
-                'slug'          => 'signature-beef-hotpot',
-                'category'      => 'frozen',
-                'category_name' => '冷凍食品',
-                'price'         => '599',
-                'reg_price'     => '699',
-                'image'         => $theme_dir . '/assets/images/product-beef.jpg',
-                'desc'          => '潮港城30年主廚獨門研發！精選牛腩肉慢火燉煮8小時，湯頭醇厚、牛肉軟嫩多汁。急凍密封包裝，加熱即可享用。',
-                'short_desc'    => '主廚研發！一箱滿足全家人的經典紅燒牛肉爐。'
-            ),
-            array(
-                'name'          => '【老饕下酒菜】主廚私房香滷鳳爪 (2入組)',
-                'slug'          => 'chef-chicken-feet',
-                'category'      => 'side-dishes',
-                'category_name' => '下酒菜',
-                'price'         => '199',
-                'reg_price'     => '250',
-                'image'         => $theme_dir . '/assets/images/product-chicken.jpg',
-                'desc'          => '嚴選肥美鳳爪，搭配十餘種中藥材與香料慢火老滷，口感Q彈有嚼勁，膠原蛋白滿滿，是下酒、小聚的最佳良伴。',
-                'short_desc'    => '香氣撲鼻、老滷入味，老饕必點下酒小菜！'
-            ),
-            array(
-                'name'          => '【國宴佳餚】潮港城極品佛跳牆 (附甕)',
-                'slug'          => 'signature-buddha-soup',
-                'category'      => 'frozen',
-                'category_name' => '冷凍食品',
-                'price'         => '1080',
-                'reg_price'     => '1280',
-                'image'         => $theme_dir . '/assets/images/product-buddha.jpg',
-                'desc'          => '國宴級經典大菜！選用頂級鮑魚、干貝、排骨酥、鳥蛋、芋頭等十餘種名貴食材，層層堆疊慢火燉煮，湯頭濃意鮮美，送禮自用兩相宜。',
-                'short_desc'    => '尊貴極致宴席大菜，圍爐必備極品佛跳牆。'
-            )
-        );
-
-        foreach ( $products_data as $data ) {
-            // Check if product already exists
-            $existing = get_posts( array(
-                'post_type'  => 'product',
-                'name'       => $data['slug'],
-                'posts_per_page' => 1
-            ) );
-
-            if ( ! empty( $existing ) ) {
-                continue;
-            }
-
-            $product = new WC_Product_Simple();
-            $product->set_name( $data['name'] );
-            $product->set_slug( $data['slug'] );
-            $product->set_status( 'publish' );
-            $product->set_description( $data['desc'] );
-            $product->set_short_description( $data['short_desc'] );
-            $product->set_regular_price( $data['reg_price'] );
-            $product->set_sale_price( $data['price'] );
-
-            // Category logic
-            $term = get_term_by( 'slug', $data['category'], 'product_cat' );
-            if ( ! $term ) {
-                $inserted = wp_insert_term( $data['category_name'], 'product_cat', array( 'slug' => $data['category'] ) );
-                if ( ! is_wp_error( $inserted ) ) {
-                    $term_id = $inserted['term_id'];
-                }
-            } else {
-                $term_id = $term->term_id;
-            }
-            if ( isset( $term_id ) ) {
-                $product->set_category_ids( array( $term_id ) );
-            }
-
-            // Image logic
-            if ( file_exists( $data['image'] ) ) {
-                $upload_dir = wp_upload_dir();
-                $filename = basename( $data['image'] );
-                $target_path = $upload_dir['path'] . '/' . $filename;
-
-                copy( $data['image'], $target_path );
-
-                $wp_filetype = wp_check_filetype( $filename, null );
-                $attachment = array(
-                    'post_mime_type' => $wp_filetype['type'],
-                    'post_title'     => sanitize_file_name( $filename ),
-                    'post_content'   => '',
-                    'post_status'    => 'inherit'
-                );
-
-                $attach_id = wp_insert_attachment( $attachment, $target_path );
-                $attach_data = wp_generate_attachment_metadata( $attach_id, $target_path );
-                wp_update_attachment_metadata( $attach_id, $attach_data );
-
-                $product->set_image_id( $attach_id );
-            }
-
-            $product->save();
-        }
-
-        echo "import_success";
-        exit;
-    }
-}
-
 /**
  * ============================================================================
  * WooCommerce Checkout & Cart UI/UX Customizations (Aligning with shop.c-k.tw)
@@ -833,13 +697,19 @@ function chao_gang_cheng_custom_checkout_fields( $fields ) {
     $fields['billing']['billing_country']['default'] = 'TW';
     $fields['billing']['billing_country']['priority'] = 40;
 
+    $tw_counties = function_exists( 'chao_get_taiwan_counties_list' ) ? chao_get_taiwan_counties_list() : array();
+
+    $fields['billing']['billing_state']['type'] = 'select';
+    $fields['billing']['billing_state']['options'] = $tw_counties;
     $fields['billing']['billing_state']['label'] = '縣市';
     $fields['billing']['billing_state']['placeholder'] = '請選擇縣市';
     $fields['billing']['billing_state']['class'] = array( 'form-row-wide' );
     $fields['billing']['billing_state']['priority'] = 50;
 
+    $fields['billing']['billing_city']['type'] = 'select';
+    $fields['billing']['billing_city']['options'] = array( '' => '─ 請先選擇縣市 ─' );
     $fields['billing']['billing_city']['label'] = '鄉鎮市區';
-    $fields['billing']['billing_city']['placeholder'] = '請輸入鄉鎮市區';
+    $fields['billing']['billing_city']['placeholder'] = '請選擇鄉鎮市區';
     $fields['billing']['billing_city']['class'] = array( 'form-row-wide' );
     $fields['billing']['billing_city']['priority'] = 60;
 
@@ -862,13 +732,17 @@ function chao_gang_cheng_custom_checkout_fields( $fields ) {
     $fields['shipping']['shipping_country']['default'] = 'TW';
     $fields['shipping']['shipping_country']['priority'] = 20;
 
+    $fields['shipping']['shipping_state']['type'] = 'select';
+    $fields['shipping']['shipping_state']['options'] = $tw_counties;
     $fields['shipping']['shipping_state']['label'] = '縣市';
     $fields['shipping']['shipping_state']['placeholder'] = '請選擇縣市';
     $fields['shipping']['shipping_state']['class'] = array( 'form-row-wide' );
     $fields['shipping']['shipping_state']['priority'] = 30;
 
+    $fields['shipping']['shipping_city']['type'] = 'select';
+    $fields['shipping']['shipping_city']['options'] = array( '' => '─ 請先選擇縣市 ─' );
     $fields['shipping']['shipping_city']['label'] = '鄉鎮市區';
-    $fields['shipping']['shipping_city']['placeholder'] = '請輸入鄉鎮市區';
+    $fields['shipping']['shipping_city']['placeholder'] = '請選擇鄉鎮市區';
     $fields['shipping']['shipping_city']['class'] = array( 'form-row-wide' );
     $fields['shipping']['shipping_city']['priority'] = 40;
 
@@ -1510,6 +1384,17 @@ function chao_gang_cheng_validate_extra_register_fields( $validation_errors, $us
         $validation_errors->add( 'billing_phone_error', '<strong>錯誤</strong>：請輸入行動電話！' );
     } elseif ( isset( $_POST['billing_phone'] ) && ! preg_match( '/^09[0-9]{8}$/', $_POST['billing_phone'] ) ) {
         $validation_errors->add( 'billing_phone_format_error', '<strong>錯誤</strong>：行動電話格式不正確，應為 09 開頭的 10 位數字！' );
+    } elseif ( isset( $_POST['billing_phone'] ) ) {
+        $phone_digits = preg_replace( '/[^0-9]/', '', $_POST['billing_phone'] );
+        $existing_users = get_users( array(
+            'meta_key'   => 'billing_phone',
+            'meta_value' => $phone_digits,
+            'number'     => 1,
+            'fields'     => 'ID',
+        ) );
+        if ( ! empty( $existing_users ) ) {
+            $validation_errors->add( 'billing_phone_exists_error', '<strong>錯誤</strong>：此行動電話已被註冊，請直接登入或使用其他號碼！' );
+        }
     }
     return $validation_errors;
 }
@@ -1662,8 +1547,29 @@ function chao_gang_cheng_buy_now_redirect_handler( $url ) {
 
 /**
  * Get WooCommerce Free Shipping Threshold dynamically
+ * 優先讀取「電商營運 > 運費管理」後台設定（chao_gang_cheng_shipping_settings）
  */
 function chao_gang_cheng_get_free_shipping_threshold() {
+    // 1. 優先從「電商營運 > 運費管理」讀取免運門檻
+    $shipping_settings = get_option( 'chao_gang_cheng_shipping_settings', array() );
+    if ( is_array( $shipping_settings ) && ! empty( $shipping_settings['free_shipping'] ) && is_array( $shipping_settings['free_shipping'] ) ) {
+        $thresholds = array();
+        foreach ( $shipping_settings['free_shipping'] as $method_key => $amount ) {
+            $amount_val = floatval( $amount );
+            if ( $amount_val > 0 ) {
+                $thresholds[ $method_key ] = $amount_val;
+            }
+        }
+        if ( ! empty( $thresholds ) ) {
+            // 若有宅配門檻優先使用宅配，否則取最小非零門檻
+            if ( isset( $thresholds['home_delivery'] ) ) {
+                return $thresholds['home_delivery'];
+            }
+            return min( $thresholds );
+        }
+    }
+
+    // 2. 備援：WooCommerce 原生 Shipping Zones
     $min_amount = 0;
     if ( class_exists( 'WC_Shipping_Zones' ) ) {
         $zones = WC_Shipping_Zones::get_zones();
@@ -2731,6 +2637,29 @@ function chao_gang_cheng_qty_buttons_script() {
                     if (isNaN(max) || val < max) {
                         $qty.val(val + 1).trigger('change');
                     }
+                });
+
+                // 2026-08 修正（第四版）：改成監聽 WooCommerce 原生的
+                // updated_cart_totals 事件，只在購物車真正更新完成（伺服器端
+                // session 已寫入新值）後才抓取最新頁面內容並替換橫幅，避免
+                // 之前固定計時器搶在伺服器端真正更新完成前就發出請求、
+                // 抓到舊資料的競態問題。
+                $(document.body).on('updated_cart_totals wc_fragments_refreshed', function() {
+                    $.ajax({
+                        url: window.location.href + (window.location.href.indexOf('?') === -1 ? '?' : '&') + 'chao_cache_bust=' + Date.now(),
+                        cache: false,
+                        success: function(response) {
+                            try {
+                                var $parsed = $('<div>').append($.parseHTML(response));
+                                var newBannerHtml = $parsed.find('.cart-shipping-progress-wrapper').first().html();
+                                if (newBannerHtml) {
+                                    $('.cart-shipping-progress-wrapper').html(newBannerHtml);
+                                }
+                            } catch (err) {
+                                console.error('Error updating cart shipping progress banner:', err);
+                            }
+                        }
+                    });
                 });
 
                 // Buy Now and Add to Cart Handler
@@ -8428,6 +8357,8 @@ function ckc_gemini_agent_page() {
             $messagesBox.scrollTop($messagesBox[0].scrollHeight);
         }
 
+        var ckcGeminiNonce = '<?php echo wp_create_nonce("ckc_gemini_nonce"); ?>';
+
         // Save API Key
         $('#save-gemini-key').on('click', function() {
             var apiKey = $('#gemini-api-key').val().trim();
@@ -8439,7 +8370,8 @@ function ckc_gemini_agent_page() {
                 type: 'POST',
                 data: {
                     action: 'ckc_save_gemini_key',
-                    api_key: apiKey
+                    api_key: apiKey,
+                    security: ckcGeminiNonce
                 },
                 success: function(response) {
                     if (response.success) {
@@ -8482,7 +8414,8 @@ function ckc_gemini_agent_page() {
                 type: 'POST',
                 data: {
                     action: 'ckc_gemini_chat',
-                    message: text
+                    message: text,
+                    security: ckcGeminiNonce
                 },
                 success: function(response) {
                     $('.temp-typing').remove();
@@ -8539,6 +8472,7 @@ function ckc_gemini_agent_page() {
  */
 add_action( 'wp_ajax_ckc_save_gemini_key', 'ckc_ajax_save_gemini_key' );
 function ckc_ajax_save_gemini_key() {
+    check_ajax_referer( 'ckc_gemini_nonce', 'security' );
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => '權限不足' ) );
     }
@@ -8919,112 +8853,8 @@ function chao_gang_cheng_points_apply_all_script() {
 }
 
 /**
- * 30. 在「我的帳戶 > 編輯地址」頁面載入台灣縣市與鄉鎮市區二級連動 JavaScript
+ * 30. 台灣地址與郵遞區號二級連動模組已獨立模組化至 includes/woocommerce/taiwan-address-postcode.php
  */
-add_action( 'wp_enqueue_scripts', 'ckc_enqueue_my_account_address_scripts' );
-function ckc_enqueue_my_account_address_scripts() {
-    if ( ! is_account_page() || ! is_wc_endpoint_url( 'edit-address' ) ) {
-        return;
-    }
-
-    $districts_file = WP_PLUGIN_DIR . '/mydybox-taiwan-for-woocommerce/includes/modules/checkout-tw/data/tw-districts.php';
-    $postcodes_file = WP_PLUGIN_DIR . '/mydybox-taiwan-for-woocommerce/includes/modules/checkout-tw/data/tw-postcodes.php';
-
-    if ( file_exists( $districts_file ) && file_exists( $postcodes_file ) ) {
-        $districts = include $districts_file;
-        $postcodes = include $postcodes_file;
-
-        $saved_billing_city = get_user_meta( get_current_user_id(), 'billing_city', true );
-        $saved_shipping_city = get_user_meta( get_current_user_id(), 'shipping_city', true );
-
-        wp_add_inline_script( 'jquery', "
-            jQuery(document).ready(function($) {
-                var twDistricts = " . json_encode( $districts ) . ";
-                var twPostcodes = " . json_encode( $postcodes ) . ";
-                var savedCities = {
-                    billing: " . json_encode( $saved_billing_city ) . ",
-                    shipping: " . json_encode( $saved_shipping_city ) . "
-                };
-
-                function updateDistricts(type) {
-                    var state = $('#' + type + '_state').val();
-                    var \$citySelect = $('#' + type + '_city');
-                    if (!\$citySelect.length) return;
-                    
-                    var currentCity = \$citySelect.val() || savedCities[type] || '';
-
-                    if (!twDistricts[state]) {
-                        if (\$citySelect.is('select')) {
-                            \$citySelect.replaceWith('<input type=\"text\" class=\"input-text\" name=\"' + type + '_city\" id=\"' + type + '_city\" value=\"' + currentCity + '\">');
-                        }
-                        return;
-                    }
-
-                    var options = '<option value=\"\">─ 請選擇 ─</option>';
-                    $.each(twDistricts[state], function(k, v) {
-                        options += '<option value=\"' + k + '\"' + (k === currentCity ? ' selected' : '') + '>' + v + '</option>';
-                    });
-
-                    if (\$citySelect.is('input')) {
-                        \$citySelect.replaceWith('<select name=\"' + type + '_city\" id=\"' + type + '_city\" class=\"select\">' + options + '</select>');
-                    } else {
-                        \$citySelect.html(options);
-                    }
-                }
-
-                $('body').on('change', 'select.state_select', function() {
-                    var type = $(this).attr('id').replace('_state', '');
-                    updateDistricts(type);
-                });
-
-                $('body').on('change', 'select[id$=\"_city\"]', function() {
-                    var type = $(this).attr('id').replace('_city', '');
-                    var state = $('#' + type + '_state').val();
-                    var city = $(this).val();
-                    if (twPostcodes[state] && twPostcodes[state][city]) {
-                        $('#' + type + '_postcode').val(twPostcodes[state][city]).trigger('change');
-                    }
-                });
-
-                // 稍微延遲執行以確保 WooCommerce 欄位 DOM 已載入完畢
-                setTimeout(function() {
-                    updateDistricts('billing');
-                    updateDistricts('shipping');
-                }, 300);
-            });
-        " );
-    }
-}
-
-// 30b. 結帳頁面：動態填入已儲存或已選擇縣市的鄉鎮市區下拉選單選項，以利預先選取
-add_filter( 'woocommerce_checkout_fields', 'chao_gang_cheng_populate_checkout_city_options', 9999 );
-function chao_gang_cheng_populate_checkout_city_options( $fields ) {
-    if ( ! is_admin() && ( is_checkout() || wp_doing_ajax() ) ) {
-        $districts_file = WP_PLUGIN_DIR . '/mydybox-taiwan-for-woocommerce/includes/modules/checkout-tw/data/tw-districts.php';
-        if ( file_exists( $districts_file ) ) {
-            $districts = include $districts_file;
-            $user_id = get_current_user_id();
-
-            foreach ( array( 'billing', 'shipping' ) as $type ) {
-                $state = '';
-                if ( isset( $_POST[ $type . '_state' ] ) ) {
-                    $state = sanitize_text_field( $_POST[ $type . '_state' ] );
-                }
-                if ( empty( $state ) && $user_id ) {
-                    $state = get_user_meta( $user_id, $type . '_state', true );
-                }
-                if ( ! empty( $state ) && isset( $districts[ $state ] ) ) {
-                    $options = array( '' => '─ 請選擇 ─' );
-                    foreach ( $districts[ $state ] as $k => $v ) {
-                        $options[ $k ] = $v;
-                    }
-                    $fields[ $type ][ $type . '_city' ]['options'] = $options;
-                }
-            }
-        }
-    }
-    return $fields;
-}
 
 /**
  * =========================================================================
@@ -9400,6 +9230,7 @@ function ckc_customer_tags_sync_page_html() {
             
             var offset = 0;
             var limit = 20;
+            var ckcTagNonce = '<?php echo wp_create_nonce("ckc_customer_tags_nonce"); ?>';
             
             function runBatch() {
                 $.ajax({
@@ -9408,7 +9239,8 @@ function ckc_customer_tags_sync_page_html() {
                     data: {
                         action: 'ckc_batch_sync_customer_tags',
                         offset: offset,
-                        limit: limit
+                        limit: limit,
+                        security: ckcTagNonce
                     },
                     success: function(response) {
                         if (response.success) {
@@ -9451,6 +9283,7 @@ function ckc_customer_tags_sync_page_html() {
  */
 add_action( 'wp_ajax_ckc_batch_sync_customer_tags', 'ckc_ajax_batch_sync_customer_tags' );
 function ckc_ajax_batch_sync_customer_tags() {
+    check_ajax_referer( 'ckc_customer_tags_nonce', 'security' );
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => '權限不足' ) );
     }
@@ -10236,7 +10069,7 @@ function chao_save_chosen_payment_meta( $order_id ) {
         $ecpay_val = 'ALL';
         if ( $payment_method === 'credit' || $payment_method === 'unionpay' || $payment_method === 'googlepay' ) {
             $ecpay_val = 'Credit';
-        } elseif ( $payment_method === 'linepay' ) {
+        } elseif ( $payment_method === 'twqr' || $payment_method === 'linepay' ) {
             $ecpay_val = 'TWQR';
         } elseif ( $payment_method === 'atm' ) {
             $ecpay_val = 'ATM';
@@ -10310,6 +10143,8 @@ function chao_save_cvs_store_meta( $order_id ) {
 
 // 2. Inject CSS and Javascript on checkout page
 require_once get_template_directory() . '/includes/woocommerce/checkout.php';
+require_once get_template_directory() . '/includes/woocommerce/taiwan-address-postcode.php';
+require_once get_template_directory() . '/includes/woocommerce/product-addon-modal.php'; // 加購商品規格選擇彈窗模組
 
 // Load custom LINE Login module
 require_once get_template_directory() . '/includes/line-login.php';
@@ -10938,3 +10773,36 @@ function chao_gang_cheng_conditional_product_addons_assets() {
 }
 // 載入 Facebook for WooCommerce / Google 商品分類中文化腳本
 require_once get_template_directory() . '/includes/ckc-google-category-translation.php';
+
+add_filter( 'woocommerce_demo_store', '__return_empty_string' );
+
+// 屏蔽訂單後台「可下載商品權限」與「自訂欄位/新增自訂欄位」區塊
+add_action( 'add_meta_boxes', 'chao_remove_order_unneeded_meta_boxes', 99 );
+function chao_remove_order_unneeded_meta_boxes() {
+    // 傳統 CPT 訂單頁面
+    remove_meta_box( 'woocommerce-order-downloads', 'shop_order', 'normal' );
+    remove_meta_box( 'postcustom', 'shop_order', 'normal' );
+    
+    // WooCommerce HPOS 訂單頁面 (wc-orders)
+    remove_meta_box( 'woocommerce-order-downloads', 'woocommerce_page_wc-orders', 'normal' );
+    remove_meta_box( 'postcustom', 'woocommerce_page_wc-orders', 'normal' );
+    remove_meta_box( 'woocommerce-order-downloads', 'wc_orders', 'normal' );
+    remove_meta_box( 'postcustom', 'wc_orders', 'normal' );
+}
+
+// 透過後台 CSS 徹底隱藏訂單頁的可下載商品權限與自訂欄位
+add_action( 'admin_head', 'chao_hide_order_unneeded_meta_boxes_css', 999 );
+function chao_hide_order_unneeded_meta_boxes_css() {
+    $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+    if ( $screen && in_array( $screen->id, array( 'shop_order', 'woocommerce_page_wc-orders', 'wc_orders' ), true ) ) {
+        echo '<style>
+            #woocommerce-order-downloads,
+            #postcustom,
+            #postcustomstuff,
+            .postbox#woocommerce-order-downloads,
+            .postbox#postcustom {
+                display: none !important;
+            }
+        </style>';
+    }
+}

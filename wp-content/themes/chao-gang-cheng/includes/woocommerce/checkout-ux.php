@@ -82,17 +82,40 @@ function chao_available_payment_gateways( $gateways ) {
             $gateways['cod'] = $cod_gateway;
         }
         
-        // 2. Re-inject Credit Card (站內付 2.0) and mydybox_ecpay (LINE Pay, ATM, CVS Code) if removed by shipping plugins
+        // 2. Re-inject Credit Card (站內付 2.0) if removed by shipping plugins
         if ( ! isset( $gateways['chao_ecpay_ecpg'] ) && isset( $loaded_gateways['chao_ecpay_ecpg'] ) ) {
             $gateways['chao_ecpay_ecpg'] = $loaded_gateways['chao_ecpay_ecpg'];
-        }
-        if ( ! isset( $gateways['mydybox_ecpay'] ) && isset( $loaded_gateways['mydybox_ecpay'] ) ) {
-            $gateways['mydybox_ecpay'] = $loaded_gateways['mydybox_ecpay'];
         }
     } else {
         // Remove native COD option if chosen shipping is NOT CVS
         if ( isset( $gateways['cod'] ) ) {
             unset( $gateways['cod'] );
+        }
+    }
+
+    // 3. 確保官方外掛的 ATM 虛擬帳號、超商代碼、TWQR、Apple Pay 閘道啟用並保留在可用閘道中
+    foreach ( array( 'Wooecpay_Gateway_Atm', 'Wooecpay_Gateway_ATM', 'wooecpay_gateway_atm' ) as $atm_id ) {
+        if ( ! isset( $gateways[ $atm_id ] ) && isset( $loaded_gateways[ $atm_id ] ) ) {
+            $gateways[ $atm_id ] = $loaded_gateways[ $atm_id ];
+            $gateways[ $atm_id ]->enabled = 'yes';
+        }
+    }
+    foreach ( array( 'Wooecpay_Gateway_Cvs', 'Wooecpay_Gateway_CVS', 'wooecpay_gateway_cvs' ) as $cvs_id ) {
+        if ( ! isset( $gateways[ $cvs_id ] ) && isset( $loaded_gateways[ $cvs_id ] ) ) {
+            $gateways[ $cvs_id ] = $loaded_gateways[ $cvs_id ];
+            $gateways[ $cvs_id ]->enabled = 'yes';
+        }
+    }
+    foreach ( array( 'Wooecpay_Gateway_Twqr', 'Wooecpay_Gateway_TWQR', 'wooecpay_gateway_twqr' ) as $twqr_id ) {
+        if ( ! isset( $gateways[ $twqr_id ] ) && isset( $loaded_gateways[ $twqr_id ] ) ) {
+            $gateways[ $twqr_id ] = $loaded_gateways[ $twqr_id ];
+            $gateways[ $twqr_id ]->enabled = 'yes';
+        }
+    }
+    foreach ( array( 'Wooecpay_Gateway_Applepay', 'Wooecpay_Gateway_ApplePay', 'wooecpay_gateway_applepay' ) as $apple_id ) {
+        if ( ! isset( $gateways[ $apple_id ] ) && isset( $loaded_gateways[ $apple_id ] ) ) {
+            $gateways[ $apple_id ] = $loaded_gateways[ $apple_id ];
+            $gateways[ $apple_id ]->enabled = 'yes';
         }
     }
     
@@ -209,7 +232,7 @@ function chao_thankyou_guest_registration_form( $order_id ) {
         </p>
         <div class="chao-register-inputs" style="display: flex; gap: 12px; max-width: 500px; flex-wrap: wrap;">
             <input type="password" id="chao_register_password" placeholder="請設定您的登入密碼" style="flex: 1; min-width: 220px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;" />
-            <button id="chao_register_submit" data-order-id="<?php echo esc_attr( $order_id ); ?>" style="padding: 10px 20px; background: #0073aa; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+            <button id="chao_register_submit" data-order-id="<?php echo esc_attr( $order_id ); ?>" data-order-key="<?php echo esc_attr( $order->get_order_key() ); ?>" style="padding: 10px 20px; background: #0073aa; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
                 立即建立並登入
             </button>
         </div>
@@ -227,6 +250,7 @@ function chao_thankyou_guest_registration_form( $order_id ) {
             var $btn = $(this);
             var password = $('#chao_register_password').val();
             var orderId = $btn.data('order-id');
+            var orderKey = $btn.data('order-key');
             var $msg = $('#chao_register_message');
             
             if (!password || password.length < 6) {
@@ -240,6 +264,7 @@ function chao_thankyou_guest_registration_form( $order_id ) {
                 action: 'chao_thankyou_guest_register',
                 password: password,
                 order_id: orderId,
+                order_key: orderKey,
                 nonce: '<?php echo wp_create_nonce("chao_thankyou_register_nonce"); ?>'
             }, function(res) {
                 if (res.success) {
@@ -263,20 +288,26 @@ add_action( 'wp_ajax_nopriv_chao_thankyou_guest_register', 'chao_ajax_thankyou_g
 function chao_ajax_thankyou_guest_register_handler() {
     check_ajax_referer( 'chao_thankyou_register_nonce', 'nonce' );
     
-    $password = isset($_POST['password']) ? $_POST['password'] : '';
-    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $password  = isset($_POST['password']) ? $_POST['password'] : '';
+    $order_id  = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $order_key = isset($_POST['order_key']) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
     
     if ( empty($password) || strlen($password) < 6 ) {
         wp_send_json_error( array( 'message' => '密碼長度需至少為 6 個字元。' ) );
     }
     
-    if ( ! $order_id ) {
-        wp_send_json_error( array( 'message' => '無效的訂單編號。' ) );
+    if ( ! $order_id || empty($order_key) ) {
+        wp_send_json_error( array( 'message' => '無效的訂單資訊或缺少安全金鑰。' ) );
     }
     
     $order = wc_get_order( $order_id );
     if ( ! $order ) {
         wp_send_json_error( array( 'message' => '找不到對應的訂單。' ) );
+    }
+    
+    // 嚴格安全驗證：比對訂單專屬金鑰 (order_key)
+    if ( $order->get_order_key() !== $order_key ) {
+        wp_send_json_error( array( 'message' => '訂單安全金鑰驗證失敗，無權操作此訂單。' ) );
     }
     
     $email = $order->get_billing_email();
@@ -509,6 +540,29 @@ function chao_get_estimated_shipping_rates() {
 }
 
 // 32a. Show estimated shipping between subtotal and total on the cart page
+function chao_get_free_shipping_notice_text() {
+    $shipping_settings = get_option( 'chao_gang_cheng_shipping_settings', array() );
+    if ( is_array( $shipping_settings ) && ! empty( $shipping_settings['free_shipping'] ) && is_array( $shipping_settings['free_shipping'] ) ) {
+        $hd  = isset( $shipping_settings['free_shipping']['home_delivery'] ) ? floatval( $shipping_settings['free_shipping']['home_delivery'] ) : 0;
+        $cvs = isset( $shipping_settings['free_shipping']['cvs'] ) ? floatval( $shipping_settings['free_shipping']['cvs'] ) : 0;
+
+        if ( $hd > 0 && $cvs > 0 ) {
+            if ( $hd === $cvs ) {
+                return sprintf( '滿 %s 免運', wc_price( $hd ) );
+            } else {
+                return sprintf( '宅配滿 %s / 超商滿 %s 免運', wc_price( $hd ), wc_price( $cvs ) );
+            }
+        } elseif ( $hd > 0 ) {
+            return sprintf( '宅配滿 %s 免運', wc_price( $hd ) );
+        } elseif ( $cvs > 0 ) {
+            return sprintf( '超商滿 %s 免運', wc_price( $cvs ) );
+        }
+    }
+
+    $threshold = chao_get_free_shipping_threshold();
+    return sprintf( '滿 %s 免運', wc_price( $threshold ) );
+}
+
 add_action( 'woocommerce_cart_totals_before_order_total', 'chao_cart_estimated_shipping_row' );
 function chao_cart_estimated_shipping_row() {
     $threshold = chao_get_free_shipping_threshold();
@@ -545,15 +599,15 @@ function chao_cart_estimated_shipping_row() {
                     echo '<span class="chao-est-shipping-rates">' . implode( '<span style="color:#c9a86c;">｜</span>', $parts ) . '</span>';
                 }
                 ?>
-                <div style="font-size:12px;color:#8c7a64;margin-top:4px;">滿 <?php echo wc_price( $threshold ); ?> 免運，實際運費依結帳時選擇的物流方式計算</div>
+                <div style="font-size:12px;color:#8c7a64;margin-top:4px;"><?php echo chao_get_free_shipping_notice_text(); ?>，實際運費依結帳時選擇的物流方式計算</div>
             <?php endif; ?>
         </td>
     </tr>
     <?php
 }
 
-// 32b. "湊免運" cross-sell block: shown below the cart items when under the threshold
-add_action( 'woocommerce_after_cart_table', 'chao_cart_free_shipping_cross_sell', 15 );
+// 32b. "湊免運" cross-sell block: shown below the cart items when under the threshold (placed outside the cart update form)
+add_action( 'woocommerce_before_cart_collaterals', 'chao_cart_free_shipping_cross_sell', 5 );
 function chao_cart_free_shipping_cross_sell() {
     if ( ! WC()->cart || WC()->cart->is_empty() ) {
         return;
@@ -561,7 +615,18 @@ function chao_cart_free_shipping_cross_sell() {
     $threshold = chao_get_free_shipping_threshold();
     // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
     $subtotal  = chao_get_free_shipping_progress_amount();
-    if ( $subtotal >= $threshold ) {
+
+    // 檢查目前購物車是否已套用含「允許免運費」的折價券
+    $coupon_free_shipping = false;
+    foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
+        $coupon = new WC_Coupon( $coupon_code );
+        if ( $coupon->get_id() && $coupon->get_free_shipping() ) {
+            $coupon_free_shipping = true;
+            break;
+        }
+    }
+
+    if ( $coupon_free_shipping || $subtotal >= $threshold ) {
         return;
     }
     $diff = $threshold - $subtotal;
@@ -589,7 +654,7 @@ function chao_cart_free_shipping_cross_sell() {
             continue;
         }
         $product = wc_get_product( $product_id );
-        if ( ! $product || ! $product->is_type( 'simple' ) || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
+        if ( ! $product || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
             continue;
         }
         $price = floatval( $product->get_price() );
@@ -611,7 +676,7 @@ function chao_cart_free_shipping_cross_sell() {
     }
     ?>
     <div class="chao-cart-cross-sell">
-        <div class="chao-cart-cross-sell-title">還差 <strong><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
+        <div class="chao-cart-cross-sell-title">還差 <strong><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 ⚡</div>
         <div class="chao-cart-cross-sell-grid">
             <?php foreach ( $picks as $product ) : ?>
                 <div class="chao-cart-cross-sell-item">
@@ -620,9 +685,11 @@ function chao_cart_free_shipping_cross_sell() {
                     </a>
                     <a href="<?php echo esc_url( $product->get_permalink() ); ?>" class="chao-cross-sell-name"><?php echo esc_html( $product->get_name() ); ?></a>
                     <span class="chao-cross-sell-price"><?php echo $product->get_price_html(); ?></span>
-                    <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>" data-quantity="1"
-                       class="button add_to_cart_button ajax_add_to_cart chao-cross-sell-add"
-                       data-product_id="<?php echo esc_attr( $product->get_id() ); ?>" rel="nofollow">＋ 加入購物車</a>
+                    <?php $has_specs = function_exists( 'chao_product_has_specs_or_variations' ) ? chao_product_has_specs_or_variations( $product ) : false; ?>
+                    <button type="button" class="button chao-cross-sell-add"
+                       data-product_id="<?php echo esc_attr( $product->get_id() ); ?>"
+                       data-product-id="<?php echo esc_attr( $product->get_id() ); ?>"
+                       data-has-specs="<?php echo $has_specs ? '1' : '0'; ?>">＋ 加入購物車</button>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -675,7 +742,18 @@ function chao_checkout_free_shipping_cross_sell() {
     $threshold = chao_get_free_shipping_threshold();
     // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
     $subtotal  = chao_get_free_shipping_progress_amount();
-    if ( $subtotal >= $threshold ) {
+
+    // 檢查目前購物車是否已套用含「允許免運費」的折價券
+    $coupon_free_shipping = false;
+    foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
+        $coupon = new WC_Coupon( $coupon_code );
+        if ( $coupon->get_id() && $coupon->get_free_shipping() ) {
+            $coupon_free_shipping = true;
+            break;
+        }
+    }
+
+    if ( $coupon_free_shipping || $subtotal >= $threshold ) {
         return;
     }
     $diff = $threshold - $subtotal;
@@ -698,7 +776,7 @@ function chao_checkout_free_shipping_cross_sell() {
             continue;
         }
         $product = wc_get_product( $product_id );
-        if ( ! $product || ! $product->is_type( 'simple' ) || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
+        if ( ! $product || ! $product->is_in_stock() || ! $product->is_purchasable() ) {
             continue;
         }
         $price = floatval( $product->get_price() );
@@ -722,11 +800,12 @@ function chao_checkout_free_shipping_cross_sell() {
         <div style="font-size:14px;font-weight:700;color:#3a2f24;margin-bottom:12px;">還差 <strong style="color:#f86f69;"><?php echo wc_price( $diff ); ?></strong> 免運，加購這些剛剛好 👇</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
             <?php foreach ( $picks as $product ) : ?>
+                <?php $has_specs = function_exists( 'chao_product_has_specs_or_variations' ) ? chao_product_has_specs_or_variations( $product ) : false; ?>
                 <div style="display:flex;flex-direction:column;gap:6px;text-align:center;">
                     <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="display:block;"><?php echo $product->get_image( 'woocommerce_thumbnail' ); ?></a>
                     <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="font-size:13px;color:#1a140f;text-decoration:none;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></a>
                     <span style="font-size:14px;font-weight:700;color:#f86f69;"><?php echo $product->get_price_html(); ?></span>
-                    <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" style="border:1px solid #c9974a;background:#fff;color:#1a140f;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
+                    <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" data-has-specs="<?php echo $has_specs ? '1' : '0'; ?>" style="border:1px solid #c9974a;background:#fff;color:#1a140f;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -734,61 +813,7 @@ function chao_checkout_free_shipping_cross_sell() {
     <?php
 }
 
-// 32c-3. 結帳頁加購 AJAX（Store API add-item）+ toast + 更新結帳金額，不重載
-add_action( 'wp_footer', 'chao_checkout_cross_sell_script' );
-function chao_checkout_cross_sell_script() {
-    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url() ) {
-        return;
-    }
-    ?>
-    <style>
-    #ckc-coupon-toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px); background:#16a34a; color:#fff; padding:14px 24px; border-radius:30px; font-size:15px; font-weight:700; z-index:2147483000; max-width:88vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; }
-    #ckc-coupon-toast.ckc-show{ opacity:1; transform:translateX(-50%) translateY(0); }
-    </style>
-    <script>
-    jQuery(function($){
-        function chaoToast(msg){
-            var $t = $('#ckc-coupon-toast');
-            if(!$t.length){ $t = $('<div id="ckc-coupon-toast" role="status" aria-live="polite"></div>').appendTo('body'); }
-            $t.text(msg).css('background','#16a34a');
-            requestAnimationFrame(function(){ $t.addClass('ckc-show'); });
-            clearTimeout(window._ckcToastTimer);
-            window._ckcToastTimer = setTimeout(function(){ $t.removeClass('ckc-show'); }, 1500);
-        }
-        $(document).on('click', '.chao-checkout-crosssell-add', function(e){
-            e.preventDefault();
-            var $btn = $(this), pid = parseInt($btn.data('product-id'), 10);
-            if(!pid){ return; }
-            $btn.prop('disabled', true).css('opacity', .6);
-            fetch('/wp-json/wc/store/cart', {credentials:'include'})
-                .then(function(r){ return r.headers.get('Nonce'); })
-                .then(function(nonce){
-                    return fetch('/wp-json/wc/store/v1/cart/add-item', {
-                        method:'POST', credentials:'include',
-                        headers:{'Content-Type':'application/json','Nonce': nonce || ''},
-                        body: JSON.stringify({ id: pid, quantity: 1 })
-                    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); });
-                })
-                .then(function(res){
-                    if(res.ok){
-                        chaoToast('已加入購物車');
-                        // 若加入後已達免運門檻，收起整個加購區
-                        var $wrap = $('.chao-checkout-cross-sell');
-                        var th = parseInt($wrap.data('threshold'), 10) || 0;
-                        var sub = parseInt((res.data && res.data.totals && res.data.totals.total_items) || '0', 10);
-                        if(th > 0 && sub >= th){ $wrap.slideUp(220); }
-                        $(document.body).trigger('update_checkout');
-                    } else {
-                        chaoToast((res.data && res.data.message) ? res.data.message : '加入失敗，請稍後再試');
-                        $btn.prop('disabled', false).css('opacity', 1);
-                    }
-                })
-                .catch(function(){ $btn.prop('disabled', false).css('opacity', 1); });
-        });
-    });
-    </script>
-    <?php
-}
+// 32c-3. 結帳頁加購與購物車加購已整合至 product-addon-modal.php 統一處理 (支援規格彈窗與無規格直接 AJAX 加購)
 
 // 32c. Continue-shopping link inside the cart actions row
 add_action( 'woocommerce_cart_actions', 'chao_cart_continue_shopping_link' );
@@ -805,7 +830,7 @@ add_action( 'woocommerce_proceed_to_checkout', 'chao_cart_trust_badges', 30 );
 function chao_cart_trust_badges() {
     ?>
     <div class="chao-cart-trust">
-        <span>🔒 綠界科技 SSL 安全加密付款：VISA・MasterCard・JCB・LINE Pay</span>
+        <span>🔒 綠界科技 SSL 安全加密付款：VISA・MasterCard・JCB・TWQR・Apple Pay</span>
         <a href="<?php echo esc_url( home_url( '/shipping-policy/' ) ); ?>">配送與運費政策</a>
     </div>
     <?php
@@ -834,8 +859,8 @@ function chao_cart_ux_footer_assets() {
     .chao-cart-cross-sell-item { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
     .chao-cart-cross-sell-item .chao-cross-sell-thumb img { width: 100%; height: auto; border-radius: 8px; display: block; }
     .chao-cart-cross-sell-item .chao-cross-sell-name { font-size: 13px; color: #1a140f; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
-    .chao-cart-cross-sell-item .chao-cross-sell-price { font-size: 14px; font-weight: 700; color: #f86f69; }
-    .chao-cart-cross-sell-item .chao-cross-sell-add { font-size: 13px; padding: 6px 12px; width: 100%; text-align: center; border: 1px solid #c9974a !important; background: #fff !important; color: #1a140f !important; }
+    .chao-cart-cross-sell-item .chao-cross-sell-add { font-size: 13px; padding: 7px 12px; width: 100%; text-align: center; border: 1px solid #c9974a !important; background: #fff !important; color: #1a140f !important; border-radius: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+    .chao-cart-cross-sell-item .chao-cross-sell-add:hover { background: #f86f69 !important; border-color: #f86f69 !important; color: #fff !important; }
     @media (max-width: 768px) {
         .chao-cart-cross-sell-grid { grid-template-columns: repeat(2, 1fr); }
     }
