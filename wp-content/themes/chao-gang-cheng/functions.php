@@ -9530,7 +9530,7 @@ function ckc_generate_ai_recommendations( $product_id ) {
         }
     }
 
-    if ( empty( $candidates ) ) {
+if ( empty( $candidates ) ) {
         return array();
     }
 
@@ -10886,9 +10886,17 @@ function ckc_repair_woocommerce_rewrite_rules() {
     }
 }
 
-
-
-
-
-
-
+add_action( 'init', 'ckc_auto_flush_cache_on_load', 1 );
+function ckc_auto_flush_cache_on_load() {
+    if ( get_option( 'ckc_batcache_flushed_v4' ) !== '1' || isset( $_GET['ckc_flush_cache'] ) ) {
+        if ( function_exists( 'wp_cache_flush' ) ) {
+            wp_cache_flush();
+        }
+        if ( function_exists( 'wp_cache_set' ) ) {
+            $host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'eshopckc.com';
+            wp_cache_set( 'batcache_cache_buster_' . $host, time(), 'batcache_flush' );
+            wp_cache_set( 'batcache_cache_buster_eshopckc.com', time(), 'batcache_flush' );
+        }
+        update_option( 'ckc_batcache_flushed_v4', '1' );
+    }
+}
