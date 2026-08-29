@@ -4,6 +4,7 @@
  */
 add_action( 'wp_ajax_ckc_gemini_chat', 'ckc_ajax_gemini_chat' );
 function ckc_ajax_gemini_chat() {
+    check_ajax_referer( 'ckc_gemini_nonce', 'security' );
     if ( ! current_user_can( 'edit_pages' ) ) {
         wp_send_json_error( array( 'message' => '權限不足' ) );
     }

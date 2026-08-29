@@ -55,3 +55,22 @@ Thumbs.db
 # Ignore SQLite database files
 /wp-content/database/.ht.sqlite
 /wp-content/database/._.ht.sqlite
+
+# Ignore Sensitive Credentials, Private Keys, and Deployment Scripts
+/wp-config.php
+.env
+.env.*
+*.pem
+/line-keys/
+deploy*.py
+sftp_*.py
+inspect_sftp.py
+read_sftp*.py
+verify_deploy*.py
+clear_cache.py
+get_option.py
+get_post.py
+test_*.php
+test-*.php
+ckc-coupon-seeder.php
+

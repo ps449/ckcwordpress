@@ -471,9 +471,15 @@ function chao_line_login_handle_callback() {
         chao_line_login_log( "No user found by LINE ID. Checking by email..." );
         // 4b. Find by email
         if ( ! empty( $email ) ) {
-            $user = get_user_by( 'email', $email );
-            if ( $user ) {
-                chao_line_login_log( "Found existing user by email. User ID: {$user->ID}. Linking accounts..." );
+            $existing_user = get_user_by( 'email', $email );
+            if ( $existing_user ) {
+                // 資安防護：若帳號具有管理員或特定高權限角色，禁止無密碼直接自動綁定 LINE
+                if ( user_can( $existing_user, 'manage_options' ) || in_array( 'administrator', (array) $existing_user->roles, true ) ) {
+                    chao_line_login_log( "Security Alert: Refusing to auto-link LINE to administrative user ID: {$existing_user->ID}" );
+                    wp_die( '基於網站安全考量，網站管理員帳號不支援自動透過社群快速綁定。請先使用管理員帳號密碼登入後台。', '安全驗證' );
+                }
+                $user = $existing_user;
+                chao_line_login_log( "Found existing customer by email. User ID: {$user->ID}. Linking accounts..." );
                 // Link this existing user to LINE
                 update_user_meta( $user->ID, 'chao_line_user_id', $line_user_id );
             }

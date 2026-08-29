@@ -613,10 +613,8 @@ function chao_cart_free_shipping_cross_sell() {
         return;
     }
     $threshold = chao_get_free_shipping_threshold();
-    // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
     $subtotal  = chao_get_free_shipping_progress_amount();
 
-    // 檢查目前購物車是否已套用含「允許免運費」的折價券
     $coupon_free_shipping = false;
     foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
         $coupon = new WC_Coupon( $coupon_code );
@@ -636,19 +634,14 @@ function chao_cart_free_shipping_cross_sell() {
         $exclude[] = $cart_item['product_id'];
     }
 
-    // Best sellers first; pick in-stock simple products whose price fits the gap (or a low-price cap)
-    // 效能：候選商品池改讀取快取（見 chao_checkout_crosssell_pool_ids），避免購物車每次
-    // AJAX 更新（加減數量、套券）都重跑一次 meta_value_num 排序查詢。
-    $price_cap = max( $diff, 400 );
     $candidate_ids = chao_checkout_crosssell_pool_ids();
-    // 溫層過濾：不推薦會跟購物車現有商品溫層衝突的加購品（例如購物車已
-    // 有冷凍年菜，就不該推薦常溫零食），見 functions.php 的
-    // chao_gang_cheng_get_cart_common_temperature_zones() 說明。
     $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
         ? chao_gang_cheng_get_cart_common_temperature_zones()
         : null;
 
     $picks = array();
+    $other_candidates = array();
+
     foreach ( $candidate_ids as $product_id ) {
         if ( in_array( (int) $product_id, $exclude, true ) ) {
             continue;
@@ -658,20 +651,35 @@ function chao_cart_free_shipping_cross_sell() {
             continue;
         }
         $price = floatval( $product->get_price() );
-        if ( $price <= 0 || $price > $price_cap ) {
+        if ( $price <= 0 ) {
             continue;
         }
         if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
             && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
             continue;
         }
-        $picks[] = $product;
+
+        if ( $price <= max( $diff * 1.5, 500 ) ) {
+            $picks[] = $product;
+        } else {
+            $other_candidates[] = $product;
+        }
+
         if ( count( $picks ) >= 4 ) {
             break;
         }
     }
 
-    if ( count( $picks ) < 2 ) {
+    if ( count( $picks ) < 4 && ! empty( $other_candidates ) ) {
+        foreach ( $other_candidates as $extra_prod ) {
+            $picks[] = $extra_prod;
+            if ( count( $picks ) >= 4 ) {
+                break;
+            }
+        }
+    }
+
+    if ( empty( $picks ) ) {
         return;
     }
     ?>
@@ -698,36 +706,37 @@ function chao_cart_free_shipping_cross_sell() {
 }
 
 /**
- * 效能重構：結帳頁加購商品的「候選商品池」改用 transient 快取。
- *
- * 舊做法：每次結帳頁 AJAX 更新（update_checkout，例如套用優惠券、改數量、
- * 換運送方式）都會重新執行一次 meta_key=total_sales / orderby=meta_value_num
- * 的 WP_Query —— 這種依 postmeta 數值排序的查詢在 WooCommerce 是公認較重的
- * 查詢方式，等於每次套券都要多付出一次不必要的重量級 DB 查詢成本。
- *
- * 新做法：熱銷商品 ID 池每 10 分鐘才重新查詢一次並快取；每次結帳頁更新只從
- * 快取的 ID 池讀取，再依當下購物車內容（排除已在購物車的商品、價格上限、
- * 庫存）做輕量篩選，不再重複打那支重查詢。
+ * 效能重構：結帳頁/購物車加購商品的「候選商品池」改用 transient 快取。
  */
 function chao_checkout_crosssell_pool_ids() {
-    $cache_key = 'ckc_checkout_crosssell_pool_v1';
+    $cache_key = 'ckc_checkout_crosssell_pool_v2';
     $ids = get_transient( $cache_key );
-    if ( false !== $ids && is_array( $ids ) ) {
+    if ( false !== $ids && is_array( $ids ) && ! empty( $ids ) ) {
         return $ids;
     }
 
     $query = new WP_Query( array(
         'post_type'      => 'product',
         'post_status'    => 'publish',
-        'posts_per_page' => 40,
-        'meta_key'       => 'total_sales',
-        'orderby'        => 'meta_value_num',
-        'order'          => 'DESC',
+        'posts_per_page' => 60,
+        'orderby'        => array(
+            'meta_value_num' => 'DESC',
+            'date'           => 'DESC',
+        ),
         'fields'         => 'ids',
         'no_found_rows'  => true,
     ) );
     $ids = $query->posts;
     wp_reset_postdata();
+
+    if ( empty( $ids ) ) {
+        $ids = get_posts( array(
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => 60,
+            'fields'         => 'ids',
+        ) );
+    }
 
     set_transient( $cache_key, $ids, 10 * MINUTE_IN_SECONDS );
     return $ids;
@@ -740,10 +749,8 @@ function chao_checkout_free_shipping_cross_sell() {
         return;
     }
     $threshold = chao_get_free_shipping_threshold();
-    // 用折扣後金額比對門檻，理由見 functions.php: chao_get_free_shipping_progress_amount()
     $subtotal  = chao_get_free_shipping_progress_amount();
 
-    // 檢查目前購物車是否已套用含「允許免運費」的折價券
     $coupon_free_shipping = false;
     foreach ( WC()->cart->get_applied_coupons() as $coupon_code ) {
         $coupon = new WC_Coupon( $coupon_code );
@@ -762,15 +769,15 @@ function chao_checkout_free_shipping_cross_sell() {
     foreach ( WC()->cart->get_cart() as $cart_item ) {
         $exclude[] = $cart_item['product_id'];
     }
-    $price_cap = max( $diff, 400 );
-    // 溫層過濾：跟購物車頁 chao_cart_free_shipping_cross_sell() 用同一套邏輯，
-    // 不推薦會跟購物車現有商品溫層衝突的加購品。
+
     $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
         ? chao_gang_cheng_get_cart_common_temperature_zones()
         : null;
 
     $candidate_ids = chao_checkout_crosssell_pool_ids();
     $picks = array();
+    $other_candidates = array();
+
     foreach ( $candidate_ids as $product_id ) {
         if ( in_array( (int) $product_id, $exclude, true ) ) {
             continue;
@@ -780,19 +787,35 @@ function chao_checkout_free_shipping_cross_sell() {
             continue;
         }
         $price = floatval( $product->get_price() );
-        if ( $price <= 0 || $price > $price_cap ) {
+        if ( $price <= 0 ) {
             continue;
         }
         if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
             && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
             continue;
         }
-        $picks[] = $product;
+
+        if ( $price <= max( $diff * 1.5, 500 ) ) {
+            $picks[] = $product;
+        } else {
+            $other_candidates[] = $product;
+        }
+
         if ( count( $picks ) >= 4 ) {
             break;
         }
     }
-    if ( count( $picks ) < 2 ) {
+
+    if ( count( $picks ) < 4 && ! empty( $other_candidates ) ) {
+        foreach ( $other_candidates as $extra_prod ) {
+            $picks[] = $extra_prod;
+            if ( count( $picks ) >= 4 ) {
+                break;
+            }
+        }
+    }
+
+    if ( empty( $picks ) ) {
         return;
     }
     ?>

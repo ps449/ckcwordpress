@@ -394,3 +394,15 @@ body.wp-admin .ckc-hb-module-header,
 body.wp-admin .ckc-popup-admin-wrap h2 {
 	color: var(--ckc-admin-text);
 }
+
+/* ==========================================================================
+   13. 訂單後台屏蔽「可下載商品權限」與「自訂欄位 / 新增自訂欄位」
+   ========================================================================== */
+body.wp-admin #woocommerce-order-downloads,
+body.wp-admin #postcustom,
+body.wp-admin #postcustomstuff,
+body.wp-admin .postbox#woocommerce-order-downloads,
+body.wp-admin .postbox#postcustom {
+	display: none !important;
+}
+

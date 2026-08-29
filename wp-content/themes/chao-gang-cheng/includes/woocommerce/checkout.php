@@ -60,35 +60,38 @@ function chao_checkout_custom_js_css() {
         vertical-align: middle;
     }
     
-    /* LINE Pay Logo Styling */
-    .chao-linepay-logo {
+    /* TWQR Logo Styling */
+    .chao-twqr-logo {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #103254 0%, #1a5b8c 100%);
+        color: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         font-weight: 900;
-        font-style: italic;
-        gap: 2px;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        padding: 4px 7px;
+        border-radius: 4px;
         margin-right: 12px;
         flex-shrink: 0;
-        user-select: none;
-    }
-    .chao-linepay-text-line {
-        color: #000000;
-        font-size: 20px;
-        letter-spacing: -1px;
         line-height: 1;
+        border: 1px solid #204d74;
     }
-    .chao-linepay-text-pay {
-        background: #00c300;
+
+    /* Apple Pay Logo Styling */
+    .chao-applepay-logo {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #000000;
         color: #ffffff;
-        font-size: 13px;
-        padding: 1px 6px;
-        border-radius: 3px;
-        font-style: normal;
-        font-weight: 900;
-        display: inline-block;
-        margin-left: 2px;
-        line-height: 1.2;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-right: 12px;
+        flex-shrink: 0;
+        height: 24px;
+        box-sizing: border-box;
     }
     
     /* Cards Style：金框選取，取代原本的黑框樣板感 */
@@ -461,15 +464,26 @@ function chao_checkout_custom_js_css() {
                                 <span class="chao-payment-desc">貨到 7-11 / 全家超商再付款</span>
                             </div>
                         </div>
-                        <div class="chao-card chao-payment-card" data-payment="linepay">
+                        <div class="chao-card chao-payment-card" data-payment="applepay">
                             <div class="chao-card-check"></div>
-                            <div class="chao-linepay-logo">
-                                <span class="chao-linepay-text-line">LINE</span>
-                                <span class="chao-linepay-text-pay">Pay</span>
+                            <div class="chao-applepay-logo">
+                                <svg viewBox="0 0 42 18" width="38" height="16" fill="#ffffff">
+                                    <path d="M7.74 7.63c-.48.58-1.28.98-2.02.94-.1-.78.27-1.6.71-2.12.48-.59 1.34-.97 2.03-.97.09.77-.25 1.58-.72 2.15zm.74 1.1c-1.12-.07-2.07.65-2.61.65-.54 0-1.37-.6-2.27-.58-1.17.02-2.25.68-2.85 1.73-1.22 2.11-.31 5.24.87 6.94.58.83 1.26 1.76 2.16 1.73.87-.04 1.2-.56 2.25-.56 1.05 0 1.35.56 2.26.54.93-.02 1.52-.84 2.09-1.67.66-.96.93-1.89.95-1.94-.02-.01-1.83-.7-1.85-2.77-.02-1.73 1.41-2.56 1.48-2.6-.81-1.18-2.06-1.31-2.48-1.34zM16.64 16.5h-1.63V7.27h3.76c2.27 0 3.73 1.38 3.73 3.49 0 2.14-1.48 3.51-3.77 3.51h-2.09v2.23zm0-3.64h1.99c1.38 0 2.21-.73 2.21-2.09 0-1.34-.83-2.07-2.21-2.07h-1.99v4.16zm9.32 3.64c-.21-.49-.3-1.04-.3-2.07v-3.73c0-1.67 1.07-2.67 2.76-2.67 1.63 0 2.65.98 2.65 2.59v3.81c0 1.04-.09 1.58-.3 2.07h-1.42l-.12-.73c-.5.58-1.2.85-2.02.85-.92 0-1.74-.43-2.13-1.19l-.12.07zm3.68-2.25v-2.31c0-.98-.54-1.52-1.46-1.52-.91 0-1.46.54-1.46 1.52v2.31c0 .98.55 1.52 1.46 1.52.92 0 1.46-.54 1.46-1.52zm5.72 4.95l1.64-5.32-2.52-6.61h1.72l1.67 4.79 1.63-4.79h1.69l-3.99 10.42h-1.84z"/>
+                                </svg>
                             </div>
                             <div class="chao-payment-info">
-                                <span class="chao-payment-title">LINE Pay</span>
-                                <span class="chao-payment-desc">使用 LINE Pay 行動支付，可折抵 LINE Points</span>
+                                <span class="chao-payment-title">Apple Pay</span>
+                                <span class="chao-payment-desc">使用 Apple Pay 快速安全結帳（支援 iPhone、iPad、Mac）</span>
+                            </div>
+                        </div>
+                        <div class="chao-card chao-payment-card" data-payment="twqr">
+                            <div class="chao-card-check"></div>
+                            <div class="chao-twqr-logo">
+                                <span>TWQR</span>
+                            </div>
+                            <div class="chao-payment-info">
+                                <span class="chao-payment-title">TWQR 行動支付</span>
+                                <span class="chao-payment-desc">支援台灣 Pay、歐付寶及各家銀行 App 掃碼付款</span>
                             </div>
                         </div>
                         <div class="chao-card chao-payment-card" data-payment="atm">
@@ -496,6 +510,7 @@ function chao_checkout_custom_js_css() {
                             </div>
                         </div>
                     </div>
+                    <div id="chao-credit-card-form-area" style="margin-top: 16px;"></div>
                     <input type="hidden" name="chao_chosen_payment_method" id="chao_chosen_payment_method" value="credit">
                 </div>
                 `;
@@ -619,17 +634,27 @@ function chao_checkout_custom_js_css() {
             }
             
             // --- SHIPPING FIELDS DYNAMIC TOGGLE ---
+            // 2026-08 修正：原本用 .hide()/.show() 讓欄位瞬間消失/出現，導致下方
+            // 欄位（詳細地址、郵遞區號等）整段位置瞬間跳動，使用者若在跳動當下
+            // 點擊，容易點空或點錯到旁邊欄位。改用 .slideUp()/.slideDown() 讓
+            // 欄位「原地展開/收合」，並先判斷目前是否已是目標狀態，避免這支
+            // 函式被頻繁呼叫（例如每次 updated_checkout）時重複疊加動畫。
             var isCvsOrPickup = activeShipping.indexOf('Wooecpay_Logistic_CVS_711') !== -1 || activeShipping.indexOf('local_pickup') !== -1;
+            var $chaoAddressFields = $('#billing_state_field, #billing_city_field, #billing_address_1_field, #billing_postcode_field, #shipping_state_field, #shipping_city_field, #shipping_address_1_field, #shipping_postcode_field, .woocommerce-shipping-fields');
             if (isCvsOrPickup) {
-                // CVS or Local Pickup -> Hide address fields
-                $('#billing_state_field, #billing_city_field, #billing_address_1_field, #billing_postcode_field').hide();
-                $('#shipping_state_field, #shipping_city_field, #shipping_address_1_field, #shipping_postcode_field').hide();
-                $('.woocommerce-shipping-fields').hide(); // Also hide ship to different address checkbox wrapper
+                $chaoAddressFields.each(function() {
+                    var $f = $(this);
+                    if ($f.is(':visible')) {
+                        $f.stop(true, true).slideUp(200);
+                    }
+                });
             } else {
-                // Home Delivery -> Show address fields
-                $('#billing_state_field, #billing_city_field, #billing_address_1_field, #billing_postcode_field').show();
-                $('#shipping_state_field, #shipping_city_field, #shipping_address_1_field, #shipping_postcode_field').show();
-                $('.woocommerce-shipping-fields').show();
+                $chaoAddressFields.each(function() {
+                    var $f = $(this);
+                    if (!$f.is(':visible')) {
+                        $f.stop(true, true).slideDown(200);
+                    }
+                });
             }
             
             // --- SHIPPING & PAYMENT BINDINGS ---
@@ -649,6 +674,14 @@ function chao_checkout_custom_js_css() {
             // Sync payment card active class
             var chosenPayment = $('#chao_chosen_payment_method').val() || 'credit';
             $('.chao-payment-card[data-payment="' + chosenPayment + '"]').addClass('active').siblings().removeClass('active');
+
+            // 平滑展開或收合信用卡輸入區
+            var $creditCardArea = $('#chao-credit-card-form-area, #ECPayPayment-container');
+            if (chosenPayment === 'credit') {
+                $creditCardArea.stop(true, true).slideDown(250);
+            } else {
+                $creditCardArea.stop(true, true).slideUp(250);
+            }
 
             // Trigger checkout helpers
             updateSubmitButtonText();
@@ -696,15 +729,79 @@ function chao_checkout_custom_js_css() {
             if (payment === 'credit') {
                 // 信用卡對應到新開發的綠界站內付 2.0 (chao_ecpay_ecpg)
                 $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                $(document.body).trigger('update_chao_ecpg');
             } else if (payment === 'cod') {
                 // 超商取貨付款對應到 WooCommerce 原生 cod
                 $('input[name="payment_method"][value="cod"]').prop('checked', true).trigger('click');
+            } else if (payment === 'applepay') {
+                // 優先對應官方 Apple Pay 閘道，或使用綠界站內付 2.0
+                var $appleRadio = $('input[name="payment_method"]').filter(function() {
+                    var val = ($(this).val() || '').toLowerCase();
+                    return val.indexOf('apple') !== -1;
+                });
+                if ($appleRadio.length > 0) {
+                    $appleRadio.first().prop('checked', true).trigger('click');
+                } else {
+                    $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                }
+            } else if (payment === 'twqr') {
+                // TWQR 行動支付（台灣 Pay / 歐付寶 / 支援 TWQR 之銀行 App 掃碼）
+                var $twqrRadio = $('input[name="payment_method"]').filter(function() {
+                    var val = ($(this).val() || '').toLowerCase();
+                    return val.indexOf('twqr') !== -1;
+                });
+                if ($twqrRadio.length > 0) {
+                    $twqrRadio.first().prop('checked', true).trigger('click');
+                } else {
+                    var $directTwqr = $('input[name="payment_method"][value="Wooecpay_Gateway_Twqr"]');
+                    if ($directTwqr.length > 0) {
+                        $directTwqr.prop('checked', true).trigger('click');
+                    } else {
+                        $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                    }
+                }
+            } else if (payment === 'atm') {
+                // 嚴格鎖定「綠界ATM虛擬帳號」（支援手機/網銀/實體機台轉帳，絕不使用需讀卡機的 WebATM）
+                var $atmRadio = $('input[name="payment_method"]').filter(function() {
+                    var val = ($(this).val() || '').toLowerCase();
+                    return (val.indexOf('atm') !== -1 || val.indexOf('vaccount') !== -1) && val.indexOf('webatm') === -1;
+                });
+
+                if ($atmRadio.length > 0) {
+                    $atmRadio.first().prop('checked', true).trigger('click');
+                } else {
+                    var $directAtm = $('input[name="payment_method"][value="Wooecpay_Gateway_Atm"], input[name="payment_method"][value="Wooecpay_Gateway_ATM"], input[name="payment_method"][value="wooecpay_gateway_atm"]');
+                    if ($directAtm.length > 0) {
+                        $directAtm.first().prop('checked', true).trigger('click');
+                    } else {
+                        // 絕不選取 Webatm（網路ATM），若無則安全回退
+                        $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                    }
+                }
+            } else if (payment === 'cvscode') {
+                // 優先鎖定超商代碼 Wooecpay_Gateway_Cvs
+                var $cvsRadio = $('input[name="payment_method"]').filter(function() {
+                    var val = ($(this).val() || '').toLowerCase();
+                    return val.indexOf('cvs') !== -1;
+                });
+
+                if ($cvsRadio.length > 0) {
+                    $cvsRadio.first().prop('checked', true).trigger('click');
+                } else {
+                    var $directCvs = $('input[name="payment_method"][value="Wooecpay_Gateway_Cvs"], input[name="payment_method"][value="Wooecpay_Gateway_CVS"]');
+                    if ($directCvs.length > 0) {
+                        $directCvs.first().prop('checked', true).trigger('click');
+                    } else {
+                        $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                    }
+                }
             } else {
-                // 其他付款方式 (LINE Pay, ATM 等) 仍走舊的 MyDyBox AIO 全方位金流 (mydybox_ecpay)
-                $('input[name="payment_method"][value="mydybox_ecpay"]').prop('checked', true).trigger('click');
+                // 無法辨識的付款方式，安全回退到信用卡，避免誤送到錯誤的閘道
+                $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
             }
             
             syncUIStates();
+            $(document.body).trigger('update_chao_ecpg');
         });
         
         // Handle ECPay Store selection map button click (bypass provider check in original JS)
@@ -811,7 +908,7 @@ function chao_checkout_custom_js_css() {
                     <span>顯示訂單明細</span>
                     <span id="chao-summary-arrow" style="font-size: 10px; transition: transform 0.2s;">▼</span>
                 </div>
-                <div style="color: #1e40af;">${totalText}</div>
+                <div id="chao-collapsible-summary-total" style="color: #1e40af;">${totalText}</div>
             </div>
             `;
             
@@ -873,13 +970,110 @@ function chao_checkout_custom_js_css() {
             });
         }
         
+        // 依 WooCommerce AJAX 重新計算後的結果，同步更新摺疊式訂單明細
+        // 標題旁邊顯示的金額，避免購物車/運送方式/地址變動後，這裡的
+        // 金額卡在初次渲染當下的舊數字，跟下面 order_review 裡的真實
+        // 總計脫節（2026-08 修正）。
+        function updateCollapsibleOrderSummaryTotal() {
+            var totalText = $('.order-total .amount').first().text() || $('.order-total td').first().text() || '';
+            if (totalText) {
+                $('#chao-collapsible-summary-total').text(totalText);
+            }
+        }
+
         // Initial setup and hooks
         initCustomCheckout();
         $(document.body).on('updated_checkout init_checkout', function() {
             initCustomCheckout();
             syncUIStates();
+            updateCollapsibleOrderSummaryTotal();
         });
     });
     </script>
+    <?php
+}
+
+/**
+ * 美化 Thank You 頁面的 ATM / CVS 付款指示資訊卡
+ */
+add_action('woocommerce_thankyou', 'chao_render_atm_payment_instructions', 15, 1);
+function chao_render_atm_payment_instructions($order_id) {
+    if (!$order_id) return;
+    $order = wc_get_order($order_id);
+    if (!$order) return;
+
+    $payment_method = $order->get_payment_method();
+    
+    // 檢查是否為 ATM 虛擬帳號或超商代碼付款
+    $is_atm = (strpos($payment_method, 'Atm') !== false || strpos($payment_method, 'atm') !== false);
+    $is_cvs = (strpos($payment_method, 'Cvs') !== false || strpos($payment_method, 'cvs') !== false || strpos($payment_method, 'Barcode') !== false);
+
+    if (!$is_atm && !$is_cvs) return;
+    if ($order->is_paid()) return;
+
+    $bank_code   = $order->get_meta('_wooecpay_atm_bank_code') ?: $order->get_meta('_chao_atm_bank_code');
+    $v_account   = $order->get_meta('_wooecpay_atm_v_account') ?: $order->get_meta('_chao_atm_v_account');
+    $expire_date = $order->get_meta('_wooecpay_atm_expire_date') ?: $order->get_meta('_chao_atm_expire_date');
+
+    // 超商繳費代碼
+    $payment_no  = $order->get_meta('_wooecpay_cvs_payment_no') ?: $order->get_meta('_chao_cvs_payment_no');
+
+    if (empty($v_account) && empty($payment_no)) {
+        return;
+    }
+
+    ?>
+    <div class="chao-atm-payment-box" style="background: #fdfbf7; border: 2px solid #8b6237; border-radius: 8px; padding: 20px; margin: 20px 0; font-family: inherit;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#8b6237" stroke-width="2">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            <h3 style="margin: 0; color: #8b6237; font-size: 18px; font-weight: 700;">
+                <?php echo $is_atm ? 'ATM 虛擬帳號轉帳繳費資訊' : '超商代碼繳費資訊'; ?>
+            </h3>
+        </div>
+        
+        <?php if (!empty($v_account)) : ?>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ebd9c8;">
+                <?php if (!empty($bank_code)) : ?>
+                <div>
+                    <span style="font-size: 12px; color: #7f6855; display: block;">銀行代碼</span>
+                    <strong style="font-size: 16px; color: #2c2520;"><?php echo esc_html($bank_code); ?></strong>
+                </div>
+                <?php endif; ?>
+                <div>
+                    <span style="font-size: 12px; color: #7f6855; display: block;">轉帳虛擬帳號</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <strong id="chao-vaccount-val" style="font-size: 18px; color: #c0392b; letter-spacing: 1px;"><?php echo esc_html($v_account); ?></strong>
+                        <button type="button" onclick="navigator.clipboard.writeText('<?php echo esc_js($v_account); ?>'); this.innerText='已複製！'; setTimeout(() => this.innerText='複製', 2000);" style="padding: 2px 8px; font-size: 12px; background: #8b6237; color: #fff; border: none; border-radius: 4px; cursor: pointer;">複製</button>
+                    </div>
+                </div>
+                <div>
+                    <span style="font-size: 12px; color: #7f6855; display: block;">應繳金額</span>
+                    <strong style="font-size: 16px; color: #2c2520;">NT$ <?php echo esc_html(number_format($order->get_total())); ?></strong>
+                </div>
+                <?php if (!empty($expire_date)) : ?>
+                <div>
+                    <span style="font-size: 12px; color: #7f6855; display: block;">繳費截止期限</span>
+                    <strong style="font-size: 14px; color: #d35400;"><?php echo esc_html($expire_date); ?></strong>
+                </div>
+                <?php endif; ?>
+            </div>
+            <p style="font-size: 13px; color: #7f6855; margin: 12px 0 0 0; line-height: 1.5;">
+                💡 請於繳費截止期限前，透過各大銀行 ATM 實體機台、網路銀行或行動銀行 App 完成轉帳。轉帳完成後系統將自動對帳完成訂單。
+            </p>
+        <?php elseif (!empty($payment_no)) : ?>
+            <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ebd9c8;">
+                <span style="font-size: 12px; color: #7f6855; display: block;">超商繳費代碼</span>
+                <strong style="font-size: 20px; color: #c0392b; letter-spacing: 1px;"><?php echo esc_html($payment_no); ?></strong>
+                <?php if (!empty($expire_date)) : ?>
+                <div style="margin-top: 8px; font-size: 13px; color: #d35400;">
+                    繳費截止期限：<?php echo esc_html($expire_date); ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </div>
     <?php
 }

@@ -36,7 +36,7 @@ define( 'DB_HOST', '127.0.0.1' );
 define( 'DB_CHARSET', 'utf8mb4' );
 
 /** Disable SQLite integration - use real MySQL database */
-define( 'DB_ENGINE', 'mysql' );
+// define( 'DB_ENGINE', 'mysql' );
 
 /** The database collate type. Don't change this if in doubt. */
 define( 'DB_COLLATE', '' );
@@ -93,6 +93,9 @@ $table_prefix = 'wp_';
 if ( ! defined( 'WP_DEBUG' ) ) {
 	define( 'WP_DEBUG', false );
 }
+
+/** 禁用後台外掛與佈景主題檔案編輯器，防止後台權限遭入侵時注入惡意程式碼 */
+define( 'DISALLOW_FILE_EDIT', true );
 
 /* That's all, stop editing! Happy publishing. */
 

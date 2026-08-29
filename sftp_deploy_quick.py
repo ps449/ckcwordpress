@@ -39,6 +39,30 @@ files_to_upload = [
     {
         "local": "wp-content/themes/chao-gang-cheng/includes/ckc-coupons.php",
         "remote": "wp-content/themes/chao-gang-cheng/includes/ckc-coupons.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/woocommerce/checkout.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/woocommerce/checkout.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/assets/css/admin-theme.css",
+        "remote": "wp-content/themes/chao-gang-cheng/assets/css/admin-theme.css"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/woocommerce/checkout-ux.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/woocommerce/checkout-ux.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/line-order-notify.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/line-order-notify.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/woocommerce/taiwan-address-postcode.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/woocommerce/taiwan-address-postcode.php"
+    },
+    {
+        "local": "wp-content/themes/chao-gang-cheng/includes/woocommerce/product-addon-modal.php",
+        "remote": "wp-content/themes/chao-gang-cheng/includes/woocommerce/product-addon-modal.php"
     }
 ]
 
