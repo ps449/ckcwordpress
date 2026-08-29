@@ -10867,6 +10867,17 @@ function ckc_repair_woocommerce_rewrite_rules() {
 
         ckc_register_product_fallback_rewrite_rules();
 
+        // 確保預設運送區域存在（避免 WC_Shipping_Zone_Data_Store 查無 zone 拋出「無效的資料儲存」錯誤）
+        global $wpdb;
+        $existing_zone = $wpdb->get_var( "SELECT zone_id FROM {$wpdb->prefix}woocommerce_shipping_zones LIMIT 1" );
+        if ( ! $existing_zone && class_exists( 'WC_Shipping_Zone' ) ) {
+            $zone = new WC_Shipping_Zone();
+            $zone->set_zone_name( '台灣' );
+            $zone->set_zone_order( 1 );
+            $zone->add_location( 'TW', 'country' );
+            $zone->save();
+        }
+
         if ( is_object( $wp_rewrite ) ) {
             $wp_rewrite->flush_rules( false );
         } else {
@@ -10874,6 +10885,9 @@ function ckc_repair_woocommerce_rewrite_rules() {
         }
     }
 }
+
+
+
 
 
 
