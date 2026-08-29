@@ -688,10 +688,10 @@ function chao_cart_free_shipping_cross_sell() {
         <div class="chao-cart-cross-sell-grid">
             <?php foreach ( $picks as $product ) : ?>
                 <div class="chao-cart-cross-sell-item">
-                    <div class="chao-cross-sell-thumb">
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" class="chao-cross-sell-thumb">
                         <?php echo $product->get_image( 'woocommerce_thumbnail' ); ?>
-                    </div>
-                    <span class="chao-cross-sell-name"><?php echo esc_html( $product->get_name() ); ?></span>
+                    </a>
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" class="chao-cross-sell-name"><?php echo esc_html( $product->get_name() ); ?></a>
                     <span class="chao-cross-sell-price"><?php echo $product->get_price_html(); ?></span>
                     <?php $has_specs = function_exists( 'chao_product_has_specs_or_variations' ) ? chao_product_has_specs_or_variations( $product ) : false; ?>
                     <button type="button" class="button chao-cross-sell-add"
@@ -825,8 +825,8 @@ function chao_checkout_free_shipping_cross_sell() {
             <?php foreach ( $picks as $product ) : ?>
                 <?php $has_specs = function_exists( 'chao_product_has_specs_or_variations' ) ? chao_product_has_specs_or_variations( $product ) : false; ?>
                 <div style="display:flex;flex-direction:column;gap:6px;text-align:center;">
-                    <div style="display:block;"><?php echo $product->get_image( 'woocommerce_thumbnail' ); ?></div>
-                    <span style="font-size:13px;color:#1a140f;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></span>
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="display:block;"><?php echo $product->get_image( 'woocommerce_thumbnail' ); ?></a>
+                    <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="font-size:13px;color:#1a140f;text-decoration:none;line-height:1.4;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"><?php echo esc_html( $product->get_name() ); ?></a>
                     <span style="font-size:14px;font-weight:700;color:#f86f69;"><?php echo $product->get_price_html(); ?></span>
                     <button type="button" class="chao-checkout-crosssell-add" data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" data-has-specs="<?php echo $has_specs ? '1' : '0'; ?>" style="border:1px solid #c9974a;background:#fff;color:#1a140f;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">＋ 加入</button>
                 </div>

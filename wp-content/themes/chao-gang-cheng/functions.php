@@ -10806,3 +10806,75 @@ function chao_hide_order_unneeded_meta_boxes_css() {
         </style>';
     }
 }
+
+/**
+ * 確保商品與商品分類網址改寫規則在每次 init 時皆正確註冊
+ */
+add_action( 'init', 'ckc_register_product_fallback_rewrite_rules', 10 );
+function ckc_register_product_fallback_rewrite_rules() {
+    add_rewrite_rule( '^product/([^/]+)/?$', 'index.php?product=$matches[1]', 'top' );
+    add_rewrite_rule( '^product/([^/]+)/([^/]+)/?$', 'index.php?product_cat=$matches[1]&product=$matches[2]', 'top' );
+    add_rewrite_rule( '^product-category/([^/]+)/?$', 'index.php?product_cat=$matches[1]', 'top' );
+    add_rewrite_rule( '^product-category/([^/]+)/page/([0-9]+)/?$', 'index.php?product_cat=$matches[1]&paged=$matches[2]', 'top' );
+}
+
+/**
+ * 自動修復並確保 WooCommerce 商品固定網址（/product/...）與改寫規則（Rewrite Rules）正常運作
+ * 避免因 flush_rewrite_rules 脫序導致商品頁、商店頁出現 404 錯誤
+ */
+add_action( 'init', 'ckc_repair_woocommerce_rewrite_rules', 999 );
+function ckc_repair_woocommerce_rewrite_rules() {
+    $need_flush = false;
+
+    // 1. 支援手動觸發修復
+    if ( isset( $_GET['ckc_flush_rewrite'] ) && '1' === $_GET['ckc_flush_rewrite'] ) {
+        $need_flush = true;
+    }
+
+    // 2. 部署後一次性自動修復旗標
+    if ( get_option( 'ckc_wc_permalinks_repaired_v5' ) !== '1' ) {
+        $need_flush = true;
+        update_option( 'ckc_wc_permalinks_repaired_v5', '1' );
+    }
+
+    if ( $need_flush ) {
+        global $wp_rewrite;
+
+        // 確保 WordPress 主永久連結結構存在（若為空，WordPress 會關閉所有 rewrite_rules）
+        if ( empty( get_option( 'permalink_structure' ) ) ) {
+            update_option( 'permalink_structure', '/%postname%/' );
+        }
+
+        if ( is_object( $wp_rewrite ) ) {
+            $wp_rewrite->set_permalink_structure( '/%postname%/' );
+        }
+
+        // 確保 WooCommerce 固定網址設定完整
+        $permalinks = get_option( 'woocommerce_permalinks' );
+        if ( ! is_array( $permalinks ) ) {
+            $permalinks = array();
+        }
+        $permalinks['product_base']  = '/product';
+        $permalinks['category_base'] = 'product-category';
+        $permalinks['tag_base']      = 'product-tag';
+        update_option( 'woocommerce_permalinks', $permalinks );
+
+        // 確保商品 post type 與 taxonomy 完整註冊改寫規則
+        if ( class_exists( 'WC_Post_Types' ) ) {
+            WC_Post_Types::register_post_types();
+            WC_Post_Types::register_taxonomies();
+        }
+
+        ckc_register_product_fallback_rewrite_rules();
+
+        if ( is_object( $wp_rewrite ) ) {
+            $wp_rewrite->flush_rules( false );
+        } else {
+            flush_rewrite_rules( false );
+        }
+    }
+}
+
+
+
+
