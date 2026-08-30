@@ -1597,7 +1597,7 @@ function chao_gang_cheng_get_free_shipping_threshold() {
             }
         }
     }
-    return $min_amount > 0 ? $min_amount : 2000;
+    return $min_amount > 0 ? $min_amount : 1500;
 }
 
 /**

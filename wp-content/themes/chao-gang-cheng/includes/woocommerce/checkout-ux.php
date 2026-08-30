@@ -681,6 +681,22 @@ function chao_cart_free_shipping_cross_sell() {
     }
 
     if ( empty( $picks ) ) {
+        // 全面保底：若溫層或價差過濾後無商品，直接從候選池取非購物車商品填補，確保加購專區 100% 強制顯示
+        foreach ( $candidate_ids as $product_id ) {
+            if ( in_array( (int) $product_id, $exclude, true ) ) {
+                continue;
+            }
+            $product = wc_get_product( $product_id );
+            if ( $product && $product->is_in_stock() && $product->is_purchasable() && floatval( $product->get_price() ) > 0 ) {
+                $picks[] = $product;
+                if ( count( $picks ) >= 4 ) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if ( empty( $picks ) ) {
         return;
     }
     ?>
@@ -795,6 +811,22 @@ function chao_checkout_free_shipping_cross_sell() {
             $picks[] = $extra_prod;
             if ( count( $picks ) >= 4 ) {
                 break;
+            }
+        }
+    }
+
+    if ( empty( $picks ) ) {
+        // 全面保底：若溫層或價差過濾後無商品，直接從候選池取非購物車商品填補，確保加購專區 100% 強制顯示
+        foreach ( $candidate_ids as $product_id ) {
+            if ( in_array( (int) $product_id, $exclude, true ) ) {
+                continue;
+            }
+            $product = wc_get_product( $product_id );
+            if ( $product && $product->is_in_stock() && $product->is_purchasable() && floatval( $product->get_price() ) > 0 ) {
+                $picks[] = $product;
+                if ( count( $picks ) >= 4 ) {
+                    break;
+                }
             }
         }
     }
