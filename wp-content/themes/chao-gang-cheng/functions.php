@@ -3242,7 +3242,7 @@ function chao_gang_cheng_seo_geo_meta_tags() {
 
     if ( is_front_page() || is_home() ) {
         $site_description = get_bloginfo( 'description' );
-        $meta_title = $site_name . ( $site_description ? ' | ' . wp_html_excerpt( wp_strip_all_tags( $site_description ), 40, '' ) : '' );
+        $meta_title = $site_name . ' - 讓潮港城串起與你的美味關係，讓我們更靠近一點';
         $meta_desc  = wp_strip_all_tags( $site_description );
         $canonical_url = home_url( '/' );
     } elseif ( is_product() ) {
@@ -3378,7 +3378,7 @@ function chao_gang_cheng_wp_robots( $robots ) {
 add_filter( 'pre_get_document_title', 'chao_gang_cheng_document_title', 20 );
 function chao_gang_cheng_document_title( $title ) {
     if ( is_front_page() || is_home() ) {
-        return get_bloginfo( 'name' ) . ' - 台中辦桌世家30年 | 冷凍年菜、常溫禮盒宅配';
+        return get_bloginfo( 'name' ) . ' - 讓潮港城串起與你的美味關係，讓我們更靠近一點';
     }
     return $title;
 }
@@ -11297,7 +11297,7 @@ function ckc_repair_woocommerce_rewrite_rules() {
 
 add_action( 'init', 'ckc_auto_flush_cache_on_load', 1 );
 function ckc_auto_flush_cache_on_load() {
-    if ( get_option( 'ckc_batcache_flushed_v4' ) !== '1' || isset( $_GET['ckc_flush_cache'] ) ) {
+    if ( get_option( 'ckc_batcache_flushed_v5' ) !== '1' || isset( $_GET['ckc_flush_cache'] ) ) {
         if ( function_exists( 'wp_cache_flush' ) ) {
             wp_cache_flush();
         }
@@ -11306,6 +11306,6 @@ function ckc_auto_flush_cache_on_load() {
             wp_cache_set( 'batcache_cache_buster_' . $host, time(), 'batcache_flush' );
             wp_cache_set( 'batcache_cache_buster_eshopckc.com', time(), 'batcache_flush' );
         }
-        update_option( 'ckc_batcache_flushed_v4', '1' );
+        update_option( 'ckc_batcache_flushed_v5', '1' );
     }
 }
