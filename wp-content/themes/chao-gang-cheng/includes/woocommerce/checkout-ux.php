@@ -119,6 +119,24 @@ function chao_available_payment_gateways( $gateways ) {
         }
     }
     
+    // 4. 嚴格依指定順序重新排列閘道：ATM轉帳 / 超商代碼繳費 / TWQR行動支付 / Apple Pay / 信用卡安全支付 / (超商取貨付款)
+    $order_map = array(
+        'wooecpay_gateway_atm'      => 10,
+        'wooecpay_gateway_cvs'      => 20,
+        'wooecpay_gateway_twqr'     => 30,
+        'wooecpay_gateway_applepay' => 40,
+        'chao_ecpay_ecpg'           => 50,
+        'cod'                       => 60,
+    );
+
+    uksort( $gateways, function( $a, $b ) use ( $order_map ) {
+        $a_lower = strtolower( $a );
+        $b_lower = strtolower( $b );
+        $a_pos   = isset( $order_map[ $a_lower ] ) ? $order_map[ $a_lower ] : 999;
+        $b_pos   = isset( $order_map[ $b_lower ] ) ? $order_map[ $b_lower ] : 999;
+        return $a_pos <=> $b_pos;
+    } );
+    
     return $gateways;
 }
 

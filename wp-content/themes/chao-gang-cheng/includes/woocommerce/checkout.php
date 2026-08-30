@@ -439,31 +439,46 @@ function chao_checkout_custom_js_css() {
                 <div class="chao-checkout-section" id="chao-payment-section">
                     <div class="chao-section-title">付款方式</div>
                     <div class="chao-payment-cards-grid">
-                        <div class="chao-card chao-payment-card" data-payment="credit">
+                        <!-- 1. ATM 轉帳 -->
+                        <div class="chao-card chao-payment-card" data-payment="atm">
                             <div class="chao-card-check"></div>
                             <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
-                                <rect x="2" y="2" width="32" height="20" rx="3" />
-                                <rect x="6" y="7" width="8" height="6" rx="1" />
-                                <circle cx="24" cy="15" r="3.5" />
-                                <circle cx="28" cy="15" r="3.5" />
+                                <rect x="3" y="2" width="30" height="15" rx="2" />
+                                <text x="18" y="11" font-family="sans-serif" font-weight="900" font-size="7" fill="#1a140f" text-anchor="middle" stroke="none">ATM</text>
+                                <path d="M10,17 L6,22 L30,22 L26,17 Z" />
                             </svg>
                             <div class="chao-payment-info">
-                                <span class="chao-payment-title">信用卡安全支付</span>
-                                <span class="chao-payment-desc">信用卡一次付清 (VISA、MasterCard、JCB)</span>
+                                <span class="chao-payment-title">ATM 轉帳</span>
+                                <span class="chao-payment-desc">虛擬帳號轉帳：支援各家銀行 ATM / 網路銀行轉帳</span>
                             </div>
                         </div>
-                        <div class="chao-card chao-payment-card" data-payment="cod" style="display: none;">
+
+                        <!-- 2. 超商代碼繳費 -->
+                        <div class="chao-card chao-payment-card" data-payment="cvscode">
                             <div class="chao-card-check"></div>
                             <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
-                                <rect x="3" y="4" width="30" height="16" rx="2" />
-                                <circle cx="18" cy="12" r="3" />
-                                <path d="M7 12h3M26 12h3" />
+                                <rect x="4" y="2" width="28" height="20" rx="2" />
+                                <path d="M8 6h20M8 10h20M8 14h12M8 18h16" />
                             </svg>
                             <div class="chao-payment-info">
-                                <span class="chao-payment-title">超商取貨付款</span>
-                                <span class="chao-payment-desc">貨到 7-11 / 全家超商再付款</span>
+                                <span class="chao-payment-title">超商代碼繳費</span>
+                                <span class="chao-payment-desc">至超商多媒體機台列印繳費單</span>
                             </div>
                         </div>
+
+                        <!-- 3. TWQR 行動支付 -->
+                        <div class="chao-card chao-payment-card" data-payment="twqr">
+                            <div class="chao-card-check"></div>
+                            <div class="chao-twqr-logo">
+                                <span>TWQR</span>
+                            </div>
+                            <div class="chao-payment-info">
+                                <span class="chao-payment-title">TWQR 行動支付</span>
+                                <span class="chao-payment-desc">支援台灣 Pay、歐付寶及各家銀行 App 掃碼付款</span>
+                            </div>
+                        </div>
+
+                        <!-- 4. Apple Pay -->
                         <div class="chao-card chao-payment-card" data-payment="applepay">
                             <div class="chao-card-check"></div>
                             <div class="chao-applepay-logo">
@@ -476,42 +491,40 @@ function chao_checkout_custom_js_css() {
                                 <span class="chao-payment-desc">使用 Apple Pay 快速安全結帳（支援 iPhone、iPad、Mac）</span>
                             </div>
                         </div>
-                        <div class="chao-card chao-payment-card" data-payment="twqr">
-                            <div class="chao-card-check"></div>
-                            <div class="chao-twqr-logo">
-                                <span>TWQR</span>
-                            </div>
-                            <div class="chao-payment-info">
-                                <span class="chao-payment-title">TWQR 行動支付</span>
-                                <span class="chao-payment-desc">支援台灣 Pay、歐付寶及各家銀行 App 掃碼付款</span>
-                            </div>
-                        </div>
-                        <div class="chao-card chao-payment-card" data-payment="atm">
+
+                        <!-- 超商取貨付款 (僅超商取貨時顯示) -->
+                        <div class="chao-card chao-payment-card" data-payment="cod" style="display: none;">
                             <div class="chao-card-check"></div>
                             <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
-                                <rect x="3" y="2" width="30" height="15" rx="2" />
-                                <text x="18" y="11" font-family="sans-serif" font-weight="900" font-size="7" fill="#1a140f" text-anchor="middle" stroke="none">ATM</text>
-                                <path d="M10,17 L6,22 L30,22 L26,17 Z" />
+                                <rect x="3" y="4" width="30" height="16" rx="2" />
+                                <circle cx="18" cy="12" r="3" />
+                                <path d="M7 12h3M26 12h3" />
                             </svg>
                             <div class="chao-payment-info">
-                                <span class="chao-payment-title">虛擬 ATM 轉帳</span>
-                                <span class="chao-payment-desc">虛擬帳號轉帳：支援各家銀行 ATM / 網路銀行轉帳</span>
+                                <span class="chao-payment-title">超商取貨付款</span>
+                                <span class="chao-payment-desc">貨到 7-11 超商再付款</span>
                             </div>
                         </div>
-                        <div class="chao-card chao-payment-card" data-payment="cvscode">
-                            <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
-                                <rect x="4" y="2" width="28" height="20" rx="2" />
-                                <path d="M8 6h20M8 10h20M8 14h12M8 18h16" />
-                            </svg>
-                            <div class="chao-payment-info">
-                                <span class="chao-payment-title">超商代碼繳費</span>
-                                <span class="chao-payment-desc">超商代碼繳費：至超商多媒體機台列印繳費單</span>
+
+                        <!-- 5. 信用卡安全支付 (含直接連附於選項下方的支付窗口) -->
+                        <div class="chao-payment-credit-wrapper" style="grid-column: 1 / -1; display: flex; flex-direction: column; width: 100%;">
+                            <div class="chao-card chao-payment-card" data-payment="credit" style="width: 100%; box-sizing: border-box;">
+                                <div class="chao-card-check"></div>
+                                <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
+                                    <rect x="2" y="2" width="32" height="20" rx="3" />
+                                    <rect x="6" y="7" width="8" height="6" rx="1" />
+                                    <circle cx="24" cy="15" r="3.5" />
+                                    <circle cx="28" cy="15" r="3.5" />
+                                </svg>
+                                <div class="chao-payment-info">
+                                    <span class="chao-payment-title">信用卡安全支付</span>
+                                    <span class="chao-payment-desc">信用卡一次付清 (VISA、MasterCard、JCB)</span>
+                                </div>
                             </div>
+                            <div id="chao-credit-card-form-area" style="margin-top: 8px; width: 100%; box-sizing: border-box;"></div>
                         </div>
                     </div>
-                    <div id="chao-credit-card-form-area" style="margin-top: 16px;"></div>
-                    <input type="hidden" name="chao_chosen_payment_method" id="chao_chosen_payment_method" value="credit">
+                    <input type="hidden" name="chao_chosen_payment_method" id="chao_chosen_payment_method" value="atm">
                 </div>
                 `;
                 // Insert payment layout inside the payment div container
@@ -664,18 +677,47 @@ function chao_checkout_custom_js_css() {
                 $codCard.show();
             } else {
                 $codCard.hide();
-                // If COD was chosen but shipping is no longer CVS, revert payment to credit
+                // If COD was chosen but shipping is no longer CVS, revert payment to ATM
                 if ($('#chao_chosen_payment_method').val() === 'cod') {
-                    $('#chao_chosen_payment_method').val('credit');
-                    $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
+                    $('#chao_chosen_payment_method').val('atm');
+                    var $atmRadio = $('input[name="payment_method"]').filter(function() {
+                        var val = ($(this).val() || '').toLowerCase();
+                        return (val.indexOf('atm') !== -1 || val.indexOf('vaccount') !== -1) && val.indexOf('webatm') === -1;
+                    });
+                    if ($atmRadio.length > 0) {
+                        $atmRadio.first().prop('checked', true).trigger('click');
+                    }
                 }
             }
 
-            // Sync payment card active class
-            var chosenPayment = $('#chao_chosen_payment_method').val() || 'credit';
-            $('.chao-payment-card[data-payment="' + chosenPayment + '"]').addClass('active').siblings().removeClass('active');
+            // Detect active payment from checked radio if not set
+            var checkedRadio = $('input[name="payment_method"]:checked').val() || '';
+            var chosenPayment = $('#chao_chosen_payment_method').val();
+            if (!chosenPayment && checkedRadio) {
+                if (checkedRadio === 'chao_ecpay_ecpg') {
+                    chosenPayment = 'credit';
+                } else if (checkedRadio.toLowerCase().indexOf('atm') !== -1 || checkedRadio.toLowerCase().indexOf('vaccount') !== -1) {
+                    chosenPayment = 'atm';
+                } else if (checkedRadio.toLowerCase().indexOf('cvs') !== -1) {
+                    chosenPayment = 'cvscode';
+                } else if (checkedRadio.toLowerCase().indexOf('twqr') !== -1) {
+                    chosenPayment = 'twqr';
+                } else if (checkedRadio.toLowerCase().indexOf('apple') !== -1) {
+                    chosenPayment = 'applepay';
+                } else if (checkedRadio === 'cod') {
+                    chosenPayment = 'cod';
+                }
+            }
+            if (!chosenPayment) {
+                chosenPayment = 'atm';
+            }
+            $('#chao_chosen_payment_method').val(chosenPayment);
 
-            // 平滑展開或收合信用卡輸入區
+            // Sync payment card active class across all cards
+            $('.chao-payment-card').removeClass('active');
+            $('.chao-payment-card[data-payment="' + chosenPayment + '"]').addClass('active');
+
+            // 平滑展開或收合信用卡輸入區（直接位於信用卡選項正下方）
             var $creditCardArea = $('#chao-credit-card-form-area, #ECPayPayment-container');
             if (chosenPayment === 'credit') {
                 $creditCardArea.stop(true, true).slideDown(250);
