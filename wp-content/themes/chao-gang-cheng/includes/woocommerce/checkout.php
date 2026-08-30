@@ -492,20 +492,6 @@ function chao_checkout_custom_js_css() {
                             </div>
                         </div>
 
-                        <!-- 超商取貨付款 (僅超商取貨時顯示) -->
-                        <div class="chao-card chao-payment-card" data-payment="cod" style="display: none;">
-                            <div class="chao-card-check"></div>
-                            <svg class="chao-payment-icon" viewBox="0 0 36 24" width="36" height="24" fill="none" stroke="#1a140f" stroke-width="1.5">
-                                <rect x="3" y="4" width="30" height="16" rx="2" />
-                                <circle cx="18" cy="12" r="3" />
-                                <path d="M7 12h3M26 12h3" />
-                            </svg>
-                            <div class="chao-payment-info">
-                                <span class="chao-payment-title">超商取貨付款</span>
-                                <span class="chao-payment-desc">貨到 7-11 超商再付款</span>
-                            </div>
-                        </div>
-
                         <!-- 5. 信用卡安全支付 (含直接連附於選項下方的支付窗口) -->
                         <div class="chao-payment-credit-wrapper" style="grid-column: 1 / -1; display: flex; flex-direction: column; width: 100%;">
                             <div class="chao-card chao-payment-card" data-payment="credit" style="width: 100%; box-sizing: border-box;">
@@ -670,26 +656,6 @@ function chao_checkout_custom_js_css() {
                 });
             }
             
-            // --- SHIPPING & PAYMENT BINDINGS ---
-            var isCvs = activeShipping.indexOf('Wooecpay_Logistic_CVS_711') !== -1;
-            var $codCard = $('.chao-payment-card[data-payment="cod"]');
-            if (isCvs) {
-                $codCard.show();
-            } else {
-                $codCard.hide();
-                // If COD was chosen but shipping is no longer CVS, revert payment to ATM
-                if ($('#chao_chosen_payment_method').val() === 'cod') {
-                    $('#chao_chosen_payment_method').val('atm');
-                    var $atmRadio = $('input[name="payment_method"]').filter(function() {
-                        var val = ($(this).val() || '').toLowerCase();
-                        return (val.indexOf('atm') !== -1 || val.indexOf('vaccount') !== -1) && val.indexOf('webatm') === -1;
-                    });
-                    if ($atmRadio.length > 0) {
-                        $atmRadio.first().prop('checked', true).trigger('click');
-                    }
-                }
-            }
-
             // Detect active payment from checked radio if not set
             var checkedRadio = $('input[name="payment_method"]:checked').val() || '';
             var chosenPayment = $('#chao_chosen_payment_method').val();
@@ -704,8 +670,6 @@ function chao_checkout_custom_js_css() {
                     chosenPayment = 'twqr';
                 } else if (checkedRadio.toLowerCase().indexOf('apple') !== -1) {
                     chosenPayment = 'applepay';
-                } else if (checkedRadio === 'cod') {
-                    chosenPayment = 'cod';
                 }
             }
             if (!chosenPayment) {
@@ -772,9 +736,6 @@ function chao_checkout_custom_js_css() {
                 // 信用卡對應到新開發的綠界站內付 2.0 (chao_ecpay_ecpg)
                 $('input[name="payment_method"][value="chao_ecpay_ecpg"]').prop('checked', true).trigger('click');
                 $(document.body).trigger('update_chao_ecpg');
-            } else if (payment === 'cod') {
-                // 超商取貨付款對應到 WooCommerce 原生 cod
-                $('input[name="payment_method"][value="cod"]').prop('checked', true).trigger('click');
             } else if (payment === 'applepay') {
                 // 優先對應官方 Apple Pay 閘道，或使用綠界站內付 2.0
                 var $appleRadio = $('input[name="payment_method"]').filter(function() {

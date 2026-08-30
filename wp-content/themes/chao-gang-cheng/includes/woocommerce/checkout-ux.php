@@ -68,32 +68,12 @@ function chao_available_payment_gateways( $gateways ) {
     $is_cvs = ( strpos( $chosen_shipping, 'Wooecpay_Logistic_CVS_711' ) !== false );
     $loaded_gateways = WC()->payment_gateways->payment_gateways();
     
-    if ( $is_cvs ) {
-        // 1. If CVS is active, force-enable and inject native COD gateway
-        if ( ! isset( $gateways['cod'] ) && isset( $loaded_gateways['cod'] ) ) {
-            $cod_gateway = $loaded_gateways['cod'];
-            $cod_gateway->enabled = 'yes';
-            $cod_gateway->enable_for_methods = array();
-            $gateways['cod'] = $cod_gateway;
-        } elseif ( ! isset( $gateways['cod'] ) && class_exists( 'WC_Gateway_COD' ) ) {
-            $cod_gateway = new WC_Gateway_COD();
-            $cod_gateway->enabled = 'yes';
-            $cod_gateway->enable_for_methods = array();
-            $gateways['cod'] = $cod_gateway;
-        }
-        
-        // 2. Re-inject Credit Card (站內付 2.0) if removed by shipping plugins
-        if ( ! isset( $gateways['chao_ecpay_ecpg'] ) && isset( $loaded_gateways['chao_ecpay_ecpg'] ) ) {
-            $gateways['chao_ecpay_ecpg'] = $loaded_gateways['chao_ecpay_ecpg'];
-        }
-    } else {
-        // Remove native COD option if chosen shipping is NOT CVS
-        if ( isset( $gateways['cod'] ) ) {
-            unset( $gateways['cod'] );
-        }
+    // 1. 結帳頁全面屏蔽「超商取貨付款 (COD)」，確保所有配送方式皆採線上金流支付
+    if ( isset( $gateways['cod'] ) ) {
+        unset( $gateways['cod'] );
     }
 
-    // 3. 確保官方外掛的 ATM 虛擬帳號、超商代碼、TWQR、Apple Pay 閘道啟用並保留在可用閘道中
+    // 2. 確保官方外掛的 ATM 虛擬帳號、超商代碼、TWQR、Apple Pay 閘道啟用並保留在可用閘道中
     foreach ( array( 'Wooecpay_Gateway_Atm', 'Wooecpay_Gateway_ATM', 'wooecpay_gateway_atm' ) as $atm_id ) {
         if ( ! isset( $gateways[ $atm_id ] ) && isset( $loaded_gateways[ $atm_id ] ) ) {
             $gateways[ $atm_id ] = $loaded_gateways[ $atm_id ];
@@ -119,14 +99,13 @@ function chao_available_payment_gateways( $gateways ) {
         }
     }
     
-    // 4. 嚴格依指定順序重新排列閘道：ATM轉帳 / 超商代碼繳費 / TWQR行動支付 / Apple Pay / 信用卡安全支付 / (超商取貨付款)
+    // 3. 嚴格依指定順序重新排列閘道：ATM轉帳 / 超商代碼繳費 / TWQR行動支付 / Apple Pay / 信用卡安全支付
     $order_map = array(
         'wooecpay_gateway_atm'      => 10,
         'wooecpay_gateway_cvs'      => 20,
         'wooecpay_gateway_twqr'     => 30,
         'wooecpay_gateway_applepay' => 40,
         'chao_ecpay_ecpg'           => 50,
-        'cod'                       => 60,
     );
 
     uksort( $gateways, function( $a, $b ) use ( $order_map ) {
@@ -367,7 +346,7 @@ function chao_ajax_thankyou_guest_register_handler() {
 }
 
 /**
- * 6. Programmatically force enable WooCommerce native COD settings option for frontend checkout
+ * 6. Programmatically force disable WooCommerce native COD settings option for frontend checkout
  */
 add_filter( 'option_woocommerce_cod_settings', 'chao_force_enable_cod_setting' );
 function chao_force_enable_cod_setting( $value ) {
@@ -377,7 +356,7 @@ function chao_force_enable_cod_setting( $value ) {
     if ( ! is_array( $value ) ) {
         $value = array();
     }
-    $value['enabled'] = 'yes';
+    $value['enabled'] = 'no';
     return $value;
 }
 
