@@ -1844,39 +1844,176 @@ function chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_
 }
 
 /**
- * 購物車頁面提示：溫層衝突時顯示錯誤訊息（不會擋下，只是提醒，實際擋下
- * 是靠 woocommerce_after_checkout_validation）。
+ * 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段 §5.1）：加入
+ * 購物車當下就強制檢查溫層相容性，不相容直接擋下，不等到結帳才發現
+ * （物流無法混溫層出貨，商家已拍板改為完全禁止混買，不做拆單）。
  *
- * 注意：結帳頁（is_checkout()）刻意不在這裡加這個 error 等級的提示——
- * WooCommerce 核心的結帳頁 [woocommerce_checkout] 只要偵測到頁面載入時
- * 已經有 error 等級的通知，就會整個不渲染結帳表單，改顯示很籠統的
- * 「你的購物車項目發生一些問題，請在結帳前回到購物車頁面並解決這些
- * 問題」，看不到真正的原因，也沒有直接可以刪除商品的地方。結帳頁改用
- * 下面 chao_gang_cheng_checkout_temperature_zone_panel() 在表單最上方
- * 直接列出衝突商品明細＋各自的移除連結，比籠統的通知更清楚可操作。
+ * 沿用上面 chao_gang_cheng_product_matches_cart_temperature_zone() 同一套
+ * 判斷邏輯（原本只用在湊免運推薦的候選商品過濾），現在同時當作「能不能
+ * 加入購物車」的權威判斷來源，確保兩處判斷基準一致，不會出現「推薦區沒
+ * 濾掉、但加入時卻被擋」或反過來的不一致情況。
+ *
+ * 掛在 woocommerce_add_to_cart_validation——這是 WC()->cart->add_to_cart()
+ * 內部唯一的驗證關卡，涵蓋商品頁「加入購物車」、分類頁/首頁快速加購
+ * （原生 ajax_add_to_cart）、購物車頁「湊免運加購推薦」與規格選擇彈窗
+ * （ckc_add_addon_to_cart AJAX action）、以及任何直接帶網址參數呼叫的
+ * 情況，不需要在每個入口各自重複判斷一次。
  */
-add_action( 'woocommerce_check_cart_items', 'chao_gang_cheng_notice_temperature_zone_conflict' );
-function chao_gang_cheng_notice_temperature_zone_conflict() {
-    if ( is_checkout() ) {
-        return;
+add_filter( 'woocommerce_add_to_cart_validation', 'chao_gang_cheng_validate_add_to_cart_temperature_zone', 10, 3 );
+function chao_gang_cheng_validate_add_to_cart_temperature_zone( $passed, $product_id, $quantity ) {
+    if ( ! $passed ) {
+        return $passed; // 已經被更早掛的驗證擋下，不需要再判斷一次。
     }
-    if ( chao_gang_cheng_get_cart_temperature_conflict() ) {
-        wc_add_notice( '購物車內的商品溫層不同（例如常溫與冷凍無法同時出貨），請分開下單。', 'error' );
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        return $passed;
+    }
+    $product = wc_get_product( $product_id );
+    if ( ! $product ) {
+        return $passed;
+    }
+
+    $cart_zones = chao_gang_cheng_get_cart_common_temperature_zones();
+    if ( chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
+        return $passed;
+    }
+
+    // 組出明確說明「原因」的錯誤訊息（不是只說「無法加入」），格式沿用
+    // spec §5.2 的範例文案：講清楚這件商品跟購物車現有商品分別是什麼溫層。
+    // 外層包一個 .chao-temp-conflict-marker class（不隱藏，一般 wc_add_notice
+    // 情境下照常可讀），讓前端 JS 可以在不同入口（商品頁 AJAX 攔截等）精準
+    // 判斷「這次失敗是不是溫層衝突」，藉此顯示 §5.2 要求的專屬攔截彈窗，
+    // 而不是被其他失敗原因（例如缺貨）誤觸發。
+    $product_zone_label = '';
+    foreach ( chao_gang_cheng_get_product_temperature_zones( $product ) as $pz ) {
+        $info = chao_gang_cheng_get_temperature_zone_info( $pz );
+        if ( $info ) {
+            $product_zone_label = $info['label'];
+            break;
+        }
+    }
+    $cart_zone_label = '';
+    if ( ! empty( $cart_zones ) ) {
+        $info = chao_gang_cheng_get_temperature_zone_info( reset( $cart_zones ) );
+        if ( $info ) {
+            $cart_zone_label = $info['label'];
+        }
+    }
+
+    $message = ( $product_zone_label && $cart_zone_label )
+        ? sprintf(
+            '此商品為【%1$s】商品，但您的購物車目前是【%2$s】商品。因%1$s與%2$s需分開配送，無法合併於同一筆訂單，請分開下單或清空購物車改買此商品。',
+            $product_zone_label,
+            $cart_zone_label
+        )
+        : '此商品的配送溫層與購物車內現有商品不同，無法合併於同一筆訂單，請分開下單或清空購物車改買此商品。';
+
+    wc_add_notice( '<span class="chao-temp-conflict-marker">' . esc_html( $message ) . '</span>', 'error' );
+    return false;
+}
+
+/**
+ * 2026-08-30 新增：配合上面的加入購物車溫層驗證，給前端「清空購物車，
+ * 改買此商品」這個攔截彈窗按鈕用的 AJAX 端點（spec §5.2）。清空與加入
+ * 在同一支後端請求內原子完成，避免前端自己orchestrate「先清空、再呼叫
+ * 原本的加入流程」在不同入口要各自兜一套邏輯；回傳格式刻意跟
+ * ckc_add_addon_to_cart（product-addon-modal.php）一致（message／
+ * fragments／cart_hash），前端可以共用同一套「原地更新購物車」處理。
+ *
+ * 破壞性操作（清空購物車）務必先驗證商品確實存在、可購買，才執行清空
+ * ——交接文件第十五章 15.6 的教訓：批次/破壞性操作若判斷用的關鍵欄位
+ * 取值異常，應立即中止而非繼續執行，這裡對應到「商品不存在或不可購買
+ * 就整個中止，完全不觸碰購物車」。
+ */
+add_action( 'wp_ajax_ckc_empty_cart_and_add', 'ckc_ajax_empty_cart_and_add' );
+add_action( 'wp_ajax_nopriv_ckc_empty_cart_and_add', 'ckc_ajax_empty_cart_and_add' );
+function ckc_ajax_empty_cart_and_add() {
+    if ( function_exists( 'wc_load_cart' ) && null === WC()->cart ) {
+        wc_load_cart();
+    }
+    if ( function_exists( 'WC' ) && WC()->session && ! WC()->session->has_session() ) {
+        WC()->session->set_customer_session_cookie( true );
+    }
+
+    $product_id   = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+    $quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( $_POST['quantity'] ) ) : 1;
+    $variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
+    $variation    = isset( $_POST['variation'] ) && is_array( $_POST['variation'] ) ? $_POST['variation'] : array();
+
+    if ( ! $product_id ) {
+        wp_send_json_error( array( 'message' => '缺少商品編號。' ) );
+    }
+
+    $product = wc_get_product( $product_id );
+    if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
+        wp_send_json_error( array( 'message' => '此商品目前無法選購或已售完，購物車內容未被清空。' ) );
+    }
+
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        wp_send_json_error( array( 'message' => '購物車尚未初始化，請重新整理頁面後再試一次。' ) );
+    }
+
+    // 驗證通過才真正執行清空——上面任一驗證失敗都已經直接 wp_send_json_error()
+    // 提前返回，不會執行到這裡。
+    WC()->cart->empty_cart();
+
+    if ( isset( $_POST['ckc_spec_selected'] ) && is_array( $_POST['ckc_spec_selected'] ) ) {
+        $_POST['ckc_spec_selected'] = wp_unslash( $_POST['ckc_spec_selected'] );
+    }
+
+    // WC_Cart::add_to_cart() 這個類別方法本身不會觸發
+    // woocommerce_add_to_cart_validation（實測確認，見
+    // ckc_ajax_add_addon_to_cart() 的同一處說明），這裡購物車雖然已經清空、
+    // 溫層本身不會再衝突，但仍要走過這關才能吃到其他既有驗證（例如規格
+    // 選項庫存檢查、受保護商品等），維持跟其他入口一致的把關標準。
+    $passed_validation = apply_filters( 'woocommerce_add_to_cart_validation', true, $product_id, $quantity, $variation_id, $variation );
+    $cart_item_key      = $passed_validation ? WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation ) : false;
+
+    if ( $cart_item_key ) {
+        WC()->cart->calculate_totals();
+        if ( WC()->session ) {
+            WC()->session->save_data();
+        }
+        WC()->cart->maybe_set_cart_cookies();
+
+        $fragments = apply_filters( 'woocommerce_add_to_cart_fragments', array() );
+
+        wp_send_json_success( array(
+            'message'   => sprintf( '已清空購物車並加入「%s」！', esc_html( $product->get_name() ) ),
+            'fragments' => $fragments,
+            'cart_hash' => WC()->cart->get_cart_hash(),
+        ) );
+    } else {
+        $notices = wc_get_notices( 'error' );
+        $err_msg = '購物車已清空，但加入商品時發生錯誤，請重新整理頁面後再試一次。';
+        if ( ! empty( $notices ) ) {
+            $messages = array();
+            foreach ( $notices as $notice ) {
+                $messages[] = wp_strip_all_tags( is_array( $notice ) ? $notice['notice'] : $notice );
+            }
+            $err_msg = implode( ' ', $messages );
+            wc_clear_notices();
+        }
+        wp_send_json_error( array( 'message' => $err_msg ) );
     }
 }
 
 /**
- * 結帳頁面提示：溫層衝突時，在結帳表單最上方直接列出目前購物車裡
- * 各個溫層各有哪些商品，並提供每件商品的「移除」連結，讓客人可以
- * 直接在結帳頁上動手刪除其中一種溫層的商品，不用先看到一段籠統、
- * 不知道問題出在哪的錯誤訊息才能繼續。
+ * 共用面板渲染邏輯：依溫層分組列出目前購物車裡造成衝突的商品明細＋
+ * 各自的「移除」連結。原本只有結帳頁有這個明細面板、購物車頁只有一句
+ * 籠統的 wc_add_notice()；2026-08-30 起購物車頁也升級成同樣的面板，讓
+ * 客人在購物車頁就能直接動手移除，不用先進到結帳頁才看得到明細
+ * （spec-同溫層限制與運費顯示修正.md 第一階段 §5.3）。
  *
- * 沿用 chao_gang_cheng_notice_temperature_zone_conflict() 上面說明的
- * 原因：這裡刻意不用 wc_add_notice( ..., 'error' )，改成自己渲染面板，
- * 避免觸發 WooCommerce 核心「有 error 通知就整頁不顯示結帳表單」的行為。
+ * 刻意不用 wc_add_notice( ..., 'error' )，改成自己渲染面板：結帳頁
+ * WooCommerce 核心只要偵測到頁面載入時已有 error 等級通知，就會整個不
+ * 渲染結帳表單，改顯示籠統的「你的購物車項目發生一些問題」，看不到
+ * 真正原因也沒有直接可以刪除商品的地方；購物車頁雖然沒有這個副作用，
+ * 但兩頁共用同一份明細面板寫法更一致，也不會讓客人在兩個頁面看到不同
+ * 措辭的提示。
+ *
+ * @param string $intro_text 面板說明文字，購物車頁跟結帳頁措辭可以不同。
  */
-add_action( 'woocommerce_before_checkout_form', 'chao_gang_cheng_checkout_temperature_zone_panel', 5 );
-function chao_gang_cheng_checkout_temperature_zone_panel() {
+function chao_gang_cheng_render_temperature_conflict_panel( $intro_text ) {
     if ( ! function_exists( 'WC' ) || ! WC()->cart || ! chao_gang_cheng_get_cart_temperature_conflict() ) {
         return;
     }
@@ -1918,7 +2055,7 @@ function chao_gang_cheng_checkout_temperature_zone_panel() {
             <span aria-hidden="true">⚠️</span> 購物車內的商品溫層不同，無法一起出貨
         </div>
         <p style="margin:0 0 16px 0;color:#5c4033;font-size:14px;line-height:1.6;">
-            請保留其中一種溫層的商品，並手動移除其餘溫層的商品，才能繼續結帳。
+            <?php echo esc_html( $intro_text ); ?>
         </p>
         <?php foreach ( $groups as $zone => $items ) :
             $zone_info = chao_gang_cheng_get_temperature_zone_info( $zone );
@@ -1937,6 +2074,120 @@ function chao_gang_cheng_checkout_temperature_zone_panel() {
                 <?php endforeach; ?>
             </ul>
         <?php endforeach; ?>
+    </div>
+    <?php
+}
+
+/**
+ * 購物車頁：溫層衝突時顯示可直接動手移除的明細面板（取代原本只有一句
+ * 籠統文字的 wc_add_notice()）。掛在 woocommerce_before_cart，優先權排
+ * 在免運進度條（預設優先權 10）之前，讓衝突警示在最上方第一眼就看到。
+ */
+add_action( 'woocommerce_before_cart', 'chao_gang_cheng_cart_temperature_zone_panel', 4 );
+function chao_gang_cheng_cart_temperature_zone_panel() {
+    chao_gang_cheng_render_temperature_conflict_panel( '請保留其中一種溫層的商品，並手動移除其餘溫層的商品，才能繼續選購與結帳。' );
+}
+
+/**
+ * 結帳頁面提示：溫層衝突時，在結帳表單最上方直接列出目前購物車裡
+ * 各個溫層各有哪些商品，並提供每件商品的「移除」連結，讓客人可以
+ * 直接在結帳頁上動手刪除其中一種溫層的商品，不用先看到一段籠統、
+ * 不知道問題出在哪的錯誤訊息才能繼續。
+ */
+add_action( 'woocommerce_before_checkout_form', 'chao_gang_cheng_checkout_temperature_zone_panel', 5 );
+function chao_gang_cheng_checkout_temperature_zone_panel() {
+    chao_gang_cheng_render_temperature_conflict_panel( '請保留其中一種溫層的商品，並手動移除其餘溫層的商品，才能繼續結帳。' );
+}
+
+/**
+ * 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第三階段 §2）：購物車
+ * 頁標示目前購物車已鎖定的溫層，讓客人在繼續逛之前就知道現在只能加購
+ * 哪些商品，而不是加購被彈窗擋下才第一次知道。
+ *
+ * 只在「沒有衝突」時顯示——有衝突時已經有上面的
+ * chao_gang_cheng_cart_temperature_zone_panel() 那個更明確、可操作的面板
+ * 負責提示，兩個同時顯示會重複、互相矛盾（一個說「目前是 X」，另一個說
+ * 「衝突了」）。掛在優先權 3，排在衝突面板（優先權 4）與免運進度條
+ * （預設優先權 10）之前。
+ */
+add_action( 'woocommerce_before_cart', 'chao_gang_cheng_cart_current_zone_notice', 3 );
+function chao_gang_cheng_cart_current_zone_notice() {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
+        return;
+    }
+    if ( chao_gang_cheng_get_cart_temperature_conflict() ) {
+        return; // 有衝突時交給衝突面板處理，避免重複提示
+    }
+    $zones = chao_gang_cheng_get_cart_common_temperature_zones();
+    if ( empty( $zones ) ) {
+        return; // null（沒有溫層限制）或空陣列，都不需要顯示
+    }
+    $info = chao_gang_cheng_get_temperature_zone_info( reset( $zones ) );
+    if ( ! $info ) {
+        return;
+    }
+    ?>
+    <div class="chao-cart-current-zone-notice" style="display:flex;align-items:center;gap:8px;background:<?php echo esc_attr( $info['bg'] ); ?>;color:<?php echo esc_attr( $info['color'] ); ?>;border:1px solid <?php echo esc_attr( $info['border'] ); ?>;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">
+        <span aria-hidden="true"><?php echo esc_html( $info['icon'] ); ?></span>
+        <span>本購物車目前為<strong>【<?php echo esc_html( $info['label'] ); ?>】</strong>商品，僅能加購<?php echo esc_html( $info['label'] ); ?>或可搭配任何溫層的商品，避免下單後因配送溫層不同無法一起出貨。</span>
+    </div>
+    <?php
+}
+
+/**
+ * 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第三階段 §3）：分類頁
+ * 若客人購物車已鎖定某溫層、目前瀏覽的分類卻是別的溫層，給一個不阻擋、
+ * 輕量的提示，讓客人點商品之前就有心理準備，而不是點了才被擋下。
+ *
+ * 這裡「這個分類代表哪個溫層」純粹是顯示用途，直接沿用規格書第 2 節給的
+ * 固定分類 slug 對照表——跟商品層級用來判斷能不能加入購物車的
+ * _ckc_temperature_zones meta 是兩回事，實際相容性判斷永遠只看商品本身
+ * 的 meta，不受這裡影響。
+ */
+function chao_gang_cheng_category_temperature_zone_map() {
+    return array(
+        'warmgift'    => 'ambient',
+        'warmfood'    => 'ambient',
+        'side-dishes' => 'chilled',
+        'icegift'     => 'frozen',
+        'frozen'      => 'frozen',
+    );
+}
+
+add_action( 'woocommerce_archive_description', 'chao_gang_cheng_category_temperature_zone_hint', 5 );
+function chao_gang_cheng_category_temperature_zone_hint() {
+    if ( ! is_product_taxonomy() ) {
+        return;
+    }
+    $term = get_queried_object();
+    if ( ! $term || empty( $term->slug ) ) {
+        return;
+    }
+    $map = chao_gang_cheng_category_temperature_zone_map();
+    if ( ! isset( $map[ $term->slug ] ) ) {
+        return; // 這個分類不對應特定溫層（例如 allitem／combo），不需要提示
+    }
+    $category_zone = $map[ $term->slug ];
+
+    $cart_zones = function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' )
+        ? chao_gang_cheng_get_cart_common_temperature_zones()
+        : null;
+    if ( null === $cart_zones || empty( $cart_zones ) ) {
+        return; // 購物車還沒鎖定溫層（空車或全是溫層通用商品），不需要提示
+    }
+    if ( in_array( $category_zone, $cart_zones, true ) ) {
+        return; // 跟購物車目前溫層相容，不需要提示
+    }
+
+    $cart_info = chao_gang_cheng_get_temperature_zone_info( reset( $cart_zones ) );
+    $cat_info  = chao_gang_cheng_get_temperature_zone_info( $category_zone );
+    if ( ! $cart_info || ! $cat_info ) {
+        return;
+    }
+    ?>
+    <div class="chao-category-temp-hint" style="display:flex;align-items:center;gap:8px;background:#fffaf1;color:#8a5a2b;border:1px solid #f0e0c8;border-radius:8px;padding:10px 14px;margin:0 0 16px 0;font-size:13px;line-height:1.6;">
+        <span aria-hidden="true">💡</span>
+        <span>您的購物車目前是<strong>【<?php echo esc_html( $cart_info['label'] ); ?>】</strong>商品，此分類為<strong>【<?php echo esc_html( $cat_info['label'] ); ?>】</strong>商品，加入購物車時可能會因配送溫層不同無法合併，建議先確認或分開下單。</span>
     </div>
     <?php
 }
@@ -2818,6 +3069,18 @@ function chao_gang_cheng_shipping_tab_content() {
         echo '<div class="product-shipping-content" style="line-height: 1.8; color: var(--primary-color);">' . wp_kses_post( $custom_shipping_html ) . '</div>';
         return;
     }
+    // 2026-08-30 修正（spec-溫層拆單與運費顯示修正.md 第一階段③）：這裡原本
+    // 寫死 NT$2,000 免運門檻與 NT$200 冷凍運費，兩個數字都跟「電商營運 >
+    // 運費管理」後台實際設定（1,500 / 250）不同步。改為跟結帳頁實際套用的
+    // chao_gang_cheng_apply_shipping_management_rates() 讀同一套來源，後台
+    // 改動門檻或費率時這裡不需要改程式碼就會同步更新。
+    $chao_tab_threshold  = function_exists( 'chao_get_free_shipping_threshold' ) ? chao_get_free_shipping_threshold() : 1500;
+    $chao_tab_frozen_fee = function_exists( 'chao_gang_cheng_lookup_shipping_fee' )
+        ? chao_gang_cheng_lookup_shipping_fee( 'home_delivery', 'main_island', 'frozen', 1 )
+        : null;
+    if ( null === $chao_tab_frozen_fee ) {
+        $chao_tab_frozen_fee = 250; // 後台尚未存過這組設定時的保底顯示值
+    }
     ?>
     <div class="product-shipping-content" style="line-height: 1.8; color: var(--primary-color);">
         <p style="margin-bottom: 10px; font-weight: bold; color: var(--accent-color);">🚚 配送說明：</p>
@@ -2826,11 +3089,11 @@ function chao_gang_cheng_shipping_tab_content() {
             <li>全程使用<strong>新竹物流/黑貓宅急便冷凍低溫專車配送</strong>，確保食品出貨新鮮度。</li>
             <li>若訂單同時包含冷凍與常溫商品，為確保品質，將自動合併以冷凍低溫寄出。</li>
         </ul>
-        
+
         <p style="margin-bottom: 10px; font-weight: bold; color: var(--accent-color);">💳 運費計算：</p>
         <ul style="padding-left: 20px; list-style-type: disc;">
-            <li>全館單筆消費滿 <strong>NT$2,000</strong> 即享低溫宅配免運費優惠。</li>
-            <li>未滿免運門檻，每筆冷凍配送訂單酌收低溫物流運費 <strong>NT$200</strong>。</li>
+            <li>全館單筆消費滿 <strong><?php echo wc_price( $chao_tab_threshold ); ?></strong> 即享低溫宅配免運費優惠。</li>
+            <li>未滿免運門檻，每筆冷凍配送訂單酌收低溫物流運費 <strong><?php echo wc_price( $chao_tab_frozen_fee ); ?></strong>。</li>
             <li>外島與特定偏遠山區低溫運費另計，如有需求請洽詢客服專線 04-2386-3322。</li>
         </ul>
     </div>
@@ -3499,6 +3762,56 @@ function chao_gang_cheng_global_header_script() {
                         data: formData,
                         success: function(response) {
                             $button.removeClass('loading').prop('disabled', false);
+
+                            // 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段
+                            // §5.2）：優先判斷這次失敗是不是溫層衝突造成的——後端
+                            // chao_gang_cheng_validate_add_to_cart_temperature_zone()
+                            // 在錯誤訊息外包了一層 .chao-temp-conflict-marker
+                            // class，不依賴解析錯誤文字內容本身，避免跟其他錯誤
+                            // （例如未選規格、缺貨）誤判混淆。命中時顯示專屬攔截
+                            // 彈窗（product-addon-modal.php 定義的
+                            // window.ckcShowTemperatureConflictModal），而不是
+                            // 走下面「有錯誤就整段表單重新 submit」的一般 fallback。
+                            if (typeof response === 'string' && response.indexOf('chao-temp-conflict-marker') !== -1 && window.ckcShowTemperatureConflictModal) {
+                                try {
+                                    var $conflictParsed = $('<div>').append($.parseHTML(response));
+                                    var conflictMsg = $conflictParsed.find('.chao-temp-conflict-marker').first().text().trim();
+                                    if (conflictMsg) {
+                                        window.ckcShowTemperatureConflictModal(conflictMsg, function(done, fail) {
+                                            $.ajax({
+                                                url: <?php echo json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
+                                                type: 'POST',
+                                                dataType: 'json',
+                                                data: { action: 'ckc_empty_cart_and_add', product_id: productId, quantity: 1 },
+                                                success: function(res) {
+                                                    if (res.success) {
+                                                        done();
+                                                        // 商品頁沒有現成的「原地刷新購物車內容」機制可用
+                                                        // （不像購物車頁有 .woocommerce 區塊可整塊替換），
+                                                        // 清空並改買後直接重整頁面，確保頁首購物車數量、
+                                                        // 下拉選單等狀態全部同步。
+                                                        window.location.reload();
+                                                    } else {
+                                                        if (window.ckcShowToast) {
+                                                            window.ckcShowToast((res.data && res.data.message) || '操作失敗，請稍後再試');
+                                                        }
+                                                        fail();
+                                                    }
+                                                },
+                                                error: function() {
+                                                    if (window.ckcShowToast) {
+                                                        window.ckcShowToast('網路連線失敗，請稍後再試');
+                                                    }
+                                                    fail();
+                                                }
+                                            });
+                                        });
+                                        return;
+                                    }
+                                } catch (conflictErr) {
+                                    console.error('Error parsing temperature conflict marker:', conflictErr);
+                                }
+                            }
 
                             // If response contains errors (e.g. no variation selected), fall back to normal submit
                             var hasError = false;
@@ -6555,6 +6868,87 @@ function chao_gang_cheng_discount_badge_css() {
 }
 
 /**
+ * 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第三階段 §1）：分類頁／
+ * 商店頁／首頁商品格線卡片補上溫層徽章（常溫／冷藏／冷凍），讓客人在
+ * 加入購物車之前就先知道溫層，降低撞到「同溫層限制」的機率。單一商品頁
+ * 已經有這個徽章（chao_gang_cheng_product_social_proof()），這裡補齊格線
+ * 卡片版本，共用同一份 chao_gang_cheng_get_temperature_zone_info() 對照表
+ * 確保用詞與配色一致。掛在跟折扣「-XX%」標籤同一個 hook
+ * （woocommerce_before_shop_loop_item_title），沿用同一套「全站：分類
+ * 卡片、首頁卡片、商品頁圖庫」的涵蓋範圍；優先權排在折扣標籤之後，CSS
+ * 定位在右上角，跟左上角的折扣標籤不衝突。
+ *
+ * 只顯示第一個溫層（多數商品只標一個；若跨兩個溫層，2.2 規則已在別處取
+ * 最嚴格者記錄警告，格線卡片空間有限，只顯示一個代表徽章）。
+ */
+add_action( 'woocommerce_before_shop_loop_item_title', 'chao_gang_cheng_shop_loop_temperature_badge', 15 );
+function chao_gang_cheng_shop_loop_temperature_badge() {
+    global $product;
+    if ( ! $product ) {
+        return;
+    }
+    $zones = chao_gang_cheng_get_product_temperature_zones( $product );
+    if ( empty( $zones ) ) {
+        return; // 沒標溫層＝不限制，不顯示徽章
+    }
+    $info = chao_gang_cheng_get_temperature_zone_info( reset( $zones ) );
+    if ( ! $info ) {
+        return;
+    }
+    echo '<span class="chao-loop-temp-badge" style="background:' . esc_attr( $info['bg'] ) . ';color:' . esc_attr( $info['color'] ) . ';border-color:' . esc_attr( $info['border'] ) . ';">' . esc_html( $info['icon'] . ' ' . $info['label'] ) . '</span>';
+}
+
+add_action( 'wp_head', 'chao_gang_cheng_shop_loop_temperature_badge_css' );
+function chao_gang_cheng_shop_loop_temperature_badge_css() {
+    ?>
+    <style>
+    /* 格線卡片溫層徽章：跟折扣「-XX%」標籤（chao_gang_cheng_discount_badge_css）
+       共用同一張卡片，刻意放右上角避免重疊；定位規則完全比照折扣標籤的
+       電腦/平板/手機三段 breakpoint 與商品頁/相關商品區塊修正邏輯。 */
+    .chao-loop-temp-badge {
+        display: inline-block !important;
+        position: absolute !important;
+        top: 10px !important;
+        right: 10px !important;
+        left: auto !important;
+        z-index: 9 !important;
+        line-height: 1 !important;
+        border: 1px solid !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        padding: 5px 9px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+    }
+    .single-product .product span.chao-loop-temp-badge {
+        top: 50px !important;
+        right: 50px !important;
+    }
+    @media (max-width: 992px) {
+        .single-product .product span.chao-loop-temp-badge {
+            top: 30px !important;
+            right: 30px !important;
+        }
+    }
+    @media (max-width: 768px) {
+        .single-product .product span.chao-loop-temp-badge {
+            top: 30px !important;
+            right: 25px !important;
+        }
+    }
+    .single-product .related.products span.chao-loop-temp-badge,
+    .single-product .up-sells.products span.chao-loop-temp-badge,
+    .single-product .cross-sells.products span.chao-loop-temp-badge {
+        top: 10px !important;
+        right: 10px !important;
+    }
+    </style>
+    <?php
+}
+
+/**
  * Enable Jetpack sharing and likes on WooCommerce products
  * Uses a flag to prevent Jetpack's automatic the_content filter from duplicating
  * the sharing buttons — only show when our manual hook calls sharing_display().
@@ -7552,7 +7946,6 @@ function ckc_setup_website_features_menu() {
         'media'     => array( 'title' => '媒體', 'slug' => 'upload.php', 'found' => false ),
         'news'      => array( 'title' => '文章', 'slug' => 'edit.php?post_type=jetpack-portfolio', 'found' => false ),
         'themes'    => array( 'title' => '外觀', 'slug' => 'themes.php', 'found' => false ),
-        'mydybox'   => array( 'title' => 'Mydybox TW', 'slug' => 'mydybox-taiwan-for-woocommerce', 'found' => false ),
         'payments'  => array( 'title' => '付款', 'slug' => 'admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM', 'found' => false ),
         'plugins'   => array( 'title' => '外掛', 'slug' => 'plugins.php', 'found' => false ),
         'settings'  => array( 'title' => '設定', 'slug' => 'options-general.php', 'found' => false ),
@@ -7576,7 +7969,9 @@ function ckc_setup_website_features_menu() {
         } elseif ( in_array( $slug, array( 'edit.php?post_type=jetpack-portfolio', 'edit.php?post_type=portfolio', 'edit.php?post_type=project' ), true ) || stripos( $title, '新聞' ) !== false || stripos( $title, '文章' ) !== false ) {
             $matched_key = 'news';
         } elseif ( stripos( $slug, 'mydybox' ) !== false || stripos( $title, 'mydybox' ) !== false ) {
-            $matched_key = 'mydybox';
+            // Mydybox TW：完全從後台選單移除
+            unset( $menu[ $pos ] );
+            continue;
         } elseif ( stripos( $slug, 'yotuwp' ) !== false || stripos( $slug, 'yotu' ) !== false || stripos( $title, 'yotuwp' ) !== false ) {
             // YotuWP 外掛自己的頂層選單：不再移入「網站功能」子選單，直接從頂層移除即可
             // （首頁 YouTube 影片摘要模塊已改用自家 RSS 抓取，不再依賴這個外掛的 shortcode）。
@@ -7618,6 +8013,20 @@ function ckc_setup_website_features_menu() {
             $slug,
             '' // 現有頁面，無需回呼函式
         );
+    }
+
+    // 確保 Mydybox TW 徹底從子選單與後台移除
+    remove_menu_page( 'mydybox-taiwan-for-woocommerce' );
+    remove_submenu_page( 'ckc-website-features', 'mydybox-taiwan-for-woocommerce' );
+    if ( ! empty( $submenu ) ) {
+        foreach ( $submenu as $parent_slug => $sub_items ) {
+            foreach ( $sub_items as $sub_pos => $sub_item ) {
+                if ( ( isset( $sub_item[2] ) && stripos( $sub_item[2], 'mydybox' ) !== false ) ||
+                     ( isset( $sub_item[0] ) && stripos( $sub_item[0], 'mydybox' ) !== false ) ) {
+                    unset( $submenu[ $parent_slug ][ $sub_pos ] );
+                }
+            }
+        }
     }
 
     // 26e. 註冊「出貨AI助理」為獨立頂層選單

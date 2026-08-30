@@ -465,6 +465,29 @@ function chao_get_cvs_shipping_cost() {
     if ( $cached !== null ) {
         return $cached;
     }
+
+    // 2026-08-30 修正（spec-溫層拆單與運費顯示修正.md 第一階段③）：優先讀
+    // 「電商營運 > 運費管理」設定——跟結帳頁實際套用的
+    // chao_gang_cheng_apply_shipping_management_rates() 同一套來源，這裡
+    // 只是頁面剛載入、WooCommerce 尚未跑完 updated_checkout 前的初始顯示值
+    // （之後會被下方的 JS 讀真實 shipping_method label 覆蓋），但初始值本身
+    // 也不該跟後台設定不同步。只有後台完全沒存過這組設定（lookup 回傳
+    // null）時，才退回下面讀 WC_Shipping_Zones 原生方式成本的舊邏輯當保底。
+    if ( function_exists( 'chao_gang_cheng_lookup_shipping_fee' ) && function_exists( 'WC' ) && WC()->cart && ! WC()->cart->is_empty() ) {
+        $temp_zone = function_exists( 'chao_gang_cheng_determine_package_temperature_zone' )
+            ? chao_gang_cheng_determine_package_temperature_zone( array( 'contents' => WC()->cart->get_cart() ) )
+            : 'ambient';
+        $qty = 0;
+        foreach ( WC()->cart->get_cart() as $cart_item ) {
+            $qty += isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 0;
+        }
+        $fee = chao_gang_cheng_lookup_shipping_fee( 'cvs', 'main_island', $temp_zone, $qty );
+        if ( null !== $fee ) {
+            $cached = $fee;
+            return $cached;
+        }
+    }
+
     $cached = 280; // default fallback
     if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
         return $cached;
@@ -594,9 +617,14 @@ function chao_cart_estimated_shipping_row() {
                         $parts[] = esc_html( $title ) . ' ' . wc_price( $cost );
                     }
                     echo '<span class="chao-est-shipping-rates">' . implode( '<span style="color:#c9a86c;">｜</span>', $parts ) . '</span>';
+                    // 購物車頁尚未收集收件地址，這裡的金額固定以本島計算（見
+                    // chao_get_estimated_shipping_rates()），離島實際運費以結帳頁
+                    // 依收件地址算出的金額為準，避免澎湖／金門等離島客人誤以為
+                    // 這裡顯示的就是最終運費（spec-溫層拆單與運費顯示修正.md §5 第一階段②）。
+                    echo '<span style="color:#8c7a64;font-size:12px;">（本島估價）</span>';
                 }
                 ?>
-                <div style="font-size:12px;color:#8c7a64;margin-top:4px;"><?php echo chao_get_free_shipping_notice_text(); ?>，實際運費依結帳時選擇的物流方式計算</div>
+                <div style="font-size:12px;color:#8c7a64;margin-top:4px;"><?php echo chao_get_free_shipping_notice_text(); ?>；以上為本島估價，離島運費另計，請於結帳頁依實際收件地址計算</div>
             <?php endif; ?>
         </td>
     </tr>
@@ -678,17 +706,30 @@ function chao_cart_free_shipping_cross_sell() {
     }
 
     if ( empty( $picks ) ) {
-        // 全面保底：若溫層或價差過濾後無商品，直接從候選池取非購物車商品填補，確保加購專區 100% 強制顯示
+        // 全面保底：若「湊免運價差」條件過濾後無商品，放寬價差限制、直接從
+        // 候選池取非購物車商品填補，盡量確保加購專區有得推薦。
+        //
+        // 2026-08-30 修正（spec-同溫層限制與運費顯示修正.md 第一階段⑤）：這裡
+        // 原本連「溫層相容」也一併放寬掉了——「同溫層限制」上線後，購物車已
+        // 鎖定某溫層時，這段保底仍可能推薦不同溫層的商品，客人點加入會被新的
+        // woocommerce_add_to_cart_validation 溫層驗證直接擋下，比完全不推薦
+        // 體驗更差（spec §5.4：加購推薦不得推薦會加不進去的商品）。保底只能
+        // 放寬「湊免運價差」這個非強制條件，溫層相容性是硬性規則，不可在此繞過。
         foreach ( $candidate_ids as $product_id ) {
             if ( in_array( (int) $product_id, $exclude, true ) ) {
                 continue;
             }
             $product = wc_get_product( $product_id );
-            if ( $product && $product->is_in_stock() && $product->is_purchasable() && floatval( $product->get_price() ) > 0 ) {
-                $picks[] = $product;
-                if ( count( $picks ) >= 4 ) {
-                    break;
-                }
+            if ( ! $product || ! $product->is_in_stock() || ! $product->is_purchasable() || floatval( $product->get_price() ) <= 0 ) {
+                continue;
+            }
+            if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
+                && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
+                continue;
+            }
+            $picks[] = $product;
+            if ( count( $picks ) >= 4 ) {
+                break;
             }
         }
     }
@@ -813,17 +854,30 @@ function chao_checkout_free_shipping_cross_sell() {
     }
 
     if ( empty( $picks ) ) {
-        // 全面保底：若溫層或價差過濾後無商品，直接從候選池取非購物車商品填補，確保加購專區 100% 強制顯示
+        // 全面保底：若「湊免運價差」條件過濾後無商品，放寬價差限制、直接從
+        // 候選池取非購物車商品填補，盡量確保加購專區有得推薦。
+        //
+        // 2026-08-30 修正（spec-同溫層限制與運費顯示修正.md 第一階段⑤）：這裡
+        // 原本連「溫層相容」也一併放寬掉了——「同溫層限制」上線後，購物車已
+        // 鎖定某溫層時，這段保底仍可能推薦不同溫層的商品，客人點加入會被新的
+        // woocommerce_add_to_cart_validation 溫層驗證直接擋下，比完全不推薦
+        // 體驗更差（spec §5.4：加購推薦不得推薦會加不進去的商品）。保底只能
+        // 放寬「湊免運價差」這個非強制條件，溫層相容性是硬性規則，不可在此繞過。
         foreach ( $candidate_ids as $product_id ) {
             if ( in_array( (int) $product_id, $exclude, true ) ) {
                 continue;
             }
             $product = wc_get_product( $product_id );
-            if ( $product && $product->is_in_stock() && $product->is_purchasable() && floatval( $product->get_price() ) > 0 ) {
-                $picks[] = $product;
-                if ( count( $picks ) >= 4 ) {
-                    break;
-                }
+            if ( ! $product || ! $product->is_in_stock() || ! $product->is_purchasable() || floatval( $product->get_price() ) <= 0 ) {
+                continue;
+            }
+            if ( function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' )
+                && ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones ) ) {
+                continue;
+            }
+            $picks[] = $product;
+            if ( count( $picks ) >= 4 ) {
+                break;
             }
         }
     }
@@ -974,11 +1028,13 @@ function chao_cart_ux_footer_assets() {
             chaoSyncStickyBar();
         });
 
-        // 4. After an AJAX add-to-cart from the cross-sell block, reload so
-        //    items, totals, progress bar and recommendations all refresh together
-        $(document.body).on('added_to_cart', function() {
-            location.reload();
-        });
+        // 4. 2026-08-30 修正：先前這裡監聽 added_to_cart 後直接 location.reload()，
+        //    是「湊免運加購」按鈕點下去感覺沒反應的根本原因之一——AJAX 本身已要
+        //    近 1.4 秒，reload 又把捲動位置重置回頁面頂端，使用者誤判為沒有點到。
+        //    現在改由 product-addon-modal.php 的加購成功回呼直接原地重抓並替換
+        //    .woocommerce 區塊（商品列表／總計／免運進度條／加購專區），完成後
+        //    會自行觸發上面已經在監聽的 updated_cart_totals 事件讓 chaoSyncStickyBar()
+        //    與其他監聽者一起同步更新，不需要、也不應該再整頁重載。
     });
     </script>
     <?php

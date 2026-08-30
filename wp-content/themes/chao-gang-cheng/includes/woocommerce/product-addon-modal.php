@@ -153,7 +153,18 @@ function ckc_ajax_add_addon_to_cart() {
         $_POST['ckc_spec_selected'] = wp_unslash( $_POST['ckc_spec_selected'] );
     }
 
-    $cart_item_key = WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation );
+    // 2026-08-30 重要修正：WC_Cart::add_to_cart() 這個類別方法本身並不會
+    // 觸發 woocommerce_add_to_cart_validation 這個 filter——實際觸發點只在
+    // WooCommerce 自己的原生進入點（class-wc-ajax.php 的原生加入購物車
+    // AJAX、class-wc-form-handler.php 的表單送出處理），直接呼叫這個類別
+    // 方法（像這裡）完全繞過驗證。這是實測用 wp-cli 直接呼叫
+    // WC()->cart->add_to_cart() 才發現的，一開始以為溫層驗證 filter 沒生效，
+    // 後來才確認是這裡完全沒有觸發過 filter，不是 filter 本身寫錯。因此這裡
+    // 必須自己手動 apply_filters() 一次，重現 WooCommerce 原生進入點的行為，
+    // 這支端點正是 spec-同溫層限制與運費顯示修正.md §5.1 第 3 點明確點名
+    // 必須驗證的入口（購物車頁「湊免運加購推薦」／規格選擇彈窗）。
+    $passed_validation = apply_filters( 'woocommerce_add_to_cart_validation', true, $product_id, $quantity, $variation_id, $variation );
+    $cart_item_key      = $passed_validation ? WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation ) : false;
 
     if ( $cart_item_key ) {
         WC()->cart->calculate_totals();
@@ -193,7 +204,21 @@ function ckc_ajax_add_addon_to_cart() {
             $err_msg = implode( ' ', $messages );
             wc_clear_notices();
         }
-        wp_send_json_error( array( 'message' => $err_msg ) );
+
+        // 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段）：獨立
+        // 重新判斷這次失敗是不是溫層衝突造成的，不依賴解析錯誤文字字串——
+        // 讓前端可以精準地只在這個情況顯示「清空購物車，改買此商品」的專屬
+        // 攔截彈窗，其他失敗原因（例如缺貨、售完）維持原本的一般 toast 提示。
+        $temperature_conflict = false;
+        if ( function_exists( 'chao_gang_cheng_get_cart_common_temperature_zones' ) && function_exists( 'chao_gang_cheng_product_matches_cart_temperature_zone' ) ) {
+            $cart_zones            = chao_gang_cheng_get_cart_common_temperature_zones();
+            $temperature_conflict  = ! chao_gang_cheng_product_matches_cart_temperature_zone( $product, $cart_zones );
+        }
+
+        wp_send_json_error( array(
+            'message'              => $err_msg,
+            'temperature_conflict' => $temperature_conflict,
+        ) );
     }
 }
 
@@ -242,6 +267,25 @@ function ckc_render_addon_spec_modal_markup() {
                         <span class="ckc-addon-submit-text">確定加購</span>
                         <span class="ckc-addon-submit-spinner" style="display: none;">處理中...</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段 §5.2）：
+         溫層不相容攔截彈窗。跟上面規格選擇彈窗是兩個獨立的彈窗，各自
+         display:none 互不影響；共用同一組 .ckc-addon-modal* 基礎樣式，
+         只多加 .ckc-temp-conflict-dialog 這個 class 做內容區的客製排版。 -->
+    <div id="ckc-temp-conflict-modal" class="ckc-addon-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="ckc-temp-conflict-title">
+        <div class="ckc-addon-modal-overlay"></div>
+        <div class="ckc-addon-modal-dialog ckc-temp-conflict-dialog">
+            <button type="button" class="ckc-addon-modal-close" aria-label="關閉視窗">&times;</button>
+            <div class="ckc-addon-modal-content">
+                <h3 id="ckc-temp-conflict-title" class="ckc-temp-conflict-title">⚠️ 無法合併配送</h3>
+                <p class="ckc-temp-conflict-message"></p>
+                <div class="ckc-temp-conflict-actions">
+                    <button type="button" class="ckc-temp-conflict-cancel">取消</button>
+                    <button type="button" class="ckc-temp-conflict-clear">清空購物車，改買此商品</button>
                 </div>
             </div>
         </div>
@@ -525,6 +569,59 @@ function ckc_render_addon_spec_modal_markup() {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
     }
+    /* 溫層不相容攔截彈窗樣式 */
+    .ckc-temp-conflict-dialog {
+        max-width: 420px;
+    }
+    .ckc-temp-conflict-title {
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a140f;
+    }
+    .ckc-temp-conflict-message {
+        margin: 0 0 20px 0;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #5c4033;
+        white-space: pre-line;
+    }
+    .ckc-temp-conflict-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .ckc-temp-conflict-cancel,
+    .ckc-temp-conflict-clear {
+        width: 100%;
+        padding: 12px 16px;
+        border-radius: 24px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .ckc-temp-conflict-cancel {
+        background: #fff;
+        color: #1a140f;
+        border: 1px solid #c9974a;
+    }
+    .ckc-temp-conflict-cancel:hover {
+        background: #fdf6ec;
+    }
+    .ckc-temp-conflict-clear {
+        background: #fff6f5;
+        color: #e2685f;
+        border: 1px solid #e2685f;
+    }
+    .ckc-temp-conflict-clear:hover {
+        background: #e2685f;
+        color: #fff;
+    }
+    .ckc-temp-conflict-clear:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
     </style>
 
     <script type="text/javascript">
@@ -545,6 +642,9 @@ function ckc_render_addon_spec_modal_markup() {
             clearTimeout(window._ckcToastTimer);
             window._ckcToastTimer = setTimeout(function() { $t.removeClass('ckc-show'); }, 1800);
         }
+        // 暴露給其他檔案（例如 functions.php 商品頁「加入購物車」的 AJAX
+        // 攔截邏輯，是獨立的 <script> 區塊／closure）共用同一顆 toast。
+        window.ckcShowToast = showToast;
 
         function closeModal() {
             $('#ckc-addon-spec-modal').removeClass('ckc-modal-open');
@@ -553,6 +653,147 @@ function ckc_render_addon_spec_modal_markup() {
                 currentModalData = null;
                 selectedSpecs = {};
             }, 250);
+        }
+
+        // 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段 §5.2）：
+        // 溫層不相容攔截彈窗。onConfirmClear 是呼叫端自訂的 callback
+        // function(done, fail)——不同入口（商品頁單品按鈕／購物車湊免運加購
+        // ／規格彈窗）各自「怎麼重新加入商品」的流程不同，這裡不假設固定的
+        // product_id/quantity payload 形狀，改由呼叫端自己決定要怎麼做，
+        // 只負責彈窗本身的顯示/關閉/二次確認/按鈕狀態管理。
+        // 暴露在 window 上，讓 functions.php 那個獨立 closure 也能呼叫。
+        window.ckcShowTemperatureConflictModal = function(message, onConfirmClear) {
+            var $modal = $('#ckc-temp-conflict-modal');
+            $modal.find('.ckc-temp-conflict-message').text(message);
+            $modal.data('onConfirmClear', typeof onConfirmClear === 'function' ? onConfirmClear : null);
+            $modal.show();
+            requestAnimationFrame(function() { $modal.addClass('ckc-modal-open'); });
+        };
+
+        function closeTempConflictModal() {
+            var $modal = $('#ckc-temp-conflict-modal');
+            $modal.removeClass('ckc-modal-open');
+            setTimeout(function() {
+                $modal.hide();
+                $modal.data('onConfirmClear', null);
+            }, 250);
+        }
+
+        $(document).on('click', '#ckc-temp-conflict-modal .ckc-temp-conflict-cancel, #ckc-temp-conflict-modal .ckc-addon-modal-close, #ckc-temp-conflict-modal .ckc-addon-modal-overlay', function() {
+            closeTempConflictModal();
+        });
+
+        $(document).on('click', '#ckc-temp-conflict-modal .ckc-temp-conflict-clear', function() {
+            var $modal = $('#ckc-temp-conflict-modal');
+            var cb = $modal.data('onConfirmClear');
+            if (typeof cb !== 'function') {
+                return;
+            }
+            // 「清空購物車」屬破壞性操作，執行前需二次確認（spec §5.2／§7④，
+            // 交接文件第十五章 15.6 教訓）。這裡是使用者直接點擊觸發的
+            // confirm()，屬於真實使用者手勢，不會被瀏覽器靜默阻擋。
+            if (!window.confirm('確定要清空購物車內所有商品，並改買這件商品嗎？此動作無法復原。')) {
+                return;
+            }
+            var $btn = $(this);
+            $btn.prop('disabled', true).text('處理中...');
+            cb(
+                function done() {
+                    $btn.prop('disabled', false).text('清空購物車，改買此商品');
+                    closeTempConflictModal();
+                },
+                function fail() {
+                    $btn.prop('disabled', false).text('清空購物車，改買此商品');
+                }
+            );
+        });
+
+        // 2026-08-30 修正：加購成功後原地套用後端已回傳、之前完全沒被使用的
+        // fragments（購物車數量徽章／下拉選單／免運進度條），取代原本「先
+        // toast、再等 400ms 整頁 reload」的做法——reload 會把捲動位置重置回
+        // 頁面頂端，加上 AJAX 本身要價約 1.4 秒，使用者感覺點擊沒有反應。
+        function ckcApplyAddonFragments(fragments) {
+            if (!fragments) return;
+            $.each(fragments, function(selector, html) {
+                var $target = $(selector);
+                if ($target.length) {
+                    $target.replaceWith(html);
+                }
+            });
+        }
+
+        // 購物車頁加購成功後，原地重新抓取本頁最新內容並替換整個 .woocommerce
+        // 區塊（涵蓋購物車商品列表、總計、免運進度條與加購專區本身），一次
+        // 更新到位。沿用交接文件 12.2.3 已驗證有效的手法：不依賴
+        // wc_fragment_refresh / wc-cart-fragments（該腳本在此站台被平台層級
+        // 機制攔截），改用帶時間戳記、關閉快取的自行 AJAX 重抓＋手動替換。
+        // 完成後觸發 updated_cart_totals，讓行動版吸底結帳列等既有監聽者
+        // 一併同步更新。
+        function ckcRefreshCartPageAfterAddonAdd() {
+            $.ajax({
+                url: window.location.href + (window.location.href.indexOf('?') === -1 ? '?' : '&') + 'chao_cache_bust=' + Date.now(),
+                cache: false,
+                success: function(response) {
+                    try {
+                        var $parsed = $('<div>').append($.parseHTML(response));
+                        var $newWoo = $parsed.find('.woocommerce').first();
+                        var $curWoo = $('.woocommerce').first();
+                        if ($newWoo.length && $curWoo.length) {
+                            $curWoo.replaceWith($newWoo);
+                            $(document.body).trigger('updated_cart_totals');
+                        }
+                    } catch (err) {
+                        console.error('Error refreshing cart page after addon add:', err);
+                    }
+                }
+            });
+        }
+
+        // 加購成功（含「清空購物車改買」成功）後，統一處理購物車頁/結帳頁
+        // 的畫面同步，避免兩個入口各自重複寫一份一樣的邏輯。
+        function ckcSyncPageAfterCartChange() {
+            var isCartPage = $('body').hasClass('woocommerce-cart') || $('.woocommerce-cart-form').length > 0;
+            var isCheckoutPage = !isCartPage && ($('body').hasClass('woocommerce-checkout') || $('form.woocommerce-checkout').length > 0);
+            if (isCartPage) {
+                ckcRefreshCartPageAfterAddonAdd();
+            } else if (isCheckoutPage) {
+                $(document.body).trigger('update_checkout');
+            }
+        }
+
+        // 2026-08-30 新增（spec-同溫層限制與運費顯示修正.md 第一階段 §5.2）：
+        // 組出溫層攔截彈窗「清空購物車，改買此商品」按鈕要用的 onConfirmClear
+        // callback，呼叫共用的 ckc_empty_cart_and_add 端點，成功後複用跟一般
+        // 加購成功完全相同的畫面同步方式（fragments／原地重抓購物車內容）。
+        function ckcBuildEmptyCartAndAddRetry(productId, quantity, specSelected) {
+            return function(done, fail) {
+                $.ajax({
+                    url: ajaxUrl,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'ckc_empty_cart_and_add',
+                        product_id: productId,
+                        quantity: quantity || 1,
+                        ckc_spec_selected: specSelected || {}
+                    },
+                    success: function(res) {
+                        if (res.success) {
+                            showToast(res.data.message || '已清空購物車並加入商品！');
+                            ckcApplyAddonFragments(res.data.fragments);
+                            ckcSyncPageAfterCartChange();
+                            done();
+                        } else {
+                            showToast((res.data && res.data.message) || '操作失敗，請稍後再試');
+                            fail();
+                        }
+                    },
+                    error: function() {
+                        showToast('網路連線失敗，請稍後再試');
+                        fail();
+                    }
+                });
+            };
         }
 
         function updateModalPriceAndValidation() {
@@ -747,21 +988,22 @@ function ckc_render_addon_spec_modal_markup() {
                         closeModal();
                         showToast(response.data.message || '已成功加入購物車！');
 
-                        // 觸發 WooCommerce 原生事件
+                        // 觸發 WooCommerce 原生事件（供既有的「已加入購物車」彈窗等監聽使用）
                         $(document.body).trigger('added_to_cart', [response.data.fragments, response.data.cart_hash, $btn]);
-                        $(document.body).trigger('wc_fragment_refresh');
+
+                        // 原地套用 fragments（購物車數量徽章／下拉選單／免運進度條）
+                        ckcApplyAddonFragments(response.data.fragments);
 
                         // 頁面同步更新
-                        var isCartPage = $('body').hasClass('woocommerce-cart') || $('.woocommerce-cart-form').length > 0;
-                        var isCheckoutPage = !isCartPage && ($('body').hasClass('woocommerce-checkout') || $('form.woocommerce-checkout').length > 0);
-
-                        if (isCartPage) {
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 400);
-                        } else if (isCheckoutPage) {
-                            $(document.body).trigger('update_checkout');
-                        }
+                        ckcSyncPageAfterCartChange();
+                    } else if (response.data && response.data.temperature_conflict) {
+                        // 溫層衝突：關掉規格彈窗，改顯示專屬攔截彈窗（spec §5.2）
+                        $btn.prop('disabled', false);
+                        closeModal();
+                        window.ckcShowTemperatureConflictModal(
+                            response.data.message || '此商品的配送溫層與購物車內現有商品不同，無法合併於同一筆訂單。',
+                            ckcBuildEmptyCartAndAddRetry(postData.product_id, qty, selectedSpecs)
+                        );
                     } else {
                         $btn.prop('disabled', false);
                         showToast((response.data && response.data.message) || '加入失敗，請稍後再試');
@@ -822,25 +1064,35 @@ function ckc_render_addon_spec_modal_markup() {
                     if (res.success) {
                         showToast(res.data.message || '已成功加入購物車！');
 
-                        // 觸發 WooCommerce 原生事件
+                        // 觸發 WooCommerce 原生事件（供既有的「已加入購物車」彈窗等監聽使用）
                         $(document.body).trigger('added_to_cart', [res.data.fragments, res.data.cart_hash, $btn]);
-                        $(document.body).trigger('wc_fragment_refresh');
+
+                        // 原地套用 fragments（購物車數量徽章／下拉選單／免運進度條）
+                        ckcApplyAddonFragments(res.data.fragments);
 
                         // 頁面同步更新
                         var isCartPage = $('body').hasClass('woocommerce-cart') || $('.woocommerce-cart-form').length > 0;
                         var isCheckoutPage = !isCartPage && ($('body').hasClass('woocommerce-checkout') || $('form.woocommerce-checkout').length > 0);
 
                         if (isCartPage) {
-                            // 購物車頁重載
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 400);
+                            // 購物車頁：原地重抓並替換購物車內容（商品列表／總計／
+                            // 免運進度條／加購專區），不整頁重載、不重置捲動位置。
+                            // 這顆按鈕本身就在會被替換的區塊內，替換完成後會自然
+                            // 換成全新渲染的按鈕，不需要手動還原 disabled 狀態。
+                            ckcRefreshCartPageAfterAddonAdd();
                         } else if (isCheckoutPage) {
                             $(document.body).trigger('update_checkout');
                             $btn.prop('disabled', false).css('opacity', 1).html(origText);
                         } else {
                             $btn.prop('disabled', false).css('opacity', 1).html(origText);
                         }
+                    } else if (res.data && res.data.temperature_conflict) {
+                        // 溫層衝突：顯示專屬攔截彈窗（spec §5.2），按鈕先還原成可再次點擊的狀態
+                        $btn.prop('disabled', false).css('opacity', 1).html(origText);
+                        window.ckcShowTemperatureConflictModal(
+                            res.data.message || '此商品的配送溫層與購物車內現有商品不同，無法合併於同一筆訂單。',
+                            ckcBuildEmptyCartAndAddRetry(pid, 1)
+                        );
                     } else {
                         showToast((res.data && res.data.message) ? res.data.message : '加入失敗，請稍後再試');
                         $btn.prop('disabled', false).css('opacity', 1).html(origText);
